@@ -79,3 +79,36 @@ export const VISTA_DESCRIPTIONS: Record<string, string> = {
   "Corte Perspectivado 3D": "A creative architectural representation where a portion of the building is 'cut' to show the interior-exterior relationship.",
   "Isométrica Explotada": "An artistic isometric view where the roof or floors are slightly detached to show the internal layout.",
 };
+
+/**
+ * Qué le exige cada vista al modelo respecto a la imagen de referencia:
+ * - seen:     muestra lo que ya se ve en la referencia desde otro ángulo/distancia
+ * - unseen:   muestra caras o elementos que NO se ven en la referencia (hay que deducirlos con cuidado)
+ * - lighting: la geometría no cambia; solo la hora y la iluminación
+ * - detail:   un acercamiento a un detalle real de la referencia
+ * - diagram:  una representación deliberada (corte, isométrica), no una foto
+ */
+export type VistaKind = 'seen' | 'unseen' | 'lighting' | 'detail' | 'diagram';
+
+export const VISTA_KINDS: Record<string, VistaKind> = {
+  "Perspectiva Principal (Hero Shot)": 'seen',
+  "Fachada Frontal (Elevación)": 'seen',
+  "Fachada Lateral Derecha": 'unseen',
+  "Fachada Lateral Izquierda": 'unseen',
+  "Fachada Posterior": 'unseen',
+  "Vista Diagonal Posterior": 'unseen',
+  "Perspectiva a Nivel de Calle": 'seen',
+  "Perspectiva Peatonal (Ojo humano)": 'seen',
+  "Vista Contrapicada": 'seen',
+  "Vista Gran Angular": 'seen',
+  "Vista Aérea (Drone)": 'unseen',
+  "Vista de Cubierta": 'unseen',
+  "Vista de Acceso": 'seen',
+  "Vista desde Jardín": 'unseen',
+  "Vista Crepuscular (Blue Hour)": 'lighting',
+  "Vista Nocturna": 'lighting',
+  "Detalle de Fachada": 'detail',
+  "Detalle de Materialidad": 'detail',
+  "Corte Perspectivado 3D": 'diagram',
+  "Isométrica Explotada": 'diagram',
+};

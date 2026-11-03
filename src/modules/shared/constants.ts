@@ -241,6 +241,15 @@ export const ASPECT_RATIOS = [
 
 export const THINKING_LEVELS = ["High", "Minimal"];
 
+/** Calidad de render (OpenAI): etiqueta de la UI → valor de la API (ver generate/route.ts) */
+export const RENDER_QUALITIES = ["Borrador", "Estándar", "Alta", "Máxima"] as const;
+export const RENDER_QUALITY_HINTS: Record<string, string> = {
+  "Borrador": "Rápido y barato, para explorar ideas",
+  "Estándar": "Equilibrio entre detalle, costo y velocidad",
+  "Alta": "Más detalle y fidelidad; recomendado para vistas y entregas",
+  "Máxima": "El mayor detalle; lento y el más costoso",
+};
+
 export const RENDER_STYLES = [
   "3D técnico / Clean render",
   "Acuarela arquitectónica",

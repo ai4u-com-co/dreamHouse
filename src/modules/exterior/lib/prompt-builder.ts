@@ -1,6 +1,15 @@
 import { DreamHouseParams } from '@/types';
+import {
+  bulletSection,
+  cameraSentence,
+  exteriorDetailLines,
+  joinList,
+  narrativeSentence,
+  present,
+  resolveRenderStyle,
+} from '@/modules/shared/lib/prompt-helpers';
 
-const PROJECT_TYPE_MAP: Record<string, string> = {
+export const PROJECT_TYPE_MAP: Record<string, string> = {
   "A-frame": "A-frame cabin with a steeply pitched triangular roof reaching the ground",
   "Apartamento/Penthouse": "penthouse apartment",
   "Biblioteca": "library",
@@ -62,8 +71,9 @@ const FORM_ORGANIZATION_MAP: Record<string, string> = {
   "Wing-based": "split into specialized wings for optimized privacy and function"
 };
 
-function getLightingPhysics(timeOfDay: string, lightingType: string, season: string): string {
+export function getLightingPhysics(timeOfDay: string, rawLightingType: string, season: string): string {
   const lower = (timeOfDay || '').toLowerCase();
+  const lightingType = present(rawLightingType) ? rawLightingType : 'natural';
   const seasonCtx = season ? ` in ${season}` : '';
 
   if (lower.includes('golden') || lower.includes('hora dorada') || lower.includes('sunset') || lower.includes('atardecer') || lower.includes('sunrise') || lower.includes('amanecer')) {
@@ -88,11 +98,14 @@ function getLightingPhysics(timeOfDay: string, lightingType: string, season: str
     return `Warm afternoon light tracks from the west${seasonCtx}, wrapping the facade in directional warmth with elongating shadows that read the building's depth — ${lightingType} conditions where every surface plane has a distinct luminosity.`;
   }
 
+  if (!present(timeOfDay)) {
+    return `Natural daylight${seasonCtx} with a single clear direction defines shadow direction, sculpts the building's volumes, and confirms the physical depth of every surface plane${present(rawLightingType) ? ` — ${rawLightingType} lighting quality` : ''}.`;
+  }
   return `The scene is captured during ${timeOfDay}${seasonCtx}, with ${lightingType} lighting that defines shadow direction, sculpts the building's volumes, and confirms the physical depth of every surface plane.`;
 }
 
 export function buildExteriorPrompt(params: DreamHouseParams, hasStructuralReference: boolean = false, targetModel?: string): string {
-  const projectType = PROJECT_TYPE_MAP[params.projectType] || params.projectType;
+  const projectType = PROJECT_TYPE_MAP[params.projectType] || params.projectType || "building";
   let scaleDesc = "modern structure";
   if (params.size) {
     const numericMeters = parseFloat(params.size);
@@ -104,32 +117,37 @@ export function buildExteriorPrompt(params: DreamHouseParams, hasStructuralRefer
   }
   const organizationDesc = FORM_ORGANIZATION_MAP[params.layoutType] ? `, ${FORM_ORGANIZATION_MAP[params.layoutType]}` : "";
   const isOpenAI = targetModel?.includes('OpenAI') || false;
+  const style = resolveRenderStyle(params.renderStyle);
+  const detailLines = exteriorDetailLines(params);
+  const styleDesc = joinList(params.architecturalStyles) || "contemporary";
+  const architectDesc = joinList(params.architect, '&');
+  const finishDesc = present(params.finishLevel) ? `, finished to a ${params.finishLevel} standard` : "";
+  const materialDesc = present(params.materials) ? `${joinList(params.materials)}${finishDesc}` : "";
+  const lightingPhys = getLightingPhysics(params.timeOfDay, params.lighting, params.season);
+  const camera = style.photographic ? cameraSentence(params) : "";
+  const siteDesc = present(params.city)
+    ? `Located in the urban context of ${params.city}`
+    : `Rooted in a ${params.environment || 'carefully considered'} environment`;
 
   if (isOpenAI) {
-    const styleDesc = params.architecturalStyles.join(' and ') || "modern style";
-    const architectDesc = params.architect.length > 0 ? params.architect.join(' & ') : "";
-    const materialDesc = params.materials.length > 0 ? `${params.materials.join(' and ')}, finished to a ${params.finishLevel} standard` : "";
-    const lightingPhys = getLightingPhysics(params.timeOfDay, params.lighting, params.season);
-    
     const prompt = `
 [INTENDED USE: Professional Architectural Portfolio Image]
 
 SCENE & CONTEXT:
 - Subject: ${hasStructuralReference ? `reimagined version of the ${projectType} from reference image` : `${scaleDesc} ${projectType}`}
 - Camera Angle: ${params.cameraAngle || 'eye-level'} view
-- Location/Setting: ${params.city ? `Located in the urban context of ${params.city}` : `Rooted in a ${params.environment || 'carefully considered'} environment`}
+- Location/Setting: ${siteDesc}
 
 ARCHITECTURAL SPECIFICATION:
 - Style: ${styleDesc} character${architectDesc ? `, drawing from the language of ${architectDesc}` : ""}
 ${params.layoutType ? `- Layout: Organized with a ${FORM_ORGANIZATION_MAP[params.layoutType] || params.layoutType} configuration\n` : ""}${params.levels > 0 ? `- Levels: Distributed across exactly ${params.levels} floors\n` : ""}- Materials: ${materialDesc || "traditional architectural facade materials"}
 - Material Detail: Honest textures with physical thickness, weathering at base, and clear joint shadow lines. No digital smoothness or plastic sheen.
-
-PHOTOGRAPHY & LIGHTING:
-- Camera Config: Shot on ${params.cameraPreset}, ${params.focalLength} lens at ${params.aperture}, ${params.filmSimulation}
-- Lighting: ${lightingPhys}
+${bulletSection('ADDITIONAL DESIGN SPECIFICATION', detailLines)}
+${style.photographic ? 'PHOTOGRAPHY & LIGHTING' : 'VISUAL TREATMENT & LIGHTING'}:
+${camera ? `- Camera Config: ${camera}\n` : ""}- Lighting: ${lightingPhys}
 ${params.artDirection ? `- Art Direction: ${params.artDirection}\n` : ""}
 CONSTRAINTS & QUALITY:
-- Look: Photorealistic architectural photography.
+- Look: ${style.look}
 - Composition: The building is the SOLE PROTAGONIST. Neutral background (open sky, landscape, or vegetation).
 - Exclude: No neighboring buildings, no adjacent houses, no other structures, no party walls, no visible neighbors in the background. No watermarks, no logos.
 `.trim();
@@ -137,50 +155,57 @@ CONSTRAINTS & QUALITY:
   }
 
   // Classic Gemini flow
+  const article = /^[aeiou]/i.test(style.medium) ? 'An' : 'A';
   let prompt = "";
   if (hasStructuralReference) {
-    prompt = `An architectural photograph — ${params.cameraAngle || 'eye-level'} view — documenting a reimagined version of the ${projectType} shown in the reference image. `;
+    prompt = `${article} ${style.medium} — ${params.cameraAngle || 'eye-level'} view — documenting a reimagined version of the ${projectType} shown in the reference image. `;
   } else {
-    prompt = `An architectural photograph — ${params.cameraAngle || 'eye-level'} view — of a ${scaleDesc} ${projectType}. `;
+    prompt = `${article} ${style.medium} — ${params.cameraAngle || 'eye-level'} view — of a ${scaleDesc} ${projectType}. `;
   }
 
-  if (params.city) {
+  if (present(params.city)) {
     prompt += `The building occupies its site in ${params.city} with confident presence, reading clearly against its urban context. `;
   } else {
     prompt += `The project is rooted in a ${params.environment || 'carefully considered'} environment — the setting is specific enough to feel real, not generic. `;
   }
 
-  prompt += `The building${organizationDesc} carries a ${params.architecturalStyles.join(' and ')} character. `;
+  prompt += `The building${organizationDesc} carries a ${styleDesc} character. `;
 
   if (params.levels > 0) {
     prompt += `Its massing is distributed across ${params.levels} floors, each level reading clearly as a distinct horizontal band in the composition. `;
   }
 
-  if (params.architect.length > 0) {
-    prompt += `The design sensibility — proportions, material honesty, spatial hierarchy — draws from the language of ${params.architect.join(' & ')}. `;
+  if (architectDesc) {
+    prompt += `The design sensibility — proportions, material honesty, spatial hierarchy — draws from the language of ${architectDesc}. `;
   }
 
-  if (params.materials.length > 0) {
-    prompt += `The facade is built from ${params.materials.join(' and ')}, finished to a ${params.finishLevel} standard. `;
+  if (materialDesc) {
+    prompt += `The facade is built from ${materialDesc}. `;
     prompt += `Render each material with honest surface behavior: grain patterns, natural color variation across panels, `;
     prompt += `the subtle imperfections and micro-texture that make a facade feel constructed rather than modeled — `;
     prompt += `weathering at base, joint shadow lines, material edges with physical thickness. `;
   }
 
-  // Physics-based lighting description derived from time of day
-  prompt += `${getLightingPhysics(params.timeOfDay, params.lighting, params.season)} `;
+  prompt += narrativeSentence(detailLines);
 
-  prompt += `Shot on ${params.cameraPreset}, ${params.focalLength} lens at ${params.aperture}, ${params.filmSimulation}. `;
+  // Physics-based lighting description derived from time of day
+  prompt += `${lightingPhys} `;
+
+  if (camera) prompt += `${camera.charAt(0).toUpperCase()}${camera.slice(1)}. `;
 
   if (params.artDirection) {
     prompt += `\nCreative Direction: ${params.artDirection}. `;
   }
 
-  // Quality: specific photographic criteria, not generic tags
-  prompt += `\nThe image must feel like a working architectural photographer's best frame — `;
-  prompt += `shadows have a single clear direction and soft-edged fall-off, surfaces have tactile texture and physical weight, `;
-  prompt += `atmosphere adds depth between foreground and background. `;
-  prompt += `No CGI smoothness, no plastic surfaces, no artificially sharpened or uniform-textured materials.`;
+  if (style.photographic) {
+    // Quality: specific photographic criteria, not generic tags
+    prompt += `\nThe image must feel like a working architectural photographer's best frame — `;
+    prompt += `shadows have a single clear direction and soft-edged fall-off, surfaces have tactile texture and physical weight, `;
+    prompt += `atmosphere adds depth between foreground and background. `;
+    prompt += `No CGI smoothness, no plastic surfaces, no artificially sharpened or uniform-textured materials.`;
+  } else {
+    prompt += `\n${style.look}`;
+  }
 
   prompt += `\nCRITICAL COMPOSITION RULE: The building is the SOLE PROTAGONIST of this image. The background must be neutral — open sky, landscape, vegetation, or abstract environment. NEVER include neighboring buildings, adjacent houses, other structures, or visible neighbors in the background. No urban density, no party walls, no competing architecture. The subject must stand alone.`;
 
