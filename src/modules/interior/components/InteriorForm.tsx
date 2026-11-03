@@ -4,11 +4,11 @@ import * as IC from '../constants';
 import * as EC from '../../exterior/constants';
 import { OutputOptions } from '@/components/FormExtras';
 import * as SC from '../../shared/constants';
-import clsx from 'clsx';
-import { Sparkles, Armchair, LayoutGrid, Layers, Palette, Camera, ImageIcon, PenLine, ScanSearch } from 'lucide-react';
+import { Sparkles, Armchair, LayoutGrid, Layers, Palette, Camera, ImageIcon, PenLine, ScanSearch, MapPin } from 'lucide-react';
 import { Section } from '@/components/ui/Section';
 import { Select } from '@/components/ui/Select';
-import { Chip } from '@/components/ui/Chip';
+import { ChipsField, EssenceFields, SiteFields, HomeProgramFields } from '@/components/FormFields';
+import { AmbienceSelects } from '@/components/FormExtras';
 import ObjectUploader from '@/components/ObjectUploader';
 import { DebouncedInput } from '@/components/ui/DebouncedInput';
 
@@ -35,40 +35,26 @@ export default function InteriorForm({ params, onChange, disabled, activeSection
     onChange({ ...params, [key]: value });
   };
 
-  const toggleMultiSelect = (key: keyof DreamHouseParams, value: string) => {
-    const current = Array.isArray(params[key]) ? (params[key] as string[]) : [];
-    const newValues = current.includes(value) ? current.filter(v => v !== value) : [...current, value];
-    handleChange(key, newValues);
-  };
-
-  const renderChipsGroup = (label: string, key: keyof DreamHouseParams, options: string[], helpText: string, scrollable: boolean = false) => {
-    const current = Array.isArray(params[key]) ? (params[key] as string[]) : [];
-    return (
-      <fieldset className="flex flex-col gap-2">
-        <div className="flex flex-col gap-1 px-1">
-          <label className="text-xs font-semibold text-muted-foreground uppercase tracking-widest">{label}</label>
-          <p className="text-[11px] text-muted-foreground opacity-60 font-mono tracking-tight">{helpText}</p>
-        </div>
-        <div className={clsx("flex flex-wrap gap-2 p-1", scrollable && "max-h-56 overflow-y-auto custom-scrollbar border border-border/20 bg-card/30")}>
-          {options.map(opt => (
-            <Chip key={opt} selected={current.includes(opt)} disabled={disabled} onToggle={() => toggleMultiSelect(key, opt)}>
-              {opt}
-            </Chip>
-          ))}
-        </div>
-      </fieldset>
-    );
-  };
+  const renderChipsGroup = (label: string, key: keyof DreamHouseParams, options: string[], helpText: string, scrollable: boolean = false) => (
+    <ChipsField params={params} onChange={handleChange} disabled={disabled} label={label} field={key} options={options} helpText={helpText} scrollable={scrollable} />
+  );
 
   // const selectedCamera = SC.CAMERA_PRESETS.find(c => c.name === params.cameraPreset) ?? null;
   // const filmSims = selectedCamera?.isFujifilm ? SC.FUJIFILM_FILM_SIMULATIONS : SC.UNIVERSAL_FILM_LOOKS;
 
   const identitySummary = [
+    params.projectType,
     params.roomType,
     params.mood,
     params.roomSizeM2 ? `${params.roomSizeM2}m²` : '',
     params.architecturalStyles.join(', '),
     params.architect.join(', ')
+  ].filter(Boolean).join(' · ') || 'Sin definir';
+
+  const siteSummary = [
+    params.city,
+    params.climate,
+    params.timeOfDay
   ].filter(Boolean).join(' · ') || 'Sin definir';
 
   const designSummary = [
@@ -116,19 +102,28 @@ export default function InteriorForm({ params, onChange, disabled, activeSection
         onToggle={() => onSectionChange('identity')}
         summary={identitySummary}
       >
-        <SectionDescription>Define el uso, el estilo y la influencia de autor de la estancia interior.</SectionDescription>
+        <SectionDescription>Define la esencia del proyecto: qué edificio es, qué espacio, con qué atmósfera, estilo e influencia de autor. Estos datos son los mismos del módulo Exterior: si los cambias aquí, también cambian allá.</SectionDescription>
         <div className="space-y-8">
-          {renderChipsGroup("Influencia de Autor (Arquitecto)", "architect", SC.ARCHITECTS, "Busca la sensibilidad espacial de un maestro específico.", true)}
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
+          <EssenceFields
+            params={params}
+            onChange={handleChange}
+            disabled={disabled}
+            projectTypeLabel="Tipo de Proyecto (edificio)"
+            projectTypeHelp="El edificio al que pertenece el espacio."
+            stylesLabel="Estilo Decorativo"
+            stylesHelp="Lenguaje estético interior."
+            architectLabel="Influencia de Autor (Arquitecto)"
+            architectHelp="Busca la sensibilidad espacial de un maestro específico."
+          >
             <Select label="Espacio / Habitación" value={params.roomType} onChange={(e) => handleChange("roomType", e.target.value)} options={IC.ROOM_TYPES} disabled={disabled} />
-            <Select label="Atmósfera / Mood" value={params.mood} onChange={(e) => handleChange("mood", e.target.value)} options={SC.MOODS} disabled={disabled} />
-          </div>
+          </EssenceFields>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
             <div className="flex flex-col gap-2">
-              <label className="text-xs font-semibold text-muted-foreground uppercase tracking-widest px-1">Superficie del espacio</label>
+              <label htmlFor="field-room-size" className="text-xs font-semibold text-muted-foreground uppercase tracking-widest px-1">Superficie del espacio</label>
               <p className="text-[11px] text-muted-foreground opacity-60 font-mono tracking-tight px-1">m² aproximados — define la escala y proporción de la escena</p>
               <div className="relative">
                 <DebouncedInput
+                  id="field-room-size"
                   type="number"
                   min={0}
                   value={params.roomSizeM2 || ""}
@@ -141,14 +136,29 @@ export default function InteriorForm({ params, onChange, disabled, activeSection
               </div>
             </div>
           </div>
-          {renderChipsGroup("Estilo Decorativo", "architecturalStyles", SC.STYLES, "Lenguaje estético interior.", true)}
+        </div>
+      </Section>
+
+      {/* ── SITIO Y LUZ NATURAL (mismos campos que el exterior) ───────── */}
+      <Section
+        title="Sitio y Luz Natural"
+        number="06"
+        icon={<MapPin className="w-5 h-5" />}
+        isOpen={activeSection === 'site'}
+        onToggle={() => onSectionChange('site')}
+        summary={siteSummary}
+      >
+        <SectionDescription>Dónde está el espacio y qué luz recibe: define lo que se ve por las ventanas y el color de la luz natural. Comparte los datos con el módulo Exterior.</SectionDescription>
+        <div className="space-y-8">
+          <SiteFields params={params} onChange={handleChange} disabled={disabled} />
+          <AmbienceSelects params={params} onChange={handleChange} disabled={disabled} people hint="La hora, la estación y el tipo de luz describen la luz natural que entra al espacio." />
         </div>
       </Section>
 
       {/* ── 02 EQUIPAMIENTO ─────────────────────────────────────── */}
       <Section 
         title="Equipamiento y Luz" 
-        number="06" 
+        number="07" 
         icon={<Armchair className="w-5 h-5" />} 
         isOpen={activeSection === 'interior-design'} 
         onToggle={() => onSectionChange('interior-design')}
@@ -164,7 +174,7 @@ export default function InteriorForm({ params, onChange, disabled, activeSection
       {/* ── 03 OBJETOS ──────────────────────────────────────────── */}
       <Section 
         title="Piezas & Objetos" 
-        number="07" 
+        number="08" 
         icon={<ScanSearch className="w-5 h-5" />} 
         isOpen={activeSection === 'interior-objects'} 
         onToggle={() => onSectionChange('interior-objects')}
@@ -177,7 +187,7 @@ export default function InteriorForm({ params, onChange, disabled, activeSection
       {/* ── 04 PROGRAMA ─────────────────────────────────────────── */}
       <Section 
         title="Detalle Funcional" 
-        number="08" 
+        number="09" 
         icon={<LayoutGrid className="w-5 h-5" />} 
         isOpen={activeSection === 'program'} 
         onToggle={() => onSectionChange('program')}
@@ -188,23 +198,14 @@ export default function InteriorForm({ params, onChange, disabled, activeSection
             <Select label="Tipo de Cocina" value={params.kitchenType} onChange={(e) => handleChange("kitchenType", e.target.value)} options={IC.KITCHEN_TYPES} disabled={disabled} />
             <Select label="Área Social" value={params.livingAreaType} onChange={(e) => handleChange("livingAreaType", e.target.value)} options={IC.LIVING_AREA_TYPES} disabled={disabled} />
           </div>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
-            <div className="flex flex-col gap-2">
-              <label className="text-xs font-bold uppercase tracking-widest text-muted-foreground">Dormitorios</label>
-              <DebouncedInput type="number" min={1} value={params.bedrooms || ''} placeholder="—" onChange={(val) => handleChange("bedrooms", parseInt(val) || 0)} disabled={disabled} />
-            </div>
-            <div className="flex flex-col gap-2">
-              <label className="text-xs font-bold uppercase tracking-widest text-muted-foreground">Baños</label>
-              <DebouncedInput type="number" min={1} value={params.bathrooms || ''} placeholder="—" onChange={(val) => handleChange("bathrooms", parseInt(val) || 0)} disabled={disabled} />
-            </div>
-          </div>
+          <HomeProgramFields params={params} onChange={handleChange} disabled={disabled} />
         </div>
       </Section>
 
       {/* ── 05 ACABADOS ─────────────────────────────────────────── */}
       <Section 
         title="Materialidad y Superficies" 
-        number="09" 
+        number="10" 
         icon={<Layers className="w-5 h-5" />} 
         isOpen={activeSection === 'materials'} 
         onToggle={() => onSectionChange('materials')}
@@ -223,7 +224,7 @@ export default function InteriorForm({ params, onChange, disabled, activeSection
       {/* ── 06 ESTÉTICA ─────────────────────────────────────────── */}
       <Section 
         title="Paleta de Color" 
-        number="10" 
+        number="11" 
         icon={<Palette className="w-5 h-5" />} 
         isOpen={activeSection === 'landscape'} 
         onToggle={() => onSectionChange('landscape')}
@@ -235,7 +236,7 @@ export default function InteriorForm({ params, onChange, disabled, activeSection
       {/* ── 07 FOTOGRAFÍA ───────────────────────────────────────── */}
       <Section 
         title="Configuración de Cámara" 
-        number="11" 
+        number="12" 
         icon={<Camera className="w-5 h-5" />} 
         isOpen={activeSection === 'photography'} 
         onToggle={() => onSectionChange('photography')}
@@ -257,7 +258,7 @@ export default function InteriorForm({ params, onChange, disabled, activeSection
       {/* ── 08 SALIDA ──────────────────────────────────────────── */}
       <Section 
         title="Output Final" 
-        number="12" 
+        number="13" 
         icon={<ImageIcon className="w-5 h-5" />} 
         isOpen={activeSection === 'output'} 
         onToggle={() => onSectionChange('output')}
@@ -275,7 +276,7 @@ export default function InteriorForm({ params, onChange, disabled, activeSection
       </Section>
 
       {/* ── 09 DIRECCIÓN ───────────────────────────────────────── */}
-      <Section title="Dirección Creativa" number="13" icon={<PenLine className="w-5 h-5" />} isOpen={activeSection === 'creative'} onToggle={() => onSectionChange('creative')}>
+      <Section title="Dirección Creativa" number="14" icon={<PenLine className="w-5 h-5" />} isOpen={activeSection === 'creative'} onToggle={() => onSectionChange('creative')}>
         <DebouncedInput
           type="textarea"
           value={params.artDirection || ""}

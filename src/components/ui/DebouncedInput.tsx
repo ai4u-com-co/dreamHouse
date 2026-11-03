@@ -4,6 +4,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { twMerge } from 'tailwind-merge';
 
 interface DebouncedInputProps {
+  id?: string;
   value: string | number;
   onChange: (value: string) => void;
   placeholder?: string;
@@ -16,6 +17,7 @@ interface DebouncedInputProps {
 }
 
 export function DebouncedInput({
+  id,
   value,
   onChange,
   placeholder,
@@ -71,6 +73,7 @@ export function DebouncedInput({
   if (type === 'textarea') {
     return (
       <textarea
+        id={id}
         value={localValue}
         onChange={handleInputChange}
         onBlur={handleBlur}
@@ -83,6 +86,7 @@ export function DebouncedInput({
 
   return (
     <input
+      id={id}
       type={type}
       value={localValue}
       onChange={handleInputChange}

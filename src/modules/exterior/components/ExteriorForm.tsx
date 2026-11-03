@@ -3,11 +3,10 @@ import { DreamHouseParams } from '@/types';
 import * as EC from '../constants';
 import { OutputOptions, AmbienceSelects } from '@/components/FormExtras';
 import * as SC from '../../shared/constants';
-import clsx from 'clsx';
 import { Sparkles, MapPin, Box, Camera, ImageIcon, Home } from 'lucide-react';
 import { Section } from '@/components/ui/Section';
 import { Select } from '@/components/ui/Select';
-import { Chip } from '@/components/ui/Chip';
+import { ChipsField, EssenceFields, SiteFields, HomeProgramFields } from '@/components/FormFields';
 import ReferenceUploader from '@/components/ReferenceUploader';
 import LotUploader from '@/components/LotUploader';
 import FloorPlanUploader from '@/components/FloorPlanUploader';
@@ -66,30 +65,9 @@ export default function ExteriorForm({
     onChange({ ...params, [key]: value });
   };
 
-  const toggleMultiSelect = (key: keyof DreamHouseParams, value: string) => {
-    const current = Array.isArray(params[key]) ? (params[key] as string[]) : [];
-    const newValues = current.includes(value) ? current.filter(v => v !== value) : [...current, value];
-    handleChange(key, newValues);
-  };
-
-  const renderChipsGroup = (label: string, key: keyof DreamHouseParams, options: string[], helpText: string, scrollable: boolean = false) => {
-    const current = Array.isArray(params[key]) ? (params[key] as string[]) : [];
-    return (
-      <fieldset className="flex flex-col gap-2">
-        <div className="flex flex-col gap-1 px-1">
-          <label className="text-xs font-semibold text-muted-foreground uppercase tracking-widest">{label}</label>
-          <p className="text-[11px] text-muted-foreground opacity-60 font-mono tracking-tight">{helpText}</p>
-        </div>
-        <div className={clsx("flex flex-wrap gap-2 p-1", scrollable && "max-h-56 overflow-y-auto custom-scrollbar border border-border/20 bg-card/30")}>
-          {options.map(opt => (
-            <Chip key={opt} selected={current.includes(opt)} disabled={disabled} onToggle={() => toggleMultiSelect(key, opt)}>
-              {opt}
-            </Chip>
-          ))}
-        </div>
-      </fieldset>
-    );
-  };
+  const renderChipsGroup = (label: string, key: keyof DreamHouseParams, options: string[], helpText: string, scrollable: boolean = false) => (
+    <ChipsField params={params} onChange={handleChange} disabled={disabled} label={label} field={key} options={options} helpText={helpText} scrollable={scrollable} />
+  );
 
   const conceptSummary = [
     params.projectType,
@@ -136,28 +114,7 @@ export default function ExteriorForm({
         summary={conceptSummary}
       >
         <SectionDescription>Define la esencia y el carácter arquitectónico del edificio exterior. Comienza eligiendo el tipo de proyecto.</SectionDescription>
-        <div className="space-y-8">
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
-            <Select 
-              label="Tipo de Proyecto (Principal)" 
-              value={params.projectType} 
-              onChange={(e) => handleChange("projectType", e.target.value)} 
-              options={EC.PROJECT_TYPES} 
-              disabled={disabled} 
-            />
-            <Select 
-              label="Atmósfera / Mood" 
-              value={params.mood} 
-              onChange={(e) => handleChange("mood", e.target.value)} 
-              options={SC.MOODS} 
-              disabled={disabled} 
-            />
-          </div>
-          <div className="grid grid-cols-1 gap-6">
-            {renderChipsGroup("Estilos Arquitectónicos", "architecturalStyles", SC.STYLES, "Combina estéticas para una propuesta única.", true)}
-            {renderChipsGroup("Arquitectos Inspiradores", "architect", SC.ARCHITECTS, "Influencia formal y conceptual del diseño.", true)}
-          </div>
-        </div>
+        <EssenceFields params={params} onChange={handleChange} disabled={disabled} projectTypeLabel="Tipo de Proyecto (Principal)" />
       </Section>
 
       {/* ── FASE 2: GEOMETRÍA E IMAGEN BASE ───────────────────────── */}
@@ -220,25 +177,7 @@ export default function ExteriorForm({
         summary={siteSummary}
       >
         <SectionDescription>El emplazamiento físico y las condiciones climáticas del sitio.</SectionDescription>
-        <div className="space-y-6">
-          <div className="flex flex-col gap-2">
-            <label className="text-xs font-semibold text-muted-foreground uppercase tracking-widest pl-1">Ciudad / Región</label>
-            <DebouncedInput 
-              value={params.city} 
-              onChange={(val) => handleChange("city", val)} 
-              placeholder="Ej: Kyoto, Oslo, Atacama..." 
-              disabled={disabled} 
-            />
-          </div>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
-            <Select label="Entorno Natural" value={params.environment} onChange={(e) => handleChange("environment", e.target.value)} options={EC.ENVIRONMENTS} disabled={disabled} />
-            <Select label="Clima Dominante" value={params.climate} onChange={(e) => handleChange("climate", e.target.value)} options={EC.CLIMATES} disabled={disabled} />
-          </div>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
-            <Select label="Cuerpo de Agua" value={params.waterBody} onChange={(e) => handleChange("waterBody", e.target.value)} options={EC.WATER_BODIES} disabled={disabled} />
-            <Select label="Condición del Tiempo" value={params.weatherCondition} onChange={(e) => handleChange("weatherCondition", e.target.value)} options={EC.WEATHER_CONDITIONS} disabled={disabled} />
-          </div>
-        </div>
+        <SiteFields params={params} onChange={handleChange} disabled={disabled} />
       </Section>
 
       {/* ── FASE 4: DISEÑO FÍSICO Y PROGRAMA ───────────────────────── */}
@@ -291,9 +230,20 @@ export default function ExteriorForm({
           <div>
             <Subtitle>Programa Exterior</Subtitle>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
-              <Select label="Estacionamiento" value={params.parkingType} onChange={(e) => handleChange("parkingType", e.target.value)} options={EC.PARKING_TYPES} disabled={disabled} />
+              <div className="flex flex-col gap-5">
+                <Select label="Estacionamiento" value={params.parkingType} onChange={(e) => handleChange("parkingType", e.target.value)} options={EC.PARKING_TYPES} disabled={disabled} />
+                <div className="flex flex-col gap-2">
+                  <label htmlFor="field-parking-spots" className="text-xs font-bold uppercase tracking-widest text-muted-foreground">Plazas de estacionamiento</label>
+                  <DebouncedInput id="field-parking-spots" type="number" min={0} max={20} value={params.parkingSpots || ''} placeholder="Auto" onChange={(val) => handleChange("parkingSpots", parseInt(val) || 0)} disabled={disabled} />
+                </div>
+              </div>
               {renderChipsGroup("Áreas Sociales", "socialAreas", EC.SOCIAL_AREAS, "Espacios compartidos exteriores.", true)}
             </div>
+          </div>
+
+          <div>
+            <Subtitle>Programa de la Vivienda</Subtitle>
+            <HomeProgramFields params={params} onChange={handleChange} disabled={disabled} />
           </div>
 
           <div>
@@ -339,7 +289,7 @@ export default function ExteriorForm({
                 <Select label="Ángulo" value={params.cameraAngle} onChange={(e) => handleChange("cameraAngle", e.target.value)} options={SC.ANGLES} disabled={disabled} />
                 <Select label="Composición" value={params.composition} onChange={(e) => handleChange("composition", e.target.value)} options={SC.COMPOSITIONS} disabled={disabled} />
               </div>
-              <AmbienceSelects params={params} onChange={handleChange} disabled={disabled} />
+              <AmbienceSelects params={params} onChange={handleChange} disabled={disabled} people />
             </div>
           </div>
 

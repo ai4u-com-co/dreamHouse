@@ -1,4 +1,5 @@
 import React from 'react';
+import { modesFor } from '@/modules/shared/param-modes';
 import { DEFAULT_PARAMS, DreamHouseParams, GenerationMode } from '@/types';
 import {
   FileText, Sparkles, MapPin, Layers, LayoutGrid,
@@ -63,7 +64,6 @@ function isFactoryDefault(item: ParamItem): boolean {
   return JSON.stringify(DEFAULT_PARAMS[item.key]) === JSON.stringify(item.value);
 }
 
-const EXT: GenerationMode[] = ['exterior'];
 const INT: GenerationMode[] = ['interior'];
 const EXT_VISTAS: GenerationMode[] = ['exterior', 'vistas'];
 const NOT_EDIT: GenerationMode[] = ['exterior', 'interior', 'vistas'];
@@ -87,8 +87,8 @@ export default function PromptPreview({ params, loadedFiles = [] }: PromptPrevie
       icon: <Sparkles className="w-3.5 h-3.5" />,
       modes: NOT_EDIT,
       items: [
-        { label: 'TIPO', value: params.projectType, key: 'projectType', modes: EXT },
-        { label: 'ESPACIO', value: params.roomType, key: 'roomType', modes: INT },
+        { label: 'TIPO', value: params.projectType, key: 'projectType' },
+        { label: 'ESPACIO', value: params.roomType, key: 'roomType' },
         { label: 'ESTILO', value: params.architecturalStyles, key: 'architecturalStyles' },
         { label: 'ARQUITECTO', value: params.architect, key: 'architect' },
         { label: 'MOOD', value: params.mood, key: 'mood' },
@@ -98,7 +98,7 @@ export default function PromptPreview({ params, loadedFiles = [] }: PromptPrevie
       number: '05',
       title: 'Contexto y Ubicación',
       icon: <MapPin className="w-3.5 h-3.5" />,
-      modes: EXT_VISTAS,
+      modes: NOT_EDIT,
       items: [
         { label: 'CIUDAD', value: params.city, key: 'city' },
         { label: 'CLIMA', value: params.climate, key: 'climate' },
@@ -138,13 +138,13 @@ export default function PromptPreview({ params, loadedFiles = [] }: PromptPrevie
       icon: <LayoutGrid className="w-3.5 h-3.5" />,
       modes: ['exterior', 'interior'],
       items: [
-        { label: 'HABITAC.', value: params.bedrooms, key: 'bedrooms', modes: INT },
-        { label: 'BAÑOS', value: params.bathrooms, key: 'bathrooms', modes: INT },
-        { label: 'COCINA', value: params.kitchenType, key: 'kitchenType', modes: INT },
-        { label: 'SALA', value: params.livingAreaType, key: 'livingAreaType', modes: INT },
-        { label: 'PARQUEO', value: params.parkingSpots, key: 'parkingSpots', modes: EXT },
-        { label: 'TIPO PKG', value: params.parkingType, key: 'parkingType', modes: EXT },
-        { label: 'ÁREAS SOC.', value: params.socialAreas, key: 'socialAreas', modes: EXT },
+        { label: 'HABITAC.', value: params.bedrooms, key: 'bedrooms' },
+        { label: 'BAÑOS', value: params.bathrooms, key: 'bathrooms' },
+        { label: 'COCINA', value: params.kitchenType, key: 'kitchenType' },
+        { label: 'SALA', value: params.livingAreaType, key: 'livingAreaType' },
+        { label: 'PARQUEO', value: params.parkingSpots, key: 'parkingSpots' },
+        { label: 'TIPO PKG', value: params.parkingType, key: 'parkingType' },
+        { label: 'ÁREAS SOC.', value: params.socialAreas, key: 'socialAreas' },
       ],
     },
     {
@@ -155,7 +155,7 @@ export default function PromptPreview({ params, loadedFiles = [] }: PromptPrevie
       items: [
         { label: 'REVESTIM.', value: params.materials, key: 'materials' },
         { label: 'CALIDAD', value: params.finishLevel, key: 'finishLevel' },
-        { label: 'DETALLES', value: params.architecturalDetails, key: 'architecturalDetails', modes: EXT_VISTAS },
+        { label: 'DETALLES', value: params.architecturalDetails, key: 'architecturalDetails' },
       ],
     },
     {
@@ -165,8 +165,8 @@ export default function PromptPreview({ params, loadedFiles = [] }: PromptPrevie
       modes: NOT_EDIT,
       items: [
         { label: 'PALETA', value: params.colorPalette, key: 'colorPalette' },
-        { label: 'ELEMENTOS', value: params.exteriorElements, key: 'exteriorElements', modes: EXT_VISTAS },
-        { label: 'VEGETACIÓN', value: params.vegetation, key: 'vegetation', modes: EXT_VISTAS },
+        { label: 'ELEMENTOS', value: params.exteriorElements, key: 'exteriorElements' },
+        { label: 'VEGETACIÓN', value: params.vegetation, key: 'vegetation' },
       ],
     },
     {
@@ -179,12 +179,12 @@ export default function PromptPreview({ params, loadedFiles = [] }: PromptPrevie
         { label: 'FOCAL', value: params.focalLength, key: 'focalLength' },
         { label: 'APERTURA', value: params.aperture, key: 'aperture' },
         { label: 'PELÍCULA', value: params.filmSimulation, key: 'filmSimulation' },
-        { label: 'ÁNGULO', value: params.cameraAngle, key: 'cameraAngle', modes: ['exterior', 'interior'] },
-        { label: 'COMPOSICIÓN', value: params.composition, key: 'composition', modes: ['exterior', 'interior'] },
-        { label: 'HORA', value: params.timeOfDay, key: 'timeOfDay', modes: EXT_VISTAS },
-        { label: 'ESTACIÓN', value: params.season, key: 'season', modes: EXT_VISTAS },
-        { label: 'LUZ', value: params.lighting, key: 'lighting', modes: EXT_VISTAS },
-        { label: 'PERSONAS', value: params.humanContext, key: 'humanContext', modes: ['exterior', 'interior'] },
+        { label: 'ÁNGULO', value: params.cameraAngle, key: 'cameraAngle' },
+        { label: 'COMPOSICIÓN', value: params.composition, key: 'composition' },
+        { label: 'HORA', value: params.timeOfDay, key: 'timeOfDay' },
+        { label: 'ESTACIÓN', value: params.season, key: 'season' },
+        { label: 'LUZ', value: params.lighting, key: 'lighting' },
+        { label: 'PERSONAS', value: params.humanContext, key: 'humanContext' },
       ],
     },
     {
@@ -216,7 +216,14 @@ export default function PromptPreview({ params, loadedFiles = [] }: PromptPrevie
   // Solo lo que aplica al módulo actual
   const applicable = groups
     .filter((g) => !g.modes || g.modes.includes(mode))
-    .map((g) => ({ ...g, items: g.items.filter((item) => !item.modes || item.modes.includes(mode)) }));
+    .map((g) => ({
+      ...g,
+      // La aplicabilidad de cada parámetro sale del registro único; `modes` del ítem solo para lo que no es un parámetro del diseño
+      items: g.items.filter((item) => {
+        const modes = item.key && modesFor(item.key).length ? modesFor(item.key) : item.modes;
+        return !modes || modes.includes(mode);
+      }),
+    }));
 
   const visibleGroups = applicable.filter((g) => g.items.some((item) => hasValue(item.value)));
 

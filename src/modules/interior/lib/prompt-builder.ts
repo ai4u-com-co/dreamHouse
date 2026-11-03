@@ -1,5 +1,6 @@
 import { DreamHouseParams } from '@/types';
 import { lookup } from '@/lib/safe-lookup';
+import { PROJECT_TYPE_MAP } from '@/modules/exterior/lib/prompt-builder';
 import {
   bulletSection,
   cameraSentence,
@@ -65,7 +66,9 @@ export function buildInteriorPrompt(params: DreamHouseParams, targetModel?: stri
   const scaleDesc = getRoomScaleDesc(params.roomSizeM2);
   const isOpenAI = targetModel?.includes('OpenAI') || false;
   const style = resolveRenderStyle(params.renderStyle);
-  const detailLines = interiorDetailLines(params);
+  // El tipo de proyecto y el sitio son los mismos del exterior (esencia compartida entre módulos)
+  const buildingType = lookup(PROJECT_TYPE_MAP, params.projectType) || params.projectType || '';
+  const detailLines = interiorDetailLines(params, buildingType);
 
   const styleDesc = joinList(params.architecturalStyles) || "contemporary";
   const architectDesc = joinList(params.architect, '&');
@@ -74,8 +77,13 @@ export function buildInteriorPrompt(params: DreamHouseParams, targetModel?: stri
   const materialList = (params.materials ?? []).filter(present).join(', ');
   const colorDesc = joinList(params.colorPalette);
   const camera = style.photographic ? cameraSentence(params) : "";
+  // Remodelación: lo que se conserva es la envolvente; el estilo y el maestro elegidos mandan sobre el rediseño
+  const remodelDirection = [
+    styleDesc && `the ${styleDesc} style`,
+    architectDesc && `the design principles of ${architectDesc}`,
+  ].filter(Boolean).join(' and ');
   const spaceNote = hasSpacePhoto
-    ? "Redesign the existing space shown in the reference photo: keep its architectural shell (walls, openings, ceiling height) and its camera viewpoint, and change only the design, furnishings, finishes and lighting."
+    ? `Redesign the existing space shown in the reference photo: keep its architectural shell (walls, openings, ceiling height) and its camera viewpoint, and change only the design, furnishings, finishes and lighting. Apply ${remodelDirection} to the redesign of every surface, piece and light source.`
     : "";
 
   if (isOpenAI) {

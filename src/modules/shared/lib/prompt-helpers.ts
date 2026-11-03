@@ -68,6 +68,14 @@ export function cameraSentence(params: DreamHouseParams): string {
 
 // ---------- detalles que antes se perdían ----------
 
+/** "3 bedrooms, 2 bathrooms": el programa de la vivienda, válido como contexto en exterior e interior */
+function homeProgram(params: DreamHouseParams): string[] {
+  return [
+    when(params.bedrooms, (v) => `${v} bedroom${v > 1 ? 's' : ''}`),
+    when(params.bathrooms, (v) => `${v} bathroom${v > 1 ? 's' : ''}`),
+  ].filter(Boolean);
+}
+
 /** Campos del módulo exterior que el usuario elige y que antes no llegaban al prompt */
 export function exteriorDetailLines(params: DreamHouseParams): string[] {
   const parking = present(params.parkingType) && !/sin estacionamiento/i.test(params.parkingType)
@@ -83,22 +91,41 @@ export function exteriorDetailLines(params: DreamHouseParams): string[] {
     when(params.exteriorElements, (v) => `Exterior elements present: ${joinList(v)}`),
     when(params.vegetation, (v) => `Landscaping and vegetation: ${joinList(v)}`),
     when(params.architecturalDetails, (v) => `Architectural details: ${joinList(v)}`),
+    when(params.colorPalette, (v) => `Facade color palette: ${joinList(v)}`),
+    when(homeProgram(params), (v) => `Home program (what the building must accommodate): ${joinList(v)}`),
     when(params.mood, (v) => `Mood: ${v}`),
     when(params.composition, (v) => `Framing preference: ${v}`),
     when(params.humanContext, (v) => `Human presence: ${v}`),
   ].filter(Boolean);
 }
 
-/** Campos del módulo interior que antes no llegaban al prompt */
-export function interiorDetailLines(params: DreamHouseParams): string[] {
-  const program = [
-    when(params.bedrooms, (v) => `${v} bedroom${v > 1 ? 's' : ''}`),
-    when(params.bathrooms, (v) => `${v} bathroom${v > 1 ? 's' : ''}`),
-  ].filter(Boolean);
+/**
+ * Lo que el interior comparte con el exterior: el tipo de edificio y el sitio. En un interior definen
+ * lo que se ve por las ventanas y la luz natural. `buildingType` es el tipo ya traducido al inglés.
+ */
+export function interiorContextLines(params: DreamHouseParams, buildingType: string): string[] {
+  const season = present(params.season) ? ` in ${params.season}` : '';
   return [
+    when(buildingType, (v) => `Building context: the space belongs to ${/^[aeiou]/i.test(v) ? 'an' : 'a'} ${v}; its character should feel coherent with it`),
+    when(params.city, (v) => `Location: ${v}`),
+    when(params.environment, (v) => `Surroundings visible through the windows: ${v}`),
+    when(params.climate, (v) => `Climate: ${v} — the natural light and what is seen outside should feel native to it`),
+    when(params.waterBody, (v) => `Water at the site: ${v}, glimpsed through the windows where the layout allows`),
+    when(params.weatherCondition, (v) => `Weather outside: ${v}`),
+    present(params.timeOfDay)
+      ? `Natural daylight entering the space: ${params.timeOfDay}${season}`
+      : when(params.season, (v) => `Season outside: ${v}`),
+    when(params.lighting, (v) => `Natural light quality: ${v}`),
+  ].filter(Boolean);
+}
+
+/** Campos del módulo interior que antes no llegaban al prompt */
+export function interiorDetailLines(params: DreamHouseParams, buildingType = ''): string[] {
+  return [
+    ...interiorContextLines(params, buildingType),
     when(params.kitchenType, (v) => `Kitchen type: ${v}`),
     when(params.livingAreaType, (v) => `Living area type: ${v}`),
-    when(program, (v) => `Home program (context for the space): ${joinList(v)}`),
+    when(homeProgram(params), (v) => `Home program (context for the space): ${joinList(v)}`),
     when(params.finishLevel, (v) => `Finish standard: ${v}`),
     when(params.mood, (v) => `Mood: ${v}`),
     when(params.cameraAngle, (v) => `Camera angle: ${v}`),

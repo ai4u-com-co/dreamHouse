@@ -19,6 +19,7 @@ export const maxDuration = 120; // Increased to 120s to allow for image generati
 const MAX_IMAGE_SIZE = 100 * 1024 * 1024; // 100MB per image
 const MAX_TOTAL_PAYLOAD_SIZE = 100 * 1024 * 1024; // 100MB total payload
 const MAX_REFERENCE_IMAGES = 14; // Nano Banana 2 support up to 14
+const OPENAI_MAX_INPUT_IMAGES = 17; // tope de imágenes de entrada de GPT Image 2.5
 
 // Base + máscara de edición: el cliente las exporta como PNG de hasta 2048 px por lado
 const EDIT_MASK_MAX_SIDE = 2048;
@@ -63,7 +64,7 @@ async function validateEditMaskPair(baseFile: File, maskFile: File): Promise<str
 // exterior = foto del terreno · interior = foto del espacio actual · vistas = la casa a fotografiar.
 const INPUTS_BY_MODE: Record<string, { lot: boolean; exteriorRef: boolean; floorPlan: boolean; files: boolean; objects: boolean }> = {
   exterior: { lot: true, exteriorRef: true, floorPlan: true, files: true, objects: false },
-  interior: { lot: true, exteriorRef: false, floorPlan: true, files: false, objects: true },
+  interior: { lot: true, exteriorRef: false, floorPlan: true, files: true, objects: true },
   vistas: { lot: true, exteriorRef: false, floorPlan: false, files: false, objects: false },
   edit: { lot: false, exteriorRef: false, floorPlan: false, files: false, objects: false },
 };
@@ -459,10 +460,13 @@ export async function POST(req: NextRequest) {
         if (params.mode === 'exterior' && lotImage) {
           openaiInputs.push({ file: lotImage, role: lotRole });
         }
-        files.forEach(file => openaiInputs.push({
-          file,
-          role: "a conceptual style reference (take mood, material palette and proportions; do not copy specific buildings or facades)",
-        }));
+        // Interior puede sumar objetos (hasta 13) + espacio + plano + referencias: las referencias de estilo
+        // ceden el sitio antes que las piezas, que "deben aparecer" en el resultado.
+        const roomForReferences = Math.max(0, OPENAI_MAX_INPUT_IMAGES - openaiInputs.length - objectImages.length);
+        const referenceRole = params.mode === 'interior'
+          ? "a conceptual style reference (take mood, material palette, atmosphere and spatial feeling; do not copy specific rooms, furniture or compositions)"
+          : "a conceptual style reference (take mood, material palette and proportions; do not copy specific buildings or facades)";
+        files.slice(0, roomForReferences).forEach(file => openaiInputs.push({ file, role: referenceRole }));
         objectImages.forEach(file => openaiInputs.push({
           file,
           role: "a specific furniture piece or object that must appear in the final design; preserve its exact shape, color, material and design",

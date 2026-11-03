@@ -71,8 +71,11 @@ export function OutputOptions({ params, onChange, disabled }: ExtrasProps) {
   );
 }
 
-/** Hora del día, estación y tipo de luz: antes existían en el prompt pero no había cómo elegirlos */
-export function AmbienceSelects({ params, onChange, disabled, hint }: ExtrasProps & { hint?: string }) {
+/**
+ * Hora del día, estación y tipo de luz (y, si se pide, presencia de personas). En exterior definen la luz
+ * de la escena; en interior, la luz natural que entra por las ventanas. Mismo estado en ambos módulos.
+ */
+export function AmbienceSelects({ params, onChange, disabled, hint, people = false }: ExtrasProps & { hint?: string; people?: boolean }) {
   return (
     <div className="space-y-3">
       {hint && <p className="text-xs text-muted-foreground">{hint}</p>}
@@ -81,6 +84,9 @@ export function AmbienceSelects({ params, onChange, disabled, hint }: ExtrasProp
         <Select label="Estación" value={params.season} onChange={(e) => onChange('season', e.target.value)} options={SC.SEASONS} disabled={disabled} />
         <Select label="Tipo de luz" value={params.lighting} onChange={(e) => onChange('lighting', e.target.value)} options={SC.LIGHTING_TYPES} disabled={disabled} />
       </div>
+      {people && (
+        <Select label="Personas en la escena" value={params.humanContext} onChange={(e) => onChange('humanContext', e.target.value)} options={SC.HUMAN_CONTEXT} disabled={disabled} />
+      )}
     </div>
   );
 }
