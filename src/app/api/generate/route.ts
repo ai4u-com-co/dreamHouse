@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { GoogleGenAI, Part } from '@google/genai';
 import OpenAI from 'openai';
 import sharp from 'sharp';
+import { embedImageMetadata, pickEmbeddableParams, METADATA_APP, METADATA_VERSION, type DreamHouseImageMetadata } from '@/lib/image-metadata';
 import { DreamHouseParams } from '@/types';
 import { buildExteriorPrompt } from '@/modules/exterior/lib/prompt-builder';
 import { buildInteriorPrompt } from '@/modules/interior/lib/prompt-builder';
@@ -55,6 +56,23 @@ async function validateEditMaskPair(baseFile: File, maskFile: File): Promise<str
   return null;
 }
 
+// Qué archivos usa cada módulo. `lotImage` es el archivo "principal" y significa algo distinto en cada uno:
+// exterior = foto del terreno · interior = foto del espacio actual · vistas = la casa a fotografiar.
+const INPUTS_BY_MODE: Record<string, { lot: boolean; exteriorRef: boolean; floorPlan: boolean; files: boolean; objects: boolean }> = {
+  exterior: { lot: true, exteriorRef: true, floorPlan: true, files: true, objects: false },
+  interior: { lot: true, exteriorRef: false, floorPlan: true, files: false, objects: true },
+  vistas: { lot: true, exteriorRef: false, floorPlan: false, files: false, objects: false },
+  edit: { lot: false, exteriorRef: false, floorPlan: false, files: false, objects: false },
+};
+
+// Incrusta los metadatos en una imagen en data URL (JPEG/PNG). Si no es data URL o falla, la devuelve igual.
+function embedMetadataInDataUrl(dataUrl: string, meta: DreamHouseImageMetadata): string {
+  const match = /^data:(image\/[a-z]+);base64,([\s\S]+)$/.exec(dataUrl);
+  if (!match) return dataUrl;
+  const embedded = embedImageMetadata(new Uint8Array(Buffer.from(match[2], 'base64')), meta);
+  return `data:${match[1]};base64,${Buffer.from(embedded).toString('base64')}`;
+}
+
 // Helper function to validate image size
 function validateImageSize(file: File, fieldName: string, skipSizeLimit: boolean = false): { valid: boolean; error?: string } {
   if (!skipSizeLimit && file.size > MAX_IMAGE_SIZE) {
@@ -77,13 +95,20 @@ function validateImageSize(file: File, fieldName: string, skipSizeLimit: boolean
 // - Flare: modelo pequeño y rápido, pensado para borradores.
 // Cualquier valor anterior (p. ej. "GPT Image 2 (OpenAI)") cae en Sunburst.
 type OpenAIImageModel = 'gpt-image-2.5-sunburst' | 'gpt-image-2.5-flare';
-type OpenAIImageQuality = 'low' | 'medium' | 'high';
+type OpenAIImageQuality = 'low' | 'medium' | 'high' | 'xhigh';
 
-function getOpenAIImageSettings(aiModel: string, thinkingLevel: string): { model: OpenAIImageModel; quality: OpenAIImageQuality } {
-  if (aiModel.includes('Flare')) {
-    return { model: 'gpt-image-2.5-flare', quality: 'low' };
-  }
-  return { model: 'gpt-image-2.5-sunburst', quality: thinkingLevel === 'High' ? 'high' : 'medium' };
+const QUALITY_BY_LABEL: Record<string, OpenAIImageQuality> = {
+  'Borrador': 'low',
+  'Estándar': 'medium',
+  'Alta': 'high',
+  'Máxima': 'xhigh',
+};
+
+function getOpenAIImageSettings(aiModel: string, thinkingLevel: string, renderQuality?: string): { model: OpenAIImageModel; quality: OpenAIImageQuality } {
+  const model: OpenAIImageModel = aiModel.includes('Flare') ? 'gpt-image-2.5-flare' : 'gpt-image-2.5-sunburst';
+  // Registros anteriores al selector de calidad solo traen thinkingLevel
+  const quality = QUALITY_BY_LABEL[renderQuality ?? ''] ?? (thinkingLevel === 'High' ? 'high' : 'medium');
+  return { model, quality };
 }
 
 // Formato de salida de OpenAI: JPEG es más rápido que PNG y mantiene la respuesta
@@ -203,6 +228,7 @@ function calculatePayloadSize(files: File[], lotImage: File | null, exteriorRefe
 }
 
 export async function POST(req: NextRequest) {
+  let requestedOpenAI = false; // para que el mensaje de error nombre la clave correcta
   try {
     const formData = await req.formData();
     const paramsJson = formData.get('params') as string;
@@ -213,12 +239,16 @@ export async function POST(req: NextRequest) {
 
     const params: DreamHouseParams = JSON.parse(paramsJson);
     const useOpenAI = params.aiModel && params.aiModel.includes('OpenAI');
+    requestedOpenAI = !!useOpenAI;
 
     // API Key validation based on selected model
     let geminiApiKey = null;
     let openaiApiKey = null;
+    // Si el cliente no trae su propia clave se usa la del servidor: ahí el costo se limita (ver más abajo)
+    let usingServerOpenAIKey = false;
 
     if (useOpenAI) {
+      usingServerOpenAIKey = !req.headers.get('x-openai-api-key');
       openaiApiKey = req.headers.get('x-openai-api-key') || process.env.OPENAI_API_KEY;
       if (!openaiApiKey) {
         return NextResponse.json(
@@ -251,12 +281,14 @@ export async function POST(req: NextRequest) {
       openaiClient = new OpenAI({ apiKey: openaiApiKey });
     }
 
-    const files = formData.getAll('files') as File[];
-    const lotImage = formData.get('lotImage') as File | null;
-    const exteriorReferenceImage = formData.get('exteriorReferenceImage') as File | null;
-    const floorPlanImage = formData.get('floorPlanImage') as File | null;
+    // Cada módulo usa solo sus propios archivos: lo que quedó cargado de otro módulo no se envía.
+    const modeInputs = INPUTS_BY_MODE[params.mode] ?? INPUTS_BY_MODE.exterior;
+    const files = modeInputs.files ? (formData.getAll('files') as File[]) : [];
+    const lotImage = modeInputs.lot ? (formData.get('lotImage') as File | null) : null;
+    const exteriorReferenceImage = modeInputs.exteriorRef ? (formData.get('exteriorReferenceImage') as File | null) : null;
+    const floorPlanImage = modeInputs.floorPlan ? (formData.get('floorPlanImage') as File | null) : null;
     const editCompositeFile = formData.get('editCompositeFile') as File | null;
-    const objectImages = formData.getAll('objectImages') as File[];
+    const objectImages = modeInputs.objects ? (formData.getAll('objectImages') as File[]) : [];
     const editBaseFile = formData.get('editBaseFile') as File | null;
     const editMaskFile = formData.get('editMaskFile') as File | null;
 
@@ -391,7 +423,7 @@ export async function POST(req: NextRequest) {
     // --- NEW: Narrative Prompt Building ---
     let narrativePrompt = "";
     if (params.mode === 'interior') {
-      narrativePrompt = buildInteriorPrompt(params, params.aiModel);
+      narrativePrompt = buildInteriorPrompt(params, params.aiModel, !!lotImage);
     } else if (params.mode === 'exterior') {
       narrativePrompt = buildExteriorPrompt(params, !!exteriorReferenceImage, params.aiModel);
     } else if (params.mode === 'vistas') {
@@ -416,24 +448,33 @@ export async function POST(req: NextRequest) {
           role: "the original image with the user's sketch and notes drawn on top; the drawings are edit instructions, not content to keep",
         });
       } else {
+        const lotRole = params.mode === 'vistas'
+          ? "the house to photograph (reference): the SAME house must appear, identical in form, materials and design; only the camera changes"
+          : params.mode === 'interior'
+            ? "the existing space to redesign: keep its architectural shell (walls, openings, ceiling height) and its camera viewpoint"
+            : "the lot or terrain photo (site context to integrate the building into)";
+        if (params.mode === 'vistas' && lotImage) {
+          openaiInputs.push({ file: lotImage, role: lotRole });
+        }
         if (exteriorReferenceImage) {
           openaiInputs.push({
             file: exteriorReferenceImage,
             role: "the existing house (structural base): keep its general volumes, shape and structure while applying the requested styles and materials",
           });
         }
+        if (params.mode === 'interior' && lotImage) {
+          openaiInputs.push({ file: lotImage, role: lotRole });
+        }
         if (floorPlanImage) {
           openaiInputs.push({ file: floorPlanImage, role: "the floor plan (geometric reference for layout and proportions)" });
         }
-        if (lotImage) {
-          openaiInputs.push({ file: lotImage, role: "the lot or terrain photo (site context to integrate the building into)" });
+        if (params.mode === 'exterior' && lotImage) {
+          openaiInputs.push({ file: lotImage, role: lotRole });
         }
-        const refRole = params.mode === 'vistas'
-          ? "the reference house; produce a new view of this exact house"
-          : params.mode === 'exterior'
-            ? "a conceptual style reference (take mood, material palette and proportions; do not copy specific buildings or facades)"
-            : "a style reference for the overall look, material palette and atmosphere";
-        files.forEach(file => openaiInputs.push({ file, role: refRole }));
+        files.forEach(file => openaiInputs.push({
+          file,
+          role: "a conceptual style reference (take mood, material palette and proportions; do not copy specific buildings or facades)",
+        }));
         objectImages.forEach(file => openaiInputs.push({
           file,
           role: "a specific furniture piece or object that must appear in the final design; preserve its exact shape, color, material and design",
@@ -448,20 +489,24 @@ export async function POST(req: NextRequest) {
     let mandate = "";
     if (useOpenAI) {
       if (params.mode === "interior") {
-        mandate = `INTERNAL SPATIAL MANDATE:
-- Respect room functionality: ${params.roomType}.
-- Render furniture: ${params.furnitureStyle.join(', ')}.
-- Flooring: ${params.flooringMaterial}, Ceiling: ${params.ceilingDetail}.`;
+        mandate = ['INTERNAL SPATIAL MANDATE:',
+          params.roomType ? `- Respect room functionality: ${params.roomType}.` : '',
+          params.furnitureStyle.length ? `- Render furniture: ${params.furnitureStyle.join(', ')}.` : '',
+          params.flooringMaterial || params.ceilingDetail
+            ? `- ${[params.flooringMaterial && `Flooring: ${params.flooringMaterial}`, params.ceilingDetail && `Ceiling: ${params.ceilingDetail}`].filter(Boolean).join(', ')}.`
+            : '',
+          lotImage ? '- Redesign the existing space from the reference photo; keep its architectural shell and viewpoint.' : '',
+        ].filter(Boolean).join('\n');
       } else if (params.mode === "exterior") {
         const structureMandate = exteriorReferenceImage 
           ? "PRESERVE general architectural volumes and facade structure from reference image."
           : "Adhere to the provided layout/floor plan geometry.";
         mandate = `ARCHITECTURAL EXTERIOR MANDATE:
-- ${structureMandate}
-- Show exactly ${params.levels} floors.`;
+- ${structureMandate}${params.levels > 0 ? `\n- Show exactly ${params.levels} floors.` : ''}`;
       } else if (params.mode === "vistas") {
         mandate = `ARCHITECTURAL PORTFOLIO MANDATE:
-- Maintain design style, materials, and geometry identical to the reference image.`;
+- Maintain design style, materials, and geometry identical to the reference image (Image 1 is the house).
+- Do not restyle, redesign or add elements that are not implied by the reference.`;
       } else if (openaiMaskFile) {
         mandate = `IMAGE EDITING MANDATE (MASKED EDIT):
 - Change only the masked area, following the edit instruction above.
@@ -475,11 +520,17 @@ export async function POST(req: NextRequest) {
       }
     } else {
       if (params.mode === "interior") {
-        mandate = `INTERNAL SPATIAL MANDATE:
-- This image is a professional interior design visualization. Scale, lighting, and texture are critical.
-- Respect the functional logic of the specified room: ${params.roomType}.
-- Ensure the furniture style (${params.furnitureStyle.join(', ')}) and lighting (${params.interiorLighting.join(', ')}) are rendered with high fidelity.
-- Materiality: The floor (${params.flooringMaterial}) and ceiling (${params.ceilingDetail}) must define the vertical boundaries of the space.`;
+        mandate = ['INTERNAL SPATIAL MANDATE:',
+          '- This image is a professional interior design visualization. Scale, lighting, and texture are critical.',
+          params.roomType ? `- Respect the functional logic of the specified room: ${params.roomType}.` : '',
+          params.furnitureStyle.length || params.interiorLighting.length
+            ? `- Ensure ${[params.furnitureStyle.length && `the furniture style (${params.furnitureStyle.join(', ')})`, params.interiorLighting.length && `the lighting (${params.interiorLighting.join(', ')})`].filter(Boolean).join(' and ')} are rendered with high fidelity.`
+            : '',
+          params.flooringMaterial || params.ceilingDetail
+            ? `- Materiality: ${[params.flooringMaterial && `the floor (${params.flooringMaterial})`, params.ceilingDetail && `the ceiling (${params.ceilingDetail})`].filter(Boolean).join(' and ')} must define the vertical boundaries of the space.`
+            : '',
+          lotImage ? '- The CURRENT SPACE PHOTO is the base: redesign it, keeping its architectural shell (walls, openings, ceiling height) and viewpoint.' : '',
+        ].filter(Boolean).join('\n');
       } else if (params.mode === "exterior") {
         const structureMandate = exteriorReferenceImage 
           ? "PRESERVE the fundamental architectural geometry, massing, and volumetric structure of the provided HOUSE REFERENCE IMAGE. Apply the requested styles and materials to this existing structure."
@@ -487,8 +538,7 @@ export async function POST(req: NextRequest) {
         mandate = `ARCHITECTURAL EXTERIOR MANDATE:
 - This image is part of a professional architectural portfolio. Volumetric hierarchy is absolute.
 - ${structureMandate}
-- Integrate the building perfectly into the terrain/lot if provided.
-- If LEVELS are specified as ${params.levels}, ensure exactly ${params.levels} floors are visible.`;
+- Integrate the building perfectly into the terrain/lot if provided.${params.levels > 0 ? `\n- Ensure exactly ${params.levels} floors are visible.` : ''}`;
       } else if (params.mode === "vistas") {
         mandate = `ARCHITECTURAL PORTFOLIO MANDATE:
 - This is a consistent architectural portfolio generation.
@@ -522,7 +572,7 @@ ${mandate}
 
 VERIFICATION STEPS:
 1. Review the generated composition against the text description.
-2. Verify that all requested materials (${params.materials.join(', ')}) are clearly visible and rendered with honest texture — not smooth or generic.
+2. ${params.materials.length ? `Verify that all requested materials (${params.materials.join(', ')}) are clearly visible and rendered with honest texture — not smooth or generic.` : 'Verify that every material is rendered with honest texture — not smooth or generic.'}
 3. Confirm that no forbidden elements appear (Negative Prompt: ${params.negativePrompt || 'None'}).
 4. Check that lighting has a clear direction and casts soft-edged shadows that read the three-dimensional form.
 5. Confirm no surface looks digitally smooth, plastic, or uniformly perfect — introduce micro-imperfections if needed.
@@ -548,6 +598,13 @@ VERIFICATION STEPS:
       }
 
       if (lotImageBase64) {
+        imageGenerationParts.push({
+          text: params.mode === 'vistas'
+            ? "HOUSE REFERENCE IMAGE: the following image is the house to photograph. The SAME house must appear in the result, identical in form, materials and design; only the camera changes."
+            : params.mode === 'interior'
+              ? "CURRENT SPACE PHOTO: the following image is the existing space to redesign. Keep its architectural shell (walls, openings, ceiling height) and its camera viewpoint."
+              : "LOT / TERRAIN PHOTO: the following image is the site context the building must be integrated into."
+        });
         imageGenerationParts.push({
           inlineData: { mimeType: lotImageMimeType, data: lotImageBase64 }
         });
@@ -585,12 +642,23 @@ VERIFICATION STEPS:
     }
 
     let imageUrl = "";
+    let usedModel = "gemini-3.1-flash-image-preview";
+    let usedQuality: string | undefined;
+    let usedSize: string | undefined;
     let groundingMetadata = null;
 
     if (useOpenAI && openaiClient) {
       const imageFiles = openaiInputs.map(input => input.file);
-      const sizeStr = getGptImage2Size(params.renderAspectRatio, params.renderOutputResolution);
-      const { model: openaiModel, quality: qualityVal } = getOpenAIImageSettings(params.aiModel, params.thinkingLevel);
+      // En edición el tamaño lo decide la imagen de entrada ("auto"): forzar 16:9 deformaría lo editado
+      // Con la clave del servidor (no la del usuario) se acota el costo: calidad máxima "medium" y resolución máxima 2K
+      const effectiveResolution = usingServerOpenAIKey && params.renderOutputResolution === '4K' ? '2K' : params.renderOutputResolution;
+      const sizeStr = params.mode === 'edit' ? 'auto' : getGptImage2Size(params.renderAspectRatio, effectiveResolution);
+      const requested = getOpenAIImageSettings(params.aiModel, params.thinkingLevel, params.renderQuality);
+      const openaiModel = requested.model;
+      const qualityVal: OpenAIImageQuality = usingServerOpenAIKey && (requested.quality === 'high' || requested.quality === 'xhigh') ? 'medium' : requested.quality;
+      usedModel = openaiModel;
+      usedQuality = qualityVal;
+      usedSize = sizeStr;
 
       let result;
       if (imageFiles.length > 0) {
@@ -600,7 +668,7 @@ VERIFICATION STEPS:
           image: imageFiles,
           ...(openaiMaskFile ? { mask: openaiMaskFile } : {}),
           prompt: fullPrompt,
-          size: sizeStr as `${number}x${number}`,
+          size: sizeStr as `${number}x${number}` | 'auto',
           quality: qualityVal,
           output_format: OPENAI_OUTPUT_FORMAT,
           output_compression: OPENAI_OUTPUT_COMPRESSION,
@@ -610,7 +678,7 @@ VERIFICATION STEPS:
         result = await openaiClient.images.generate({
           model: openaiModel,
           prompt: fullPrompt,
-          size: sizeStr as `${number}x${number}`,
+          size: sizeStr as `${number}x${number}` | 'auto',
           quality: qualityVal,
           output_format: OPENAI_OUTPUT_FORMAT,
           output_compression: OPENAI_OUTPUT_COMPRESSION,
@@ -651,7 +719,7 @@ VERIFICATION STEPS:
             } as any
           ],
           imageConfig: {
-            ...(params.renderAspectRatio ? { aspectRatio: params.renderAspectRatio } : {}),
+            ...(params.renderAspectRatio && params.mode !== 'edit' ? { aspectRatio: params.renderAspectRatio } : {}),
             ...(params.renderOutputResolution ? { imageSize: params.renderOutputResolution } : {})
           },
           thinkingConfig: {
@@ -712,7 +780,28 @@ Return ONLY the 3-word name, no quotes, no extra text. Focus on what makes it un
       houseName = `${params.architecturalStyles[0] || 'Modern'} Design House`;
     }
 
-    return NextResponse.json({ imageUrl, groundingMetadata, houseName });
+    // --- Metadatos incrustados: los parámetros viajan dentro del archivo ---
+    const metadataId = crypto.randomUUID();
+    if (params.embedMetadata !== false) {
+      imageUrl = embedMetadataInDataUrl(imageUrl, {
+        app: METADATA_APP,
+        version: METADATA_VERSION,
+        id: metadataId,
+        createdAt: new Date().toISOString(),
+        mode: params.mode,
+        model: usedModel,
+        quality: usedQuality,
+        size: usedSize,
+        houseName,
+        viewType: params.mode === 'vistas' ? params.viewType : undefined,
+        parentId: params.sourceRender?.id,
+        // Lista explícita de campos de diseño; ciudad, notas y prompt solo si el usuario lo permitió
+        params: pickEmbeddableParams(params, !!params.embedDetails),
+        prompt: params.embedDetails ? fullPrompt : undefined,
+      });
+    }
+
+    return NextResponse.json({ imageUrl, groundingMetadata, houseName, metadataId });
 
   } catch (error: unknown) {
     console.error("API Error Detailed:", error);
@@ -734,7 +823,7 @@ Return ONLY the 3-word name, no quotes, no extra text. Focus on what makes it un
         statusCode = 413;
         errorCode = "PAYLOAD_TOO_LARGE";
       } else if (errorMessage.includes('API_KEY') || errorMessage.includes('authentication') || errorMessage.includes('401')) {
-        errorMessage = "Error de autenticación: la GEMINI_API_KEY no es válida o falta.";
+        errorMessage = `Error de autenticación: la ${requestedOpenAI ? 'OPENAI_API_KEY' : 'GEMINI_API_KEY'} no es válida o falta.`;
         statusCode = 401;
         errorCode = "AUTH_ERROR";
       } else if (errorMessage.includes('503') || errorMessage.includes('Service Unavailable')) {

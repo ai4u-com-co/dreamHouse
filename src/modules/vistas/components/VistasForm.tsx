@@ -5,6 +5,7 @@ import clsx from 'clsx';
 import { Check, LayoutGrid, ImageIcon } from 'lucide-react';
 import { Section } from '@/components/ui/Section';
 import { Select } from '@/components/ui/Select';
+import { OutputOptions, AmbienceSelects } from '@/components/FormExtras';
 import * as SC from '../../shared/constants';
 
 interface VistasFormProps {
@@ -86,8 +87,19 @@ export default function VistasForm({ params, onChange, disabled, activeSection, 
 
       {/* ── 02 PROCESO ─────────────────────────────────────────── */}
       <Section title="Configuración de Salida" number="06" icon={<ImageIcon className="w-5 h-5" />} isOpen={activeSection === 'output'} onToggle={() => onSectionChange('output')}>
+        <div className="mb-8">
+          <AmbienceSelects
+            params={params}
+            onChange={handleChange}
+            disabled={disabled}
+            hint={params.sourceRender
+              ? 'Opcional: si lo dejas vacío, las vistas mantienen la hora, estación y luz del render original.'
+              : 'Opcional: si lo dejas vacío, las vistas mantienen la luz de la foto de la casa.'}
+          />
+        </div>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-5 mb-5">
           <Select label="Modelo de IA" value={params.aiModel} onChange={(e) => handleChange("aiModel", e.target.value)} options={SC.AI_MODELS} disabled={disabled} />
+          <OutputOptions params={params} onChange={handleChange} disabled={disabled} />
         </div>
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-5">
           <Select label="Estilo de Imagen" value={params.renderStyle} onChange={(e) => handleChange("renderStyle", e.target.value)} options={SC.RENDER_STYLES} disabled={disabled} />

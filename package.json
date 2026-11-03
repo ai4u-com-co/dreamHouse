@@ -8,7 +8,8 @@
     "start": "next start",
     "lint": "eslint",
     "type-check": "tsc --noEmit",
-    "ngrok": "ngrok http 3000"
+    "ngrok": "ngrok http 3000",
+    "test:unit": "node --experimental-strip-types --disable-warning=ExperimentalWarning --import ./tests/unit/register.mjs --test \"tests/unit/*.test.mjs\""
   },
   "dependencies": {
     "@emotion/react": "^11.14.0",

@@ -13,6 +13,8 @@ import { Loader2 } from 'lucide-react';
 interface LotUploaderProps {
   file: File | null;
   onFileChange: (file: File | null) => void;
+  /** Se llama con el archivo original, ANTES de recomprimirlo (la recompresión en canvas borra los metadatos) */
+  onOriginalSelected?: (file: File) => void;
   title?: string;
   description?: string;
   icon?: React.ReactNode;
@@ -22,6 +24,7 @@ interface LotUploaderProps {
 export default function LotUploader({ 
   file, 
   onFileChange, 
+  onOriginalSelected,
   title = "Foto del Lote / Terreno",
   description = "Sube una foto real del lugar donde se construirá. La IA adaptará el diseño al entorno.",
   icon = <Map className="w-5 h-5 text-green-500" />,
@@ -65,6 +68,7 @@ export default function LotUploader({
         setError(null);
         try {
           // Compress image before further validation/upload
+          onOriginalSelected?.(droppedFile);
           const processedFile = await compressImage(droppedFile);
           
           // Re-validate size just in case (though it should be much smaller now)
@@ -84,7 +88,7 @@ export default function LotUploader({
 
       processFile();
     }
-  }, [onFileChange, skipSizeValidation]);
+  }, [onFileChange, onOriginalSelected, skipSizeValidation]);
 
   const handleFileInput = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     setError(null);
@@ -96,6 +100,7 @@ export default function LotUploader({
           setError(null);
           try {
             // Compress image
+            onOriginalSelected?.(selectedFile);
             const processedFile = await compressImage(selectedFile);
             
             const validation = validateImageFile(processedFile, 'Imagen del lote', skipSizeValidation);
@@ -114,7 +119,7 @@ export default function LotUploader({
         processFile();
       }
     }
-  }, [onFileChange, skipSizeValidation]);
+  }, [onFileChange, onOriginalSelected, skipSizeValidation]);
 
   const removeFile = useCallback(() => {
     onFileChange(null);

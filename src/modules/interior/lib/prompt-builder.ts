@@ -1,4 +1,14 @@
 import { DreamHouseParams } from '@/types';
+import {
+  bulletSection,
+  cameraSentence,
+  interiorDetailLines,
+  joinList,
+  narrativeSentence,
+  present,
+  resolveRenderStyle,
+  when,
+} from '@/modules/shared/lib/prompt-helpers';
 
 const ROOM_MAP: Record<string, string> = {
   "Baño principal": "a luxurious master bathroom sanctuary",
@@ -49,90 +59,103 @@ function getRoomScaleDesc(m2: number): string {
   return `a grand ${m2}m² expansive space`;
 }
 
-export function buildInteriorPrompt(params: DreamHouseParams, targetModel?: string): string {
+export function buildInteriorPrompt(params: DreamHouseParams, targetModel?: string, hasSpacePhoto: boolean = false): string {
   const roomDesc = ROOM_MAP[params.roomType] || "a beautifully designed interior space";
   const scaleDesc = getRoomScaleDesc(params.roomSizeM2);
   const isOpenAI = targetModel?.includes('OpenAI') || false;
+  const style = resolveRenderStyle(params.renderStyle);
+  const detailLines = interiorDetailLines(params);
+
+  const styleDesc = joinList(params.architecturalStyles) || "contemporary";
+  const architectDesc = joinList(params.architect, '&');
+  const furnitureDesc = joinList((params.furnitureStyle ?? []).map(s => FURNITURE_MAP[s] || s));
+  const lightingDesc = (params.interiorLighting ?? []).map(l => INTERIOR_LIGHTING_MAP[l] || l).join(', complemented by ');
+  const materialList = (params.materials ?? []).filter(present).join(', ');
+  const colorDesc = joinList(params.colorPalette);
+  const camera = style.photographic ? cameraSentence(params) : "";
+  const spaceNote = hasSpacePhoto
+    ? "Redesign the existing space shown in the reference photo: keep its architectural shell (walls, openings, ceiling height) and its camera viewpoint, and change only the design, furnishings, finishes and lighting."
+    : "";
 
   if (isOpenAI) {
-    const styleDesc = params.architecturalStyles.join(' and ') || "modern style";
-    const architectDesc = params.architect.length > 0 ? params.architect.join(' & ') : "";
-    const furnitureDesc = params.furnitureStyle.length > 0 ? params.furnitureStyle.map(s => FURNITURE_MAP[s] || s).join(' and ') : "";
-    const lightingDesc = params.interiorLighting.length > 0 ? params.interiorLighting.map(l => INTERIOR_LIGHTING_MAP[l] || l).join(', complemented by ') : "";
-    const materialList = params.materials.length > 0 ? params.materials.join(', ') : "";
-    const colorDesc = params.colorPalette.length > 0 ? params.colorPalette.join(' and ') : "";
-
     const prompt = `
 [INTENDED USE: Professional Architectural Interior Design Visualization]
 
 SCENE & CONTEXT:
 - Subject: ${roomDesc}${scaleDesc ? ` (${scaleDesc})` : ""}
-- Perspective: Inside the space, looking at the layout and key features
-
+- Perspective: ${present(params.cameraAngle) ? `${params.cameraAngle}, inside the space` : "Inside the space, looking at the layout and key features"}
+${spaceNote ? `- Existing space: ${spaceNote}\n` : ""}
 ARCHITECTURAL & DESIGN SPECIFICATION:
 - Style: ${styleDesc} character${architectDesc ? `, shaped by the design principles of ${architectDesc}` : ""}
-${furnitureDesc ? `- Furniture: Curated pieces of ${furnitureDesc}. Each piece sits with physical weight, showing natural material texture and subtle wear at contact points.\n` : ""}- Flooring: ${params.flooringMaterial || "traditional flooring material"}, rendered with convincing grain and joint lines
-- Ceiling: ${params.ceilingDetail || "clean architectural ceiling"}, confirmed by subtle shadow and texture
-${materialList ? `- Materials: ${materialList} elements throughout the space. Each material must show honest texture, grain direction, and micro-imperfections.\n` : ""}${colorDesc ? `- Color Palette: ${colorDesc}, colors shifting naturally across surfaces based on light angle\n` : ""}
-PHOTOGRAPHY & LIGHTING:
-- Camera Config: Shot on ${params.cameraPreset}, ${params.focalLength} lens at ${params.aperture}, ${params.filmSimulation}
-- Depth of Field: ${params.depthOfField || "Natural depth of field separating foreground from background"}
-${lightingDesc ? `- Lighting: Illuminated by ${lightingDesc}. Light falls with natural gradient and fall-off from bright source to soft shadow.\n` : ""}${params.artDirection ? `- Art Direction: ${params.artDirection}\n` : ""}
+${furnitureDesc ? `- Furniture: Curated pieces of ${furnitureDesc}. Each piece sits with physical weight, showing natural material texture and subtle wear at contact points.\n` : ""}${params.flooringMaterial ? `- Flooring: ${params.flooringMaterial}, rendered with convincing grain and joint lines\n` : ""}${params.ceilingDetail ? `- Ceiling: ${params.ceilingDetail}, confirmed by subtle shadow and texture\n` : ""}${materialList ? `- Materials: ${materialList} elements throughout the space. Each material must show honest texture, grain direction, and micro-imperfections.\n` : ""}${colorDesc ? `- Color Palette: ${colorDesc}, colors shifting naturally across surfaces based on light angle\n` : ""}${bulletSection('ADDITIONAL DESIGN SPECIFICATION', detailLines)}
+${style.photographic ? 'PHOTOGRAPHY & LIGHTING' : 'VISUAL TREATMENT & LIGHTING'}:
+${camera ? `- Camera Config: ${camera}\n` : ""}${style.photographic ? `- Depth of Field: ${params.depthOfField || "Natural depth of field separating foreground from background"}\n` : ""}${lightingDesc ? `- Lighting: Illuminated by ${lightingDesc}. Light falls with natural gradient and fall-off from bright source to soft shadow.\n` : ""}${params.artDirection ? `- Art Direction: ${params.artDirection}\n` : ""}
 CONSTRAINTS & QUALITY:
-- Look: Photorealistic interior photography. High tactile presence and physical weight.
-- Exclude: No digital/CGI smoothness, no plastic surfaces, no over-sharpened edges. No watermarks, no logos.
+- Look: ${style.photographic ? `${style.look} High tactile presence and physical weight.` : style.look}
+- Exclude: ${style.photographic ? "No digital/CGI smoothness, no plastic surfaces, no over-sharpened edges. " : ""}No watermarks, no logos.
 `.trim();
     return prompt;
   }
 
   // Classic Gemini flow
-  // Narrative opening — position the viewer inside the space
-  let prompt = `An architectural interior photograph taken inside ${roomDesc}${scaleDesc ? ` — ${scaleDesc}` : ""}. `;
+  const article = /^[aeiou]/i.test(style.medium) ? 'An' : 'A';
+  let prompt = `${article} ${style.medium.replace('architectural ', 'architectural interior ')} taken inside ${roomDesc}${scaleDesc ? ` — ${scaleDesc}` : ""}. `;
+  if (spaceNote) prompt += `${spaceNote} `;
 
-  prompt += `The space carries a ${params.architecturalStyles.join(' and ')} character`;
-  if (params.architect.length > 0) {
-    prompt += `, shaped by the design principles of ${params.architect.join(' & ')}`;
+  prompt += `The space carries a ${styleDesc} character`;
+  if (architectDesc) {
+    prompt += `, shaped by the design principles of ${architectDesc}`;
   }
   prompt += `. `;
 
-  if (params.furnitureStyle.length > 0) {
-    prompt += `Every object in the room is ${params.furnitureStyle.map(s => FURNITURE_MAP[s] || s).join(' and ')} — `;
+  if (furnitureDesc) {
+    prompt += `Every object in the room is ${furnitureDesc} — `;
     prompt += `each piece sits with the physical weight of a real object: surfaces show natural material variation, `;
     prompt += `subtle wear at edges and contact points, and the honest craft marks that separate handmade from digital. `;
   }
 
-  if (params.interiorLighting.length > 0) {
-    prompt += `The room is illuminated by ${params.interiorLighting.map(l => INTERIOR_LIGHTING_MAP[l] || l).join(', complemented by ')}. `;
+  if (lightingDesc) {
+    prompt += `The room is illuminated by ${lightingDesc}. `;
     prompt += `Light falls with natural gradient and fall-off — bright at source, dissolving into soft shadow — `;
     prompt += `revealing surface depth, material texture, and the three-dimensional volume of every form. `;
   }
 
   // Materials with physical specificity
-  prompt += `The floor is ${params.flooringMaterial} — its grain, joint lines, and surface sheen are physically convincing. `;
-  prompt += `The ceiling is ${params.ceilingDetail}, its material presence confirmed by subtle shadow and texture. `;
+  prompt += when(params.flooringMaterial, (v) => `The floor is ${v} — its grain, joint lines, and surface sheen are physically convincing. `);
+  prompt += when(params.ceilingDetail, (v) => `The ceiling is ${v}, its material presence confirmed by subtle shadow and texture. `);
 
-  if (params.materials.length > 0) {
-    prompt += `Throughout the space: ${params.materials.join(', ')} — each rendered with honest texture, `;
+  if (materialList) {
+    prompt += `Throughout the space: ${materialList} — each rendered with honest texture, `;
     prompt += `natural color variation across the surface, and the controlled micro-imperfections `;
     prompt += `(pore structure, grain direction, slight tonal shifts) that distinguish real material from a smooth CGI simulation. `;
   }
 
-  prompt += `Color palette: ${params.colorPalette.join(' and ')}, rendered as pigment and light interact physically — `;
-  prompt += `colors shift subtly across planes as light angle changes. `;
+  if (colorDesc) {
+    prompt += `Color palette: ${colorDesc}, rendered as pigment and light interact physically — `;
+    prompt += `colors shift subtly across planes as light angle changes. `;
+  }
+
+  prompt += narrativeSentence(detailLines);
 
   // Camera integrated naturally into the scene
-  prompt += `Shot with ${params.cameraPreset}, ${params.focalLength} lens at ${params.aperture}, ${params.filmSimulation} — `;
-  prompt += `depth of field separates foreground objects from a naturally softened background. `;
+  if (camera) {
+    prompt += `${camera.charAt(0).toUpperCase()}${camera.slice(1)} — `;
+    prompt += `depth of field separates foreground objects from a naturally softened background. `;
+  }
 
   if (params.artDirection) {
     prompt += `\nCreative Direction: ${params.artDirection}. `;
   }
 
-  // Quality instruction: specific realism criteria, not generic tags
-  prompt += `\nThe image must feel like a photograph, not a render: imperfect enough to be believed, `;
-  prompt += `lit well enough to be aspirational. No plastic surfaces, no over-sharpened edges, `;
-  prompt += `no uniform smoothness on any material. Shadows have soft gradient fall-off. `;
-  prompt += `Every surface has physical weight and tactile presence.`;
+  if (style.photographic) {
+    // Quality instruction: specific realism criteria, not generic tags
+    prompt += `\nThe image must feel like a photograph, not a render: imperfect enough to be believed, `;
+    prompt += `lit well enough to be aspirational. No plastic surfaces, no over-sharpened edges, `;
+    prompt += `no uniform smoothness on any material. Shadows have soft gradient fall-off. `;
+    prompt += `Every surface has physical weight and tactile presence.`;
+  } else {
+    prompt += `\n${style.look}`;
+  }
 
   return prompt.trim();
 }

@@ -1,6 +1,7 @@
 import React from 'react';
 import { DreamHouseParams } from '@/types';
 import * as EC from '../constants';
+import { OutputOptions, AmbienceSelects } from '@/components/FormExtras';
 import * as SC from '../../shared/constants';
 import clsx from 'clsx';
 import { Sparkles, MapPin, Box, Camera, ImageIcon, Home } from 'lucide-react';
@@ -275,8 +276,8 @@ export default function ExteriorForm({
                   type="number" 
                   min={1} 
                   max={50} 
-                  value={params.levels || 1} 
-                  onChange={(val) => handleChange("levels", parseInt(val) || 1)} 
+                  value={params.levels || ''} placeholder="Auto" 
+                  onChange={(val) => handleChange("levels", parseInt(val) || 0)} 
                   disabled={disabled} 
                 />
               </div>
@@ -338,6 +339,7 @@ export default function ExteriorForm({
                 <Select label="Ángulo" value={params.cameraAngle} onChange={(e) => handleChange("cameraAngle", e.target.value)} options={SC.ANGLES} disabled={disabled} />
                 <Select label="Composición" value={params.composition} onChange={(e) => handleChange("composition", e.target.value)} options={SC.COMPOSITIONS} disabled={disabled} />
               </div>
+              <AmbienceSelects params={params} onChange={handleChange} disabled={disabled} />
             </div>
           </div>
 
@@ -346,6 +348,7 @@ export default function ExteriorForm({
             <div className="space-y-5">
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
                 <Select label="Modelo de IA" value={params.aiModel} onChange={(e) => handleChange("aiModel", e.target.value)} options={SC.AI_MODELS} disabled={disabled} />
+          <OutputOptions params={params} onChange={handleChange} disabled={disabled} />
               </div>
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-5">
                 <Select label="Estilo" value={params.renderStyle} onChange={(e) => handleChange("renderStyle", e.target.value)} options={SC.RENDER_STYLES} disabled={disabled} />

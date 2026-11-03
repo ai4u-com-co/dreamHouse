@@ -1,5 +1,19 @@
 export type GenerationMode = "exterior" | "interior" | "edit" | "vistas";
 
+/** Render del que se deriva esta generación (vistas, ediciones): sus parámetros se usan para mantener fidelidad */
+export interface SourceRender {
+  /** Id de la imagen de origen (metadatos incrustados), para enlazar la genealogía */
+  id: string;
+  mode: GenerationMode;
+  houseName?: string;
+  model?: string;
+  /** Parámetros con los que se generó el render original */
+  params: Partial<DreamHouseParams>;
+}
+
+/** Calidad de render que elige el usuario (OpenAI): se traduce a low / medium / high / xhigh */
+export type RenderQuality = "Borrador" | "Estándar" | "Alta" | "Máxima";
+
 export interface SharedParams {
   mode: GenerationMode;
   
@@ -29,6 +43,13 @@ export interface SharedParams {
   renderAspectRatio: string;
   renderOutputResolution: string;
   thinkingLevel: "Minimal" | "High";
+  renderQuality: RenderQuality;
+  /** Incrustar los parámetros dentro del archivo de imagen generado (XMP/iTXt) */
+  embedMetadata: boolean;
+  /** Incluir además ciudad, notas, textos libres y el prompt completo (más detalle, menos privado) */
+  embedDetails: boolean;
+  /** Render original del que se deriva esta generación (lo llena la subida de una imagen con metadatos) */
+  sourceRender?: SourceRender;
 
   // Creative (Shared)
   technicalNotes: string;
@@ -94,14 +115,17 @@ export const DEFAULT_PARAMS: DreamHouseParams = {
   lighting: "",
   humanContext: "",
   cameraPreset: "Fujifilm X100 VI",
-  focalLength: "35mm (documental natural)",
-  aperture: "f/5.6 (punto dulce arquitectónico)",
+  focalLength: "35mm",
+  aperture: "f/5.6",
   filmSimulation: "Classic Chrome",
   depthOfField: "Total (f/8–f/11, todo nítido)",
   renderStyle: "",
   renderAspectRatio: "16:9",
   renderOutputResolution: "",
   thinkingLevel: "Minimal",
+  renderQuality: "Estándar",
+  embedMetadata: true,
+  embedDetails: false,
   technicalNotes: "",
   artDirection: "",
   negativePrompt: "",
