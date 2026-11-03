@@ -16,6 +16,45 @@ const MAX_IMAGE_SIZE = 100 * 1024 * 1024; // 100MB per image
 const MAX_TOTAL_PAYLOAD_SIZE = 100 * 1024 * 1024; // 100MB total payload
 const MAX_REFERENCE_IMAGES = 14; // Nano Banana 2 support up to 14
 
+// Base + máscara de edición: el cliente las exporta como PNG de hasta 2048 px por lado
+const EDIT_MASK_MAX_SIDE = 2048;
+const EDIT_MASK_MAX_BYTES = 25 * 1024 * 1024; // por archivo
+const EDIT_MASK_MAX_PIXELS = EDIT_MASK_MAX_SIDE * EDIT_MASK_MAX_SIDE;
+const PNG_SIGNATURE = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
+// La imagen que devuelve OpenAI puede llegar a 8,3 MP (límite de la API)
+const OPENAI_RESULT_MAX_PIXELS = 8_500_000;
+
+// Valida el par base + máscara en el servidor (no se confía en el tipo MIME ni en los límites del cliente):
+// firma PNG real, límite de bytes, límite de píxeles ANTES de decodificar, y mismas dimensiones.
+async function validateEditMaskPair(baseFile: File, maskFile: File): Promise<string | null> {
+  const dims: Array<{ width: number; height: number }> = [];
+  for (const [file, label] of [[baseFile, 'Edit base image'], [maskFile, 'Edit mask']] as const) {
+    if (file.size > EDIT_MASK_MAX_BYTES) {
+      return `${label} exceeds maximum size of ${EDIT_MASK_MAX_BYTES / 1024 / 1024}MB.`;
+    }
+    const buf = Buffer.from(await file.arrayBuffer());
+    if (buf.length < PNG_SIGNATURE.length || !buf.subarray(0, PNG_SIGNATURE.length).equals(PNG_SIGNATURE)) {
+      return `${label} must be a PNG.`;
+    }
+    try {
+      const meta = await sharp(buf, { limitInputPixels: EDIT_MASK_MAX_PIXELS }).metadata();
+      if (meta.format !== 'png' || !meta.width || !meta.height) {
+        return `${label} must be a PNG.`;
+      }
+      if (meta.width > EDIT_MASK_MAX_SIDE || meta.height > EDIT_MASK_MAX_SIDE) {
+        return `${label} exceeds ${EDIT_MASK_MAX_SIDE}px per side.`;
+      }
+      dims.push({ width: meta.width, height: meta.height });
+    } catch {
+      return `${label} is not a valid image or is too large.`;
+    }
+  }
+  if (dims[0].width !== dims[1].width || dims[0].height !== dims[1].height) {
+    return 'Edit base image and mask must have identical dimensions.';
+  }
+  return null;
+}
+
 // Helper function to validate image size
 function validateImageSize(file: File, fieldName: string, skipSizeLimit: boolean = false): { valid: boolean; error?: string } {
   if (!skipSizeLimit && file.size > MAX_IMAGE_SIZE) {
@@ -63,14 +102,14 @@ async function compositeMaskedEdit(baseFile: File, maskFile: File, resultBase64:
     const maskBuf = Buffer.from(await maskFile.arrayBuffer());
     const resultBuf = Buffer.from(resultBase64, 'base64');
 
-    const baseMeta = await sharp(baseBuf).metadata();
-    const resultMeta = await sharp(resultBuf).metadata();
+    const baseMeta = await sharp(baseBuf, { limitInputPixels: EDIT_MASK_MAX_PIXELS }).metadata();
+    const resultMeta = await sharp(resultBuf, { limitInputPixels: OPENAI_RESULT_MAX_PIXELS }).metadata();
     if (!baseMeta.width || !baseMeta.height || !resultMeta.width || !resultMeta.height) return null;
     const { width, height } = baseMeta;
     if (Math.abs(resultMeta.width / resultMeta.height - width / height) > 0.01) return null;
 
     // Zona editable = parte transparente de la máscara, con borde suavizado
-    const editableAlpha = await sharp(maskBuf)
+    const editableAlpha = await sharp(maskBuf, { limitInputPixels: EDIT_MASK_MAX_PIXELS })
       .resize(width, height)
       .ensureAlpha()
       .extractChannel(3)
@@ -80,13 +119,13 @@ async function compositeMaskedEdit(baseFile: File, maskFile: File, resultBase64:
       .toBuffer();
 
     // joinChannel debe ir en una llamada aparte: dentro de la misma cadena que removeAlpha no añade el canal
-    const editedRgb = await sharp(resultBuf).resize(width, height).removeAlpha().png().toBuffer();
+    const editedRgb = await sharp(resultBuf, { limitInputPixels: OPENAI_RESULT_MAX_PIXELS }).resize(width, height).removeAlpha().png().toBuffer();
     const editedPatch = await sharp(editedRgb)
       .joinChannel(editableAlpha, { raw: { width, height, channels: 1 } })
       .png()
       .toBuffer();
 
-    const final = await sharp(baseBuf)
+    const final = await sharp(baseBuf, { limitInputPixels: EDIT_MASK_MAX_PIXELS })
       .removeAlpha()
       .composite([{ input: editedPatch }])
       .jpeg({ quality: OPENAI_OUTPUT_COMPRESSION })
@@ -271,14 +310,9 @@ export async function POST(req: NextRequest) {
       if (!editBaseFile || !editMaskFile) {
         return NextResponse.json({ message: 'Edit base image and mask must be sent together.' }, { status: 400 });
       }
-      for (const [file, label] of [[editBaseFile, 'Edit base image'], [editMaskFile, 'Edit mask']] as const) {
-        const validation = validateImageSize(file, label, true);
-        if (!validation.valid) {
-          return NextResponse.json({ message: validation.error }, { status: 400 });
-        }
-        if (file.type !== 'image/png') {
-          return NextResponse.json({ message: `${label} must be a PNG.` }, { status: 400 });
-        }
+      const maskError = await validateEditMaskPair(editBaseFile, editMaskFile);
+      if (maskError) {
+        return NextResponse.json({ message: maskError }, { status: 400 });
       }
     }
 
