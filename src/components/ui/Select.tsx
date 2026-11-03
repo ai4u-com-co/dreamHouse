@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useId } from 'react';
 import { ChevronDown } from 'lucide-react';
 import { twMerge } from 'tailwind-merge';
 
@@ -13,17 +13,22 @@ export function Select({
   options,
   className,
   containerClassName,
+  id,
   ...props
 }: SelectProps) {
+  // La etiqueta debe estar enlazada al control: sin esto un lector de pantalla (y getByLabel) no los asocia
+  const autoId = useId();
+  const selectId = id ?? autoId;
   return (
     <div className={twMerge('flex flex-col gap-2 group', containerClassName)}>
       {label && (
-        <label className="text-xs font-bold uppercase tracking-widest text-muted-foreground">
+        <label htmlFor={selectId} className="text-xs font-bold uppercase tracking-widest text-muted-foreground">
           {label}
         </label>
       )}
       <div className="relative">
         <select
+          id={selectId}
           className={twMerge(
             'w-full appearance-none bg-card border border-border py-3 px-4 pr-10 rounded-none',
             'text-foreground text-sm font-medium uppercase tracking-wide',

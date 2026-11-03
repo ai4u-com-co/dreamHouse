@@ -69,6 +69,13 @@ You are an expert interior designer assistant. Parse the user's natural language
 Return a JSON object with any of the following keys if they are mentioned or inferred in the text:
 
 - "roomType" (string) - MUST be one of: ${JSON.stringify(IC.ROOM_TYPES)}
+- "projectType" (string) - The kind of building the room belongs to. MUST be one of: ${JSON.stringify(EC.PROJECT_TYPES)}
+- "city" (string) - Free text region/city (e.g. "Kyoto", "Oslo")
+- "environment" (string) - Natural surroundings seen from the room. MUST be one of: ${JSON.stringify(EC.ENVIRONMENTS)}
+- "climate" (string) - MUST be one of: ${JSON.stringify(EC.CLIMATES)}
+- "waterBody" (string) - MUST be one of: ${JSON.stringify(EC.WATER_BODIES)}
+- "weatherCondition" (string) - MUST be one of: ${JSON.stringify(EC.WEATHER_CONDITIONS)}
+- "humanContext" (string) - MUST be one of: ${JSON.stringify(SC.HUMAN_CONTEXT)}
 - "furnitureStyle" (array of strings, max 2) - MUST match elements of: ${JSON.stringify(IC.FURNITURE_STYLES)}
 - "interiorLighting" (array of strings, max 2) - MUST match elements of: ${JSON.stringify(IC.INTERIOR_LIGHTING_TYPES)}
 - "flooringMaterial" (string) - MUST be one of: ${JSON.stringify(IC.FLOORING_MATERIALS)}

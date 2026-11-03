@@ -90,7 +90,13 @@ function StudioContent() {
     if (mode === params.mode) return;
     setParams(prev => ({ ...prev, mode }));
     setActiveSection(FIRST_SECTION[mode]);
-    if (lotFile) showToast(`Se conserva la foto cargada: en ${MODE_NAMES[mode]} se usará como ${LOT_ROLE[mode]}.`);
+    // Un solo estado para todos los módulos: lo compartido se conserva y lo exclusivo queda guardado por si se vuelve
+    const shared = mode === 'exterior' || mode === 'interior'
+      ? 'Se conservan tu esencia (tipo, mood, estilo, arquitecto), el sitio y la luz: lo que cambies aquí también cambia en el otro módulo.'
+      : '';
+    const photo = lotFile ? `La foto cargada se usará como ${LOT_ROLE[mode]}.` : '';
+    const message = [shared, photo].filter(Boolean).join(' ');
+    if (message) showToast(message);
   };
 
   /** Metadatos de una imagen -> render de origen. Vienen de un archivo, así que se validan y se acotan. */
@@ -167,7 +173,7 @@ function StudioContent() {
     }
     if (exteriorReferenceFile) list.push({ label: 'CASA ACT.', name: exteriorReferenceFile.name, used: m === 'exterior' });
     if (floorPlanFile) list.push({ label: 'PLANO', name: floorPlanFile.name, used: m === 'exterior' || m === 'interior' });
-    if (files.length) list.push({ label: 'REFERENC.', name: `${files.length} imagen${files.length > 1 ? 'es' : ''}`, used: m === 'exterior' });
+    if (files.length) list.push({ label: 'REFERENC.', name: `${files.length} imagen${files.length > 1 ? 'es' : ''}`, used: m === 'exterior' || m === 'interior' });
     if (objectFiles.length) list.push({ label: 'OBJETOS', name: `${objectFiles.length} pieza${objectFiles.length > 1 ? 's' : ''}`, used: m === 'interior' });
     if (m === 'edit' && editMask) list.push({ label: 'MÁSCARA', name: 'zona pintada', used: true });
     return list;
@@ -207,6 +213,7 @@ function StudioContent() {
 
     const isExt = params.mode === 'exterior';
     const isInt = params.mode === 'interior';
+    const isExtOrInt = isExt || isInt; // esencia y sitio se comparten entre exterior e interior (ver PARAM_MODES)
     const randomProjectType = pick(EC.PROJECT_TYPES);
     // Metros cuadrados coherentes con el tipo: una tiny house no puede ser una mansión
     const randomSize = randomProjectType === 'Tiny house' ? '35' : String(60 + Math.floor(Math.random() * 740));
@@ -226,12 +233,12 @@ function StudioContent() {
       renderStyle: pick(SC.RENDER_STYLES),
 
       // Exterior
-      projectType: isExt ? randomProjectType : params.projectType,
+      projectType: isExtOrInt ? randomProjectType : params.projectType,
       city: params.city,
-      climate: isExt ? pick(EC.CLIMATES) : params.climate,
-      environment: isExt ? pick(EC.ENVIRONMENTS) : params.environment,
-      waterBody: isExt ? pick(EC.WATER_BODIES) : params.waterBody,
-      weatherCondition: isExt ? pick(EC.WEATHER_CONDITIONS) : params.weatherCondition,
+      climate: isExtOrInt ? pick(EC.CLIMATES) : params.climate,
+      environment: isExtOrInt ? pick(EC.ENVIRONMENTS) : params.environment,
+      waterBody: isExtOrInt ? pick(EC.WATER_BODIES) : params.waterBody,
+      weatherCondition: isExtOrInt ? pick(EC.WEATHER_CONDITIONS) : params.weatherCondition,
       size: isExt ? randomSize : params.size,
       levels: isExt ? Math.floor(Math.random() * 5) + 1 : params.levels,
       roofType: isExt ? pick(EC.ROOF_TYPES) : params.roofType,
@@ -249,8 +256,8 @@ function StudioContent() {
       interiorLighting: isInt ? pickMulti(IC.INTERIOR_LIGHTING_TYPES, 2) : params.interiorLighting,
       flooringMaterial: isInt ? pick(IC.FLOORING_MATERIALS) : params.flooringMaterial,
       ceilingDetail: isInt ? pick(IC.CEILING_DETAILS) : params.ceilingDetail,
-      bedrooms: isInt ? Math.floor(Math.random() * 4) + 1 : params.bedrooms,
-      bathrooms: isInt ? Math.floor(Math.random() * 3) + 1 : params.bathrooms,
+      bedrooms: isExtOrInt ? Math.floor(Math.random() * 4) + 1 : params.bedrooms,
+      bathrooms: isExtOrInt ? Math.floor(Math.random() * 3) + 1 : params.bathrooms,
       kitchenType: isInt ? pick(IC.KITCHEN_TYPES) : params.kitchenType,
       livingAreaType: isInt ? pick(IC.LIVING_AREA_TYPES) : params.livingAreaType,
       
