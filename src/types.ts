@@ -46,6 +46,8 @@ export interface SharedParams {
   renderQuality: RenderQuality;
   /** Incrustar los parámetros dentro del archivo de imagen generado (XMP/iTXt) */
   embedMetadata: boolean;
+  /** Incluir además ciudad, notas, textos libres y el prompt completo (más detalle, menos privado) */
+  embedDetails: boolean;
   /** Render original del que se deriva esta generación (lo llena la subida de una imagen con metadatos) */
   sourceRender?: SourceRender;
 
@@ -113,8 +115,8 @@ export const DEFAULT_PARAMS: DreamHouseParams = {
   lighting: "",
   humanContext: "",
   cameraPreset: "Fujifilm X100 VI",
-  focalLength: "35mm (documental natural)",
-  aperture: "f/5.6 (punto dulce arquitectónico)",
+  focalLength: "35mm",
+  aperture: "f/5.6",
   filmSimulation: "Classic Chrome",
   depthOfField: "Total (f/8–f/11, todo nítido)",
   renderStyle: "",
@@ -123,6 +125,7 @@ export const DEFAULT_PARAMS: DreamHouseParams = {
   thinkingLevel: "Minimal",
   renderQuality: "Estándar",
   embedMetadata: true,
+  embedDetails: false,
   technicalNotes: "",
   artDirection: "",
   negativePrompt: "",

@@ -1,12 +1,21 @@
 import React from 'react';
-import { DreamHouseParams } from '@/types';
+import { DEFAULT_PARAMS, DreamHouseParams, GenerationMode } from '@/types';
 import {
   FileText, Sparkles, MapPin, Layers, LayoutGrid,
-  Hammer, Palette, Camera, Settings2, PenLine, Maximize2, Armchair
+  Hammer, Palette, Camera, Settings2, PenLine, Maximize2, Armchair, Paperclip
 } from 'lucide-react';
+
+/** Un archivo cargado por el usuario y si el módulo actual lo usa */
+export interface LoadedFile {
+  label: string;
+  name: string;
+  used: boolean;
+}
 
 interface PromptPreviewProps {
   params: DreamHouseParams;
+  /** Archivos cargados (con el rol que cumplen en el módulo actual) */
+  loadedFiles?: LoadedFile[];
 }
 
 type ParamValue = string | string[] | number;
@@ -14,6 +23,10 @@ type ParamValue = string | string[] | number;
 interface ParamItem {
   label: string;
   value: ParamValue;
+  /** Campo de params al que corresponde (para saber si sigue en su valor por defecto) */
+  key?: keyof DreamHouseParams;
+  /** Módulos en los que este dato aplica (por defecto, los del grupo) */
+  modes?: GenerationMode[];
 }
 
 interface ParamGroup {
@@ -21,7 +34,16 @@ interface ParamGroup {
   title: string;
   icon: React.ReactNode;
   items: ParamItem[];
+  /** Módulos en los que aplica el grupo (por defecto, todos) */
+  modes?: GenerationMode[];
 }
+
+const MODE_LABELS: Record<GenerationMode, string> = {
+  exterior: 'Exterior',
+  interior: 'Interior',
+  edit: 'Edición',
+  vistas: 'Vistas',
+};
 
 function hasValue(val: ParamValue): boolean {
   if (Array.isArray(val)) return val.length > 0;
@@ -35,108 +57,134 @@ function renderValue(val: ParamValue): string[] {
   return [val];
 }
 
-export default function PromptPreview({ params }: PromptPreviewProps) {
+/** ¿El valor sigue siendo el de fábrica? Se muestra, pero no cuenta como algo que el usuario eligió */
+function isFactoryDefault(item: ParamItem): boolean {
+  if (!item.key) return false;
+  return JSON.stringify(DEFAULT_PARAMS[item.key]) === JSON.stringify(item.value);
+}
+
+const EXT: GenerationMode[] = ['exterior'];
+const INT: GenerationMode[] = ['interior'];
+const EXT_VISTAS: GenerationMode[] = ['exterior', 'vistas'];
+const NOT_EDIT: GenerationMode[] = ['exterior', 'interior', 'vistas'];
+
+export default function PromptPreview({ params, loadedFiles = [] }: PromptPreviewProps) {
+  const mode = params.mode;
   const groups: ParamGroup[] = [
     {
       number: '03',
       title: 'Modo de Trabajo',
       icon: <Maximize2 className="w-3.5 h-3.5" />,
       items: [
-        { label: 'MODO', value: params.mode },
+        { label: 'MODO', value: MODE_LABELS[mode] ?? mode },
+        { label: 'VISTAS', value: params.selectedVistas, key: 'selectedVistas', modes: ['vistas'] },
+        { label: 'ORIGEN', value: params.sourceRender ? `${params.sourceRender.houseName || 'Render DreamHouse'}${params.sourceRender.model ? ` · ${params.sourceRender.model}` : ''}` : '', modes: ['vistas', 'edit'] },
       ],
     },
     {
       number: '04',
       title: 'Esencia del Proyecto',
       icon: <Sparkles className="w-3.5 h-3.5" />,
+      modes: NOT_EDIT,
       items: [
-        { label: 'TIPO', value: params.mode === 'exterior' ? params.projectType : params.roomType },
-        { label: 'ESTILO', value: params.architecturalStyles },
-        { label: 'ARQUITECTO', value: params.architect },
-        { label: 'MOOD', value: params.mood },
+        { label: 'TIPO', value: params.projectType, key: 'projectType', modes: EXT },
+        { label: 'ESPACIO', value: params.roomType, key: 'roomType', modes: INT },
+        { label: 'ESTILO', value: params.architecturalStyles, key: 'architecturalStyles' },
+        { label: 'ARQUITECTO', value: params.architect, key: 'architect' },
+        { label: 'MOOD', value: params.mood, key: 'mood' },
       ],
     },
     {
       number: '05',
       title: 'Contexto y Ubicación',
       icon: <MapPin className="w-3.5 h-3.5" />,
+      modes: EXT_VISTAS,
       items: [
-        { label: 'CIUDAD', value: params.city },
-        { label: 'CLIMA', value: params.climate },
-        { label: 'ENTORNO', value: params.environment },
-        { label: 'AGUA', value: params.waterBody },
-        { label: 'TIEMPO', value: params.weatherCondition },
+        { label: 'CIUDAD', value: params.city, key: 'city' },
+        { label: 'CLIMA', value: params.climate, key: 'climate' },
+        { label: 'ENTORNO', value: params.environment, key: 'environment' },
+        { label: 'AGUA', value: params.waterBody, key: 'waterBody' },
+        { label: 'TIEMPO', value: params.weatherCondition, key: 'weatherCondition' },
       ],
     },
     {
       number: '06',
       title: 'Volumetría y Forma',
       icon: <Layers className="w-3.5 h-3.5" />,
+      modes: EXT_VISTAS,
       items: [
-        { label: 'TAMAÑO', value: params.size },
-        { label: 'NIVELES', value: params.levels },
-        { label: 'CUBIERTA', value: params.roofType },
-        { label: 'PLANTA', value: params.layoutType },
+        { label: 'TAMAÑO', value: params.size, key: 'size' },
+        { label: 'NIVELES', value: params.levels, key: 'levels' },
+        { label: 'CUBIERTA', value: params.roofType, key: 'roofType' },
+        { label: 'PLANTA', value: params.layoutType, key: 'layoutType' },
       ],
     },
     {
       number: '07',
       title: 'Diseño Interior',
       icon: <Armchair className="w-3.5 h-3.5" />,
+      modes: INT,
       items: [
-        { label: 'MUEBLES', value: params.furnitureStyle },
-        { label: 'LUZ INT.', value: params.interiorLighting },
+        { label: 'M²', value: params.roomSizeM2, key: 'roomSizeM2' },
+        { label: 'MUEBLES', value: params.furnitureStyle, key: 'furnitureStyle' },
+        { label: 'LUZ INT.', value: params.interiorLighting, key: 'interiorLighting' },
+        { label: 'SUELO', value: params.flooringMaterial, key: 'flooringMaterial' },
+        { label: 'TECHO', value: params.ceilingDetail, key: 'ceilingDetail' },
       ],
     },
     {
       number: '08',
       title: 'Programa Arquitectónico',
       icon: <LayoutGrid className="w-3.5 h-3.5" />,
+      modes: ['exterior', 'interior'],
       items: [
-        { label: 'HABITAC.', value: params.bedrooms },
-        { label: 'BAÑOS', value: params.bathrooms },
-        { label: 'PARQUEO', value: params.parkingSpots },
-        { label: 'TIPO PKG', value: params.parkingType },
-        { label: 'COCINA', value: params.kitchenType },
-        { label: 'SALA', value: params.livingAreaType },
-        { label: 'ÁREAS SOC.', value: params.socialAreas },
+        { label: 'HABITAC.', value: params.bedrooms, key: 'bedrooms', modes: INT },
+        { label: 'BAÑOS', value: params.bathrooms, key: 'bathrooms', modes: INT },
+        { label: 'COCINA', value: params.kitchenType, key: 'kitchenType', modes: INT },
+        { label: 'SALA', value: params.livingAreaType, key: 'livingAreaType', modes: INT },
+        { label: 'PARQUEO', value: params.parkingSpots, key: 'parkingSpots', modes: EXT },
+        { label: 'TIPO PKG', value: params.parkingType, key: 'parkingType', modes: EXT },
+        { label: 'ÁREAS SOC.', value: params.socialAreas, key: 'socialAreas', modes: EXT },
       ],
     },
     {
       number: '09',
       title: 'Materialidad y Acabados',
       icon: <Hammer className="w-3.5 h-3.5" />,
+      modes: NOT_EDIT,
       items: [
-        { label: 'SUELO', value: params.flooringMaterial },
-        { label: 'TECHO', value: params.ceilingDetail },
-        { label: 'REVESTIM.', value: params.materials },
-        { label: 'CALIDAD', value: params.finishLevel },
-        { label: 'DETALLES', value: params.architecturalDetails },
+        { label: 'REVESTIM.', value: params.materials, key: 'materials' },
+        { label: 'CALIDAD', value: params.finishLevel, key: 'finishLevel' },
+        { label: 'DETALLES', value: params.architecturalDetails, key: 'architecturalDetails', modes: EXT_VISTAS },
       ],
     },
     {
       number: '10',
       title: 'Estética y Paisaje',
       icon: <Palette className="w-3.5 h-3.5" />,
+      modes: NOT_EDIT,
       items: [
-        { label: 'PALETA', value: params.colorPalette },
-        { label: 'ELEMENTOS', value: params.exteriorElements },
-        { label: 'VEGETACIÓN', value: params.vegetation },
+        { label: 'PALETA', value: params.colorPalette, key: 'colorPalette' },
+        { label: 'ELEMENTOS', value: params.exteriorElements, key: 'exteriorElements', modes: EXT_VISTAS },
+        { label: 'VEGETACIÓN', value: params.vegetation, key: 'vegetation', modes: EXT_VISTAS },
       ],
     },
     {
       number: '11',
       title: 'Parámetros Fotográficos',
       icon: <Camera className="w-3.5 h-3.5" />,
+      modes: NOT_EDIT,
       items: [
-        { label: 'CÁMARA', value: params.cameraPreset },
-        { label: 'FOCAL', value: params.focalLength },
-        { label: 'APERTURA', value: params.aperture },
-        { label: 'PELÍCULA', value: params.filmSimulation },
-        { label: 'ÁNGULO', value: params.cameraAngle },
-        { label: 'COMPOSICIÓN', value: params.composition },
-        { label: 'HORA', value: params.timeOfDay },
-        { label: 'LUZ', value: params.lighting },
+        { label: 'CÁMARA', value: params.cameraPreset, key: 'cameraPreset' },
+        { label: 'FOCAL', value: params.focalLength, key: 'focalLength' },
+        { label: 'APERTURA', value: params.aperture, key: 'aperture' },
+        { label: 'PELÍCULA', value: params.filmSimulation, key: 'filmSimulation' },
+        { label: 'ÁNGULO', value: params.cameraAngle, key: 'cameraAngle', modes: ['exterior', 'interior'] },
+        { label: 'COMPOSICIÓN', value: params.composition, key: 'composition', modes: ['exterior', 'interior'] },
+        { label: 'HORA', value: params.timeOfDay, key: 'timeOfDay', modes: EXT_VISTAS },
+        { label: 'ESTACIÓN', value: params.season, key: 'season', modes: EXT_VISTAS },
+        { label: 'LUZ', value: params.lighting, key: 'lighting', modes: EXT_VISTAS },
+        { label: 'PERSONAS', value: params.humanContext, key: 'humanContext', modes: ['exterior', 'interior'] },
       ],
     },
     {
@@ -144,11 +192,12 @@ export default function PromptPreview({ params }: PromptPreviewProps) {
       title: 'Configuración de Salida',
       icon: <Settings2 className="w-3.5 h-3.5" />,
       items: [
-        { label: 'MODELO IA', value: params.aiModel },
-        { label: 'RENDER', value: params.renderStyle },
-        { label: 'RATIO', value: params.renderAspectRatio },
-        { label: 'RESOLUCIÓN', value: params.renderOutputResolution },
-        { label: 'THINKING', value: params.thinkingLevel !== 'Minimal' ? params.thinkingLevel : '' },
+        { label: 'MODELO IA', value: params.aiModel, key: 'aiModel' },
+        { label: 'RENDER', value: params.renderStyle, key: 'renderStyle', modes: NOT_EDIT },
+        { label: 'CALIDAD', value: params.aiModel.includes('OpenAI') ? params.renderQuality : '', key: 'renderQuality' },
+        { label: 'RATIO', value: params.renderAspectRatio, key: 'renderAspectRatio', modes: NOT_EDIT },
+        { label: 'RESOLUCIÓN', value: params.renderOutputResolution, key: 'renderOutputResolution', modes: NOT_EDIT },
+        { label: 'THINKING', value: params.thinkingLevel !== 'Minimal' ? params.thinkingLevel : '', modes: NOT_EDIT },
       ],
     },
     {
@@ -156,21 +205,28 @@ export default function PromptPreview({ params }: PromptPreviewProps) {
       title: 'Dirección Creativa',
       icon: <PenLine className="w-3.5 h-3.5" />,
       items: [
-        { label: 'EDITAR', value: params.editPrompt },
-        { label: 'TÉCNICAS', value: params.technicalNotes },
-        { label: 'ART DIR.', value: params.artDirection },
-        { label: 'EXCLUIR', value: params.negativePrompt },
+        { label: 'EDITAR', value: params.editPrompt, key: 'editPrompt', modes: ['edit'] },
+        { label: 'TÉCNICAS', value: params.technicalNotes, key: 'technicalNotes', modes: NOT_EDIT },
+        { label: 'ART DIR.', value: params.artDirection, key: 'artDirection', modes: NOT_EDIT },
+        { label: 'EXCLUIR', value: params.negativePrompt, key: 'negativePrompt' },
       ],
     },
   ];
 
-  // Only show groups that have at least one value set
-  const activeGroups = groups.filter(g => g.items.some(item => hasValue(item.value)));
+  // Solo lo que aplica al módulo actual
+  const applicable = groups
+    .filter((g) => !g.modes || g.modes.includes(mode))
+    .map((g) => ({ ...g, items: g.items.filter((item) => !item.modes || item.modes.includes(mode)) }));
 
-  const totalParams = groups.reduce(
-    (acc, g) => acc + g.items.filter(item => hasValue(item.value)).length,
+  const visibleGroups = applicable.filter((g) => g.items.some((item) => hasValue(item.value)));
+
+  // Cuenta solo lo que el usuario eligió (los valores de fábrica se muestran pero no cuentan)
+  const totalParams = applicable.reduce(
+    (acc, g) => acc + g.items.filter((item) => hasValue(item.value) && !isFactoryDefault(item)).length,
     0
   );
+  const usedFiles = loadedFiles.filter((f) => f.used);
+  const ignoredFiles = loadedFiles.filter((f) => !f.used);
 
   return (
     <div className="h-full flex flex-col animate-fade-in-up bg-card/50 backdrop-blur-sm">
@@ -194,7 +250,7 @@ export default function PromptPreview({ params }: PromptPreviewProps) {
         </div>
       </div>
 
-      {totalParams === 0 ? (
+      {totalParams === 0 && loadedFiles.length === 0 ? (
         <div className="flex-1 flex items-center justify-center">
           <p className="text-[10px] font-mono text-muted-foreground/50 uppercase tracking-widest text-center">
             Configure parameters<br />to see the spec
@@ -202,8 +258,8 @@ export default function PromptPreview({ params }: PromptPreviewProps) {
         </div>
       ) : (
         <div className="flex-1 overflow-y-auto pr-2 space-y-5">
-          {activeGroups.map((group) => {
-            const activeItems = group.items.filter(item => hasValue(item.value));
+          {visibleGroups.map((group) => {
+            const activeItems = group.items.filter((item) => hasValue(item.value));
             return (
               <div
                 key={group.number}
@@ -230,7 +286,7 @@ export default function PromptPreview({ params }: PromptPreviewProps) {
                         <span className="text-[10px] font-mono text-muted-foreground/50 w-[4.5rem] shrink-0 uppercase tracking-tight text-right group-hover:text-primary/70 transition-colors">
                           {item.label}
                         </span>
-                        <span className="text-xs font-medium text-foreground border-b border-dashed border-border/50 pb-0.5 group-hover:border-primary/30 transition-colors leading-tight">
+                        <span className="text-xs font-medium text-foreground border-b border-dashed border-border/50 pb-0.5 group-hover:border-primary/30 transition-colors leading-tight break-words min-w-0">
                           {val}
                         </span>
                       </div>
@@ -240,6 +296,30 @@ export default function PromptPreview({ params }: PromptPreviewProps) {
               </div>
             );
           })}
+
+          {/* Archivos cargados: qué se usa en este módulo y qué se ignora */}
+          {loadedFiles.length > 0 && (
+            <div className="relative pl-3 border-l border-border/40">
+              <div className="flex items-center gap-1.5 mb-2">
+                <span className="text-muted-foreground"><Paperclip className="w-3.5 h-3.5" /></span>
+                <span className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground/80">Archivos</span>
+              </div>
+              <div className="grid grid-cols-1 gap-1.5">
+                {usedFiles.map((f, i) => (
+                  <div key={`u-${i}`} className="flex items-baseline gap-3">
+                    <span className="text-[10px] font-mono text-muted-foreground/50 w-[4.5rem] shrink-0 uppercase tracking-tight text-right">{f.label}</span>
+                    <span className="text-xs font-medium text-foreground leading-tight break-words min-w-0">{f.name}</span>
+                  </div>
+                ))}
+                {ignoredFiles.map((f, i) => (
+                  <div key={`i-${i}`} className="flex items-baseline gap-3 opacity-60">
+                    <span className="text-[10px] font-mono text-muted-foreground/50 w-[4.5rem] shrink-0 uppercase tracking-tight text-right">{f.label}</span>
+                    <span className="text-xs leading-tight break-words min-w-0">{f.name} <em className="text-[10px] not-italic text-muted-foreground">(no se usa en {MODE_LABELS[mode]})</em></span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
         </div>
       )}
     </div>

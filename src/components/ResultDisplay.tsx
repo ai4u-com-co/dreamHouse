@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Download, RefreshCw, Sparkles, Maximize2 } from 'lucide-react';
+import { Download, RefreshCw, Sparkles, Maximize2, LayoutGrid, Wand } from 'lucide-react';
 import Image from 'next/image';
 import { Button } from './ui/Button';
 import clsx from 'clsx';
@@ -46,6 +46,8 @@ interface ResultDisplayProps {
   vistasImages?: { type: string; url: string | null; loading?: boolean }[];
   activeVistaIndex?: number;
   houseName?: string | null;
+  /** Usa el render mostrado como imagen base de otro módulo (sus parámetros viajan en el propio archivo) */
+  onUseAsBase?: (target: 'vistas' | 'edit') => void;
 }
 
 
@@ -58,7 +60,8 @@ export default function ResultDisplay({
   subtitle = "Generado con inteligencia artificial",
   vistasImages,
   activeVistaIndex = 0,
-  houseName
+  houseName,
+  onUseAsBase
 }: ResultDisplayProps) {
   const [messageIndex, setMessageIndex] = useState(0);
   const { openLightbox } = useLightbox();
@@ -244,6 +247,26 @@ export default function ResultDisplay({
                       <Download className="w-4 h-4" />
                       Descargar
                     </a>
+                    {onUseAsBase && (
+                      <>
+                        <button
+                          type="button"
+                          onClick={() => onUseAsBase('vistas')}
+                          className="inline-flex items-center justify-center gap-2 px-4 py-2 min-h-[44px] text-sm font-semibold text-white bg-black/50 backdrop-blur-md border border-white/20 rounded-lg hover:bg-white/20 transition-colors"
+                        >
+                          <LayoutGrid className="w-4 h-4" aria-hidden="true" />
+                          Crear vistas
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => onUseAsBase('edit')}
+                          className="inline-flex items-center justify-center gap-2 px-4 py-2 min-h-[44px] text-sm font-semibold text-white bg-black/50 backdrop-blur-md border border-white/20 rounded-lg hover:bg-white/20 transition-colors"
+                        >
+                          <Wand className="w-4 h-4" aria-hidden="true" />
+                          Editar
+                        </button>
+                      </>
+                    )}
                   </div>
                 </div>
               </>

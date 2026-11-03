@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { GoogleGenAI, Part } from '@google/genai';
 import OpenAI from 'openai';
 import sharp from 'sharp';
-import { embedImageMetadata, METADATA_APP, METADATA_VERSION, type DreamHouseImageMetadata } from '@/lib/image-metadata';
+import { embedImageMetadata, pickEmbeddableParams, METADATA_APP, METADATA_VERSION, type DreamHouseImageMetadata } from '@/lib/image-metadata';
 import { DreamHouseParams } from '@/types';
 import { buildExteriorPrompt } from '@/modules/exterior/lib/prompt-builder';
 import { buildInteriorPrompt } from '@/modules/interior/lib/prompt-builder';
@@ -244,8 +244,11 @@ export async function POST(req: NextRequest) {
     // API Key validation based on selected model
     let geminiApiKey = null;
     let openaiApiKey = null;
+    // Si el cliente no trae su propia clave se usa la del servidor: ahí el costo se limita (ver más abajo)
+    let usingServerOpenAIKey = false;
 
     if (useOpenAI) {
+      usingServerOpenAIKey = !req.headers.get('x-openai-api-key');
       openaiApiKey = req.headers.get('x-openai-api-key') || process.env.OPENAI_API_KEY;
       if (!openaiApiKey) {
         return NextResponse.json(
@@ -647,8 +650,12 @@ VERIFICATION STEPS:
     if (useOpenAI && openaiClient) {
       const imageFiles = openaiInputs.map(input => input.file);
       // En edición el tamaño lo decide la imagen de entrada ("auto"): forzar 16:9 deformaría lo editado
-      const sizeStr = params.mode === 'edit' ? 'auto' : getGptImage2Size(params.renderAspectRatio, params.renderOutputResolution);
-      const { model: openaiModel, quality: qualityVal } = getOpenAIImageSettings(params.aiModel, params.thinkingLevel, params.renderQuality);
+      // Con la clave del servidor (no la del usuario) se acota el costo: calidad máxima "medium" y resolución máxima 2K
+      const effectiveResolution = usingServerOpenAIKey && params.renderOutputResolution === '4K' ? '2K' : params.renderOutputResolution;
+      const sizeStr = params.mode === 'edit' ? 'auto' : getGptImage2Size(params.renderAspectRatio, effectiveResolution);
+      const requested = getOpenAIImageSettings(params.aiModel, params.thinkingLevel, params.renderQuality);
+      const openaiModel = requested.model;
+      const qualityVal: OpenAIImageQuality = usingServerOpenAIKey && (requested.quality === 'high' || requested.quality === 'xhigh') ? 'medium' : requested.quality;
       usedModel = openaiModel;
       usedQuality = qualityVal;
       usedSize = sizeStr;
@@ -788,9 +795,9 @@ Return ONLY the 3-word name, no quotes, no extra text. Focus on what makes it un
         houseName,
         viewType: params.mode === 'vistas' ? params.viewType : undefined,
         parentId: params.sourceRender?.id,
-        // Sin el render de origen (ya viaja como parentId) ni banderas internas
-        params: { ...params, sourceRender: undefined, embedMetadata: undefined },
-        prompt: fullPrompt,
+        // Lista explícita de campos de diseño; ciudad, notas y prompt solo si el usuario lo permitió
+        params: pickEmbeddableParams(params, !!params.embedDetails),
+        prompt: params.embedDetails ? fullPrompt : undefined,
       });
     }
 

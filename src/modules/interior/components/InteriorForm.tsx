@@ -2,6 +2,7 @@ import React from 'react';
 import { DreamHouseParams } from '@/types';
 import * as IC from '../constants';
 import * as EC from '../../exterior/constants';
+import { OutputOptions } from '@/components/FormExtras';
 import * as SC from '../../shared/constants';
 import clsx from 'clsx';
 import { Sparkles, Armchair, LayoutGrid, Layers, Palette, Camera, ImageIcon, PenLine, ScanSearch } from 'lucide-react';
@@ -190,11 +191,11 @@ export default function InteriorForm({ params, onChange, disabled, activeSection
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
             <div className="flex flex-col gap-2">
               <label className="text-xs font-bold uppercase tracking-widest text-muted-foreground">Dormitorios</label>
-              <DebouncedInput type="number" min={1} value={params.bedrooms || 1} onChange={(val) => handleChange("bedrooms", parseInt(val) || 1)} disabled={disabled} />
+              <DebouncedInput type="number" min={1} value={params.bedrooms || ''} placeholder="—" onChange={(val) => handleChange("bedrooms", parseInt(val) || 0)} disabled={disabled} />
             </div>
             <div className="flex flex-col gap-2">
               <label className="text-xs font-bold uppercase tracking-widest text-muted-foreground">Baños</label>
-              <DebouncedInput type="number" min={1} value={params.bathrooms || 1} onChange={(val) => handleChange("bathrooms", parseInt(val) || 1)} disabled={disabled} />
+              <DebouncedInput type="number" min={1} value={params.bathrooms || ''} placeholder="—" onChange={(val) => handleChange("bathrooms", parseInt(val) || 0)} disabled={disabled} />
             </div>
           </div>
         </div>
@@ -264,6 +265,7 @@ export default function InteriorForm({ params, onChange, disabled, activeSection
       >
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-5 mb-5">
           <Select label="Modelo de IA" value={params.aiModel} onChange={(e) => handleChange("aiModel", e.target.value)} options={SC.AI_MODELS} disabled={disabled} />
+          <OutputOptions params={params} onChange={handleChange} disabled={disabled} />
         </div>
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-5">
           <Select label="Estilo de Imagen" value={params.renderStyle} onChange={(e) => handleChange("renderStyle", e.target.value)} options={SC.RENDER_STYLES} disabled={disabled} />

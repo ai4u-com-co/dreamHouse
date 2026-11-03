@@ -10,7 +10,7 @@ import InteriorForm from '@/modules/interior/components/InteriorForm';
 import EditForm from '@/modules/edit/components/EditForm';
 import VistasForm from '@/modules/vistas/components/VistasForm';
 import ResultDisplay from '@/components/ResultDisplay';
-import PromptPreview from '@/components/PromptPreview';
+import PromptPreview, { type LoadedFile } from '@/components/PromptPreview';
 import { DreamHouseParams, DEFAULT_PARAMS } from '@/types';
 import { Wand2, AlertCircle, RotateCcw, Dices, CheckCircle2, Home, Armchair, Maximize2, Camera, PenLine, Wand, ImageIcon } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
@@ -25,6 +25,8 @@ import { GenerationRecord } from '@/lib/db';
 import { LightboxProvider } from '@/context/LightboxContext';
 import MemoryGuard from '@/components/MemoryGuard';
 import type { EditMaskPayload } from '@/components/SketchCanvas';
+import { readImageMetadataFromFile } from '@/lib/image-metadata';
+import { sanitizeAssistantParams } from '@/lib/assistant-params';
 
 
 export default function StudioPage() {
@@ -71,6 +73,95 @@ function StudioContent() {
     setActiveSection(prev => prev === id ? null : id);
   };
 
+  // El mismo archivo "principal" (lotFile) significa cosas distintas en cada módulo
+  const MODE_NAMES: Record<DreamHouseParams['mode'], string> = {
+    exterior: 'Arquitectura Exterior', interior: 'Diseño Interior', edit: 'Edición', vistas: 'Vistas',
+  };
+  const LOT_ROLE: Record<DreamHouseParams['mode'], string> = {
+    exterior: 'la foto del terreno', interior: 'la foto del espacio actual', vistas: 'la casa a fotografiar', edit: 'la imagen base a editar',
+  };
+  const FIRST_SECTION: Record<DreamHouseParams['mode'], string> = {
+    exterior: 'concept', interior: 'context', vistas: 'context', edit: 'sketch',
+  };
+
+  /** Cambia de módulo: abre su primera sección y avisa qué se conserva y con qué rol */
+  const switchMode = (mode: DreamHouseParams['mode']) => {
+    if (mode === params.mode) return;
+    setParams(prev => ({ ...prev, mode }));
+    setActiveSection(FIRST_SECTION[mode]);
+    if (lotFile) showToast(`Se conserva la foto cargada: en ${MODE_NAMES[mode]} se usará como ${LOT_ROLE[mode]}.`);
+  };
+
+  /** Si la imagen subida fue generada por DreamHouse, recupera los parámetros con los que se creó */
+  const applySourceRender = async (file: File | null) => {
+    if (!file) {
+      setParams(prev => (prev.sourceRender ? { ...prev, sourceRender: undefined } : prev));
+      return;
+    }
+    const meta = await readImageMetadataFromFile(file);
+    setParams(prev => ({
+      ...prev,
+      sourceRender: meta ? { id: meta.id, mode: meta.mode, houseName: meta.houseName, model: meta.model, params: meta.params } : undefined,
+    }));
+    if (meta) showToast(`Detectamos los parámetros de "${meta.houseName || 'tu render'}": se usarán para mantener la fidelidad.`);
+  };
+
+  const handleLotFileChange = (file: File | null) => {
+    setLotFile(file);
+    void applySourceRender(file);
+  };
+
+  /** En edición, al cambiar o quitar la base se descarta el boceto y la máscara de la imagen anterior */
+  const handleEditBaseChange = (file: File | null) => {
+    setLotFile(file);
+    setEditCompositeFile(null);
+    setEditMask(null);
+    void applySourceRender(file);
+  };
+
+  /** Convierte el render mostrado en la imagen base de otro módulo (sus parámetros viajan en el archivo) */
+  const handleUseResultAsBase = async (target: 'vistas' | 'edit') => {
+    const url = params.mode === 'vistas' ? (vistasResults[activeVistaIndex]?.url ?? imageUrl) : imageUrl;
+    if (!url) return;
+    try {
+      const blob = await (await fetch(url)).blob();
+      const ext = blob.type === 'image/png' ? 'png' : 'jpg';
+      const file = new File([blob], `${(houseName || 'render').replace(/\s+/g, '-')}.${ext}`, { type: blob.type });
+      setLotFile(file);
+      setEditCompositeFile(null);
+      setEditMask(null);
+      const meta = await readImageMetadataFromFile(file);
+      setParams(prev => ({
+        ...prev,
+        mode: target,
+        sourceRender: meta ? { id: meta.id, mode: meta.mode, houseName: meta.houseName, model: meta.model, params: meta.params } : undefined,
+      }));
+      setActiveSection(FIRST_SECTION[target]);
+      showToast(meta
+        ? `Render cargado como base de ${MODE_NAMES[target]} con sus parámetros originales.`
+        : `Render cargado como base de ${MODE_NAMES[target]}.`);
+      setTimeout(() => document.getElementById('studio')?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 100);
+    } catch (err) {
+      console.error('No se pudo usar el render como base:', err);
+      setError('No se pudo cargar el render como imagen base. Descárgalo y súbelo manualmente.');
+    }
+  };
+
+  /** Archivos cargados y si el módulo actual los usa (para el resumen) */
+  const buildLoadedFiles = (): LoadedFile[] => {
+    const m = params.mode;
+    const list: LoadedFile[] = [];
+    if (lotFile) {
+      list.push({ label: m === 'exterior' ? 'TERRENO' : m === 'interior' ? 'ESPACIO' : m === 'vistas' ? 'CASA' : 'BASE', name: lotFile.name, used: true });
+    }
+    if (exteriorReferenceFile) list.push({ label: 'CASA ACT.', name: exteriorReferenceFile.name, used: m === 'exterior' });
+    if (floorPlanFile) list.push({ label: 'PLANO', name: floorPlanFile.name, used: m === 'exterior' || m === 'interior' });
+    if (files.length) list.push({ label: 'REFERENC.', name: `${files.length} imagen${files.length > 1 ? 'es' : ''}`, used: m === 'exterior' });
+    if (objectFiles.length) list.push({ label: 'OBJETOS', name: `${objectFiles.length} pieza${objectFiles.length > 1 ? 's' : ''}`, used: m === 'interior' });
+    if (m === 'edit' && editMask) list.push({ label: 'MÁSCARA', name: 'zona pintada', used: true });
+    return list;
+  };
+
   const handleReset = () => {
     setParams({
       ...DEFAULT_PARAMS,
@@ -89,6 +180,9 @@ function StudioContent() {
     setEditMask(null);
     setObjectFiles([]);
     setHouseName(null);
+    setImageUrl(null);
+    setError(null);
+    setVistasResults([]);
     showToast("Parameters reset to default");
   };
 
@@ -101,6 +195,15 @@ function StudioContent() {
     };
 
     const isExt = params.mode === 'exterior';
+    const isInt = params.mode === 'interior';
+    // La API de OpenAI admite relaciones de aspecto entre 1:3 y 3:1
+    const safeRatios = SC.ASPECT_RATIOS.filter((r) => {
+      const [w, h] = r.split(':').map(Number);
+      return w / h <= 3 && w / h >= 1 / 3;
+    });
+    const randomProjectType = pick(EC.PROJECT_TYPES);
+    // Metros cuadrados coherentes con el tipo: una tiny house no puede ser una mansión
+    const randomSize = randomProjectType === 'Tiny house' ? '35' : String(60 + Math.floor(Math.random() * 740));
 
     const randomParams: DreamHouseParams = {
       ...params,
@@ -115,17 +218,17 @@ function StudioContent() {
       lighting: pick(SC.LIGHTING_TYPES),
       humanContext: pick(SC.HUMAN_CONTEXT),
       renderOutputResolution: pick(SC.OUTPUT_RESOLUTIONS),
-      renderAspectRatio: pick(SC.ASPECT_RATIOS),
+      renderAspectRatio: pick(safeRatios.length ? safeRatios : SC.ASPECT_RATIOS),
       renderStyle: pick(SC.RENDER_STYLES),
 
       // Exterior
-      projectType: isExt ? pick(EC.PROJECT_TYPES) : params.projectType,
+      projectType: isExt ? randomProjectType : params.projectType,
       city: params.city,
       climate: isExt ? pick(EC.CLIMATES) : params.climate,
       environment: isExt ? pick(EC.ENVIRONMENTS) : params.environment,
       waterBody: isExt ? pick(EC.WATER_BODIES) : params.waterBody,
       weatherCondition: isExt ? pick(EC.WEATHER_CONDITIONS) : params.weatherCondition,
-      size: isExt ? pick(EC.SIZES) : params.size,
+      size: isExt ? randomSize : params.size,
       levels: isExt ? Math.floor(Math.random() * 5) + 1 : params.levels,
       roofType: isExt ? pick(EC.ROOF_TYPES) : params.roofType,
       layoutType: isExt ? pick(EC.LAYOUT_TYPES) : params.layoutType,
@@ -137,18 +240,18 @@ function StudioContent() {
       architecturalDetails: isExt ? pickMulti(EC.ARCHITECTURAL_DETAILS, 2) : params.architecturalDetails,
 
       // Interior
-      roomType: !isExt ? pick(IC.ROOM_TYPES) : params.roomType,
-      furnitureStyle: !isExt ? pickMulti(IC.FURNITURE_STYLES, 2) : params.furnitureStyle,
-      interiorLighting: !isExt ? pickMulti(IC.INTERIOR_LIGHTING_TYPES, 2) : params.interiorLighting,
-      flooringMaterial: !isExt ? pick(IC.FLOORING_MATERIALS) : params.flooringMaterial,
-      ceilingDetail: !isExt ? pick(IC.CEILING_DETAILS) : params.ceilingDetail,
-      bedrooms: !isExt ? Math.floor(Math.random() * 4) + 1 : params.bedrooms,
-      bathrooms: !isExt ? Math.floor(Math.random() * 3) + 1 : params.bathrooms,
-      kitchenType: !isExt && params.mode !== 'edit' ? pick(IC.KITCHEN_TYPES) : params.kitchenType,
-      livingAreaType: !isExt && params.mode !== 'edit' ? pick(IC.LIVING_AREA_TYPES) : params.livingAreaType,
+      roomType: isInt ? pick(IC.ROOM_TYPES) : params.roomType,
+      furnitureStyle: isInt ? pickMulti(IC.FURNITURE_STYLES, 2) : params.furnitureStyle,
+      interiorLighting: isInt ? pickMulti(IC.INTERIOR_LIGHTING_TYPES, 2) : params.interiorLighting,
+      flooringMaterial: isInt ? pick(IC.FLOORING_MATERIALS) : params.flooringMaterial,
+      ceilingDetail: isInt ? pick(IC.CEILING_DETAILS) : params.ceilingDetail,
+      bedrooms: isInt ? Math.floor(Math.random() * 4) + 1 : params.bedrooms,
+      bathrooms: isInt ? Math.floor(Math.random() * 3) + 1 : params.bathrooms,
+      kitchenType: isInt ? pick(IC.KITCHEN_TYPES) : params.kitchenType,
+      livingAreaType: isInt ? pick(IC.LIVING_AREA_TYPES) : params.livingAreaType,
       
-      // Edit mode (just randomize output settings)
-      editPrompt: params.mode === 'edit' ? "Make the sky cloudy, add modern street lamps" : params.editPrompt,
+      // Edición: no se toca lo que el usuario escribió
+      editPrompt: params.editPrompt,
     };
 
     setParams(randomParams);
@@ -164,6 +267,14 @@ function StudioContent() {
     const isVistasMode = params.mode === 'vistas';
 
     try {
+      if (params.mode === 'edit') {
+        if (!lotFile) throw new Error('Sube la imagen que quieres editar.');
+        if (!params.editPrompt.trim()) throw new Error('Describe qué quieres cambiar en la imagen.');
+      }
+      if (params.mode === 'vistas' && !lotFile) {
+        throw new Error('Sube la foto de la casa para generar sus vistas.');
+      }
+
       const useOpenAI = params.aiModel && params.aiModel.includes('OpenAI');
       const apiKey = useOpenAI ? localStorage.getItem('OPENAI_API_KEY') : localStorage.getItem('GEMINI_API_KEY');
       if (!apiKey) {
@@ -180,6 +291,9 @@ function StudioContent() {
         setVistasResults(initialResults);
         
         // Generate one by one
+        let okCount = 0;
+        let failCount = 0;
+        let lastVistaError = '';
         for (let i = 0; i < params.selectedVistas.length; i++) {
           const viewType = params.selectedVistas[i];
           setActiveVistaIndex(i);
@@ -201,9 +315,13 @@ function StudioContent() {
               body: formData,
             });
 
-            if (!apiResponse.ok) throw new Error(`Error en vista ${viewType}`);
+            if (!apiResponse.ok) {
+              const failure = await apiResponse.json().catch(() => ({} as { message?: string }));
+              throw new Error(failure.message || `Error en vista ${viewType}`);
+            }
 
             const data = await apiResponse.json();
+            okCount++;
             
             // Update individual result
             setVistasResults(prev => prev.map((v, idx) => 
@@ -224,13 +342,20 @@ function StudioContent() {
 
           } catch (err) {
             console.error(`Error generating vista ${viewType}:`, err);
+            failCount++;
+            lastVistaError = err instanceof Error ? err.message : String(err);
             setVistasResults(prev => prev.map((v, idx) => 
               idx === i ? { ...v, loading: false } : v
             ));
           }
         }
         
-        showToast("Portafolio generado con éxito");
+        if (okCount === 0) {
+          throw new Error(lastVistaError || 'No se pudo generar ninguna vista. Revisa tu clave y la imagen e inténtalo de nuevo.');
+        }
+        showToast(failCount > 0
+          ? `Portafolio parcial: ${okCount} de ${okCount + failCount} vistas (${failCount} fallaron: ${lastVistaError}).`
+          : 'Portafolio generado con éxito');
       } else {
         const formData = new FormData();
         files.forEach((file) => {
@@ -323,7 +448,10 @@ function StudioContent() {
   };
 
   const handleLoadHistory = (record: GenerationRecord) => {
-    setParams(record.params);
+    // Se mezcla con los valores por defecto: un registro anterior a un campo nuevo no deja undefined
+    setParams({ ...DEFAULT_PARAMS, ...record.params });
+    setActiveSection(FIRST_SECTION[record.mode] ?? 'mode');
+    setVistasResults([]);
     setImageUrl(record.imageUrl);
     setHouseName(record.houseName || null);
     // Reset files since we don't store them in history (only the params)
@@ -335,7 +463,7 @@ function StudioContent() {
     setEditMask(null);
     setObjectFiles([]);
     
-    showToast(`Cargado diseño ${record.mode} de ${new Date(record.timestamp).toLocaleDateString()}`);
+    showToast(`Cargado diseño ${record.mode} de ${new Date(record.timestamp).toLocaleDateString()}. Los archivos subidos no se guardan en el historial: vuelve a cargarlos si quieres regenerar.`);
     
     setTimeout(() => {
       document.getElementById('studio')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
@@ -360,7 +488,9 @@ function StudioContent() {
               <AIAssistantPanel
                 mode={params.mode}
                 onParseSuccess={(parsedData) => {
-                  setParams(prev => ({ ...prev, ...parsedData }));
+                  const { params: safe, dropped } = sanitizeAssistantParams(parsedData);
+                  setParams(prev => ({ ...prev, ...safe }));
+                  if (dropped.length) showToast(`El asistente propuso ${dropped.length} valor(es) que el formulario no ofrece; se ignoraron.`);
                   if (params.mode === 'exterior') {
                     setActiveSection('concept');
                   } else if (params.mode === 'interior') {
@@ -427,10 +557,7 @@ function StudioContent() {
           >
             <div className="grid grid-cols-2 gap-4">
               <button
-                onClick={() => {
-                  setParams({ ...params, mode: 'exterior' });
-                  setActiveSection('concept');
-                }}
+                onClick={() => switchMode('exterior')}
                 className={clsx(
                   "flex flex-col items-center gap-3 p-6 border transition-all",
                   params.mode === "exterior" ? "bg-primary text-primary-foreground" : "bg-card text-muted-foreground"
@@ -440,10 +567,7 @@ function StudioContent() {
                 <span className="text-xs font-bold uppercase tracking-widest">Arquitectura Exterior</span>
               </button>
               <button
-                onClick={() => {
-                  setParams({ ...params, mode: 'interior' });
-                  setActiveSection('context');
-                }}
+                onClick={() => switchMode('interior')}
                 className={clsx(
                   "flex flex-col items-center gap-3 p-6 border transition-all",
                   params.mode === "interior" ? "bg-primary text-primary-foreground" : "bg-card text-muted-foreground"
@@ -453,7 +577,7 @@ function StudioContent() {
                 <span className="text-xs font-bold uppercase tracking-widest">Diseño Interior</span>
               </button>
               <button
-                onClick={() => setParams({ ...params, mode: 'edit' })}
+                onClick={() => switchMode('edit')}
                 className={clsx(
                   "flex flex-col items-center gap-3 p-6 border transition-all col-span-2 sm:col-span-1",
                   params.mode === "edit" ? "bg-primary text-primary-foreground" : "bg-card text-muted-foreground"
@@ -463,10 +587,7 @@ function StudioContent() {
                 <span className="text-xs font-bold uppercase tracking-widest">Editar Imagen con IA</span>
               </button>
               <button
-                onClick={() => {
-                  setParams({ ...params, mode: 'vistas' });
-                  setActiveSection('context');
-                }}
+                onClick={() => switchMode('vistas')}
                 className={clsx(
                   "flex flex-col items-center gap-3 p-6 border transition-all col-span-2 sm:col-span-1",
                   params.mode === "vistas" ? "bg-primary text-primary-foreground" : "bg-card text-muted-foreground"
@@ -508,7 +629,7 @@ function StudioContent() {
           <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
             <LotUploader 
               file={lotFile} 
-              onFileChange={setLotFile} 
+              onFileChange={handleLotFileChange} 
               title={
                   params.mode === 'interior' ? "Espacio Principal (Foto Actual)" :
                   "Cargar Foto de la Casa"
@@ -519,6 +640,16 @@ function StudioContent() {
               }
               icon={params.mode === 'vistas' ? <ImageIcon className="w-5 h-5 text-primary" /> : params.mode === 'interior' ? <Armchair className="w-5 h-5 text-primary" /> : undefined}
             />
+            {params.sourceRender && (params.mode === 'vistas' || params.mode === 'interior') && (
+              <div className="md:col-span-2 border border-primary/40 bg-primary/5 p-4 text-sm" role="status">
+                <p className="font-bold uppercase tracking-wider text-xs text-primary mb-1">Render DreamHouse detectado</p>
+                <p className="text-muted-foreground">
+                  {params.sourceRender.houseName ? `“${params.sourceRender.houseName}”` : 'Esta imagen'} trae los parámetros con los que se generó
+                  {params.sourceRender.model ? ` (${params.sourceRender.model})` : ''}. Lo que no elijas de nuevo se hereda de ahí para que las vistas
+                  mantengan el mismo diseño.
+                </p>
+              </div>
+            )}
           </div>
           </Section>
           )}
@@ -553,7 +684,7 @@ function StudioContent() {
               files={files}
               onFilesChange={setFiles}
               lotFile={lotFile}
-              onLotFileChange={setLotFile}
+              onLotFileChange={handleLotFileChange}
               exteriorReferenceFile={exteriorReferenceFile}
               onExteriorReferenceFileChange={setExteriorReferenceFile}
               floorPlanFile={floorPlanFile}
@@ -577,7 +708,7 @@ function StudioContent() {
               activeSection={activeSection}
               onSectionChange={toggleSection}
               baseImage={lotFile}
-              onBaseImageUpdate={setLotFile}
+              onBaseImageUpdate={handleEditBaseChange}
               onCompositeImageUpdate={setEditCompositeFile}
               onMaskUpdate={setEditMask}
             />
@@ -622,7 +753,7 @@ function StudioContent() {
               {/* Left Column: Prompt DNA (Tags) */}
               <div className="lg:col-span-3 lg:order-1 order-2">
                 <div className="bg-card border border-border rounded-xl p-4 h-full max-h-[600px] overflow-hidden sticky top-24">
-                  <PromptPreview params={params} />
+                  <PromptPreview params={params} loadedFiles={buildLoadedFiles()} />
                 </div>
               </div>
 
@@ -637,6 +768,7 @@ function StudioContent() {
                   vistasImages={params.mode === 'vistas' ? vistasResults : undefined}
                   activeVistaIndex={activeVistaIndex}
                   houseName={houseName}
+                  onUseAsBase={handleUseResultAsBase}
                 />
               </div>
             </div>

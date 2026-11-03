@@ -2,7 +2,8 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import sharp from 'sharp';
-import { embedImageMetadata, readImageMetadata } from '../../src/lib/image-metadata.ts';
+import { embedImageMetadata, readImageMetadata, pickEmbeddableParams } from '@/lib/image-metadata';
+import { DEFAULT_PARAMS } from '@/types';
 
 const meta = (over = {}) => ({
   app: 'DreamHouse',
@@ -83,4 +84,43 @@ test('un paquete con otra app o JSON corrupto se rechaza', async () => {
   const original = new Uint8Array(await makeJpeg());
   const ajeno = embedImageMetadata(original, meta({ app: 'OtraApp' }));
   assert.equal(readImageMetadata(ajeno), null);
+});
+
+// ---------- privacidad: qué se incrusta ----------
+
+const sensitive = {
+  ...DEFAULT_PARAMS,
+  city: 'Calle Secreta 123, Medellín',
+  artDirection: 'Nota privada del cliente',
+  technicalNotes: 'Presupuesto: 500 millones',
+  negativePrompt: 'sin vecinos',
+  editPrompt: 'quitar el carro del vecino',
+  projectType: 'Tiny house',
+  materials: ['Madera'],
+  campoNuevoSinRevisar: 'no debería viajar',
+  sourceRender: { id: 'x', mode: 'exterior', params: {} },
+};
+
+test('por defecto solo se incrustan campos de diseño: nada de ciudad, notas ni textos libres', () => {
+  const out = pickEmbeddableParams(sensitive);
+  assert.equal(out.projectType, 'Tiny house');
+  assert.deepEqual(out.materials, ['Madera']);
+  for (const key of ['city', 'artDirection', 'technicalNotes', 'negativePrompt', 'editPrompt', 'sourceRender', 'campoNuevoSinRevisar']) {
+    assert.ok(!(key in out), `no debe incrustarse "${key}"`);
+  }
+  const serialized = JSON.stringify(out);
+  assert.ok(!/Secreta|privada|500 millones|vecino/.test(serialized));
+});
+
+test('con permiso expreso se incluyen ciudad y textos libres, pero un campo nuevo sigue fuera', () => {
+  const out = pickEmbeddableParams(sensitive, true);
+  assert.equal(out.city, 'Calle Secreta 123, Medellín');
+  assert.equal(out.artDirection, 'Nota privada del cliente');
+  assert.ok(!('campoNuevoSinRevisar' in out));
+  assert.ok(!('sourceRender' in out));
+});
+
+test('los valores vacíos no ocupan espacio en el archivo', () => {
+  const out = pickEmbeddableParams(DEFAULT_PARAMS);
+  assert.ok(!('mood' in out) && !('materials' in out));
 });

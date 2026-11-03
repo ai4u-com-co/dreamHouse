@@ -36,6 +36,40 @@ export interface DreamHouseImageMetadata {
   prompt?: string;
 }
 
+/**
+ * Campos de diseño que se incrustan por defecto. Es una LISTA EXPLÍCITA: un campo nuevo del formulario
+ * no viaja dentro de la imagen hasta que alguien lo agregue aquí a propósito.
+ * Quedan fuera, y solo se incrustan si el usuario lo pide (`embedDetails`): la ciudad, las notas y
+ * textos libres (`artDirection`, `technicalNotes`, `negativePrompt`, `editPrompt`) y el prompt completo.
+ */
+export const DESIGN_PARAM_KEYS = [
+  'architecturalStyles', 'architect', 'mood', 'materials', 'finishLevel', 'colorPalette',
+  'cameraAngle', 'composition', 'timeOfDay', 'season', 'lighting', 'humanContext',
+  'cameraPreset', 'focalLength', 'aperture', 'filmSimulation', 'depthOfField',
+  'renderStyle', 'renderAspectRatio', 'renderOutputResolution', 'renderQuality', 'aiModel',
+  'projectType', 'climate', 'environment', 'waterBody', 'weatherCondition', 'size', 'levels',
+  'roofType', 'layoutType', 'parkingSpots', 'parkingType', 'socialAreas', 'exteriorElements',
+  'vegetation', 'architecturalDetails',
+  'roomType', 'roomSizeM2', 'furnitureStyle', 'interiorLighting', 'flooringMaterial', 'ceilingDetail',
+  'bedrooms', 'bathrooms', 'kitchenType', 'livingAreaType',
+] as const satisfies ReadonlyArray<keyof DreamHouseParams>;
+
+/** Solo con permiso expreso del usuario: ubicación y textos libres */
+export const DETAIL_PARAM_KEYS = [
+  'city', 'artDirection', 'technicalNotes', 'negativePrompt', 'editPrompt',
+] as const satisfies ReadonlyArray<keyof DreamHouseParams>;
+
+/** Parámetros que se pueden incrustar: la lista de diseño, y los detalles solo si `includeDetails` */
+export function pickEmbeddableParams(params: DreamHouseParams, includeDetails = false): Partial<DreamHouseParams> {
+  const keys: ReadonlyArray<keyof DreamHouseParams> = includeDetails ? [...DESIGN_PARAM_KEYS, ...DETAIL_PARAM_KEYS] : DESIGN_PARAM_KEYS;
+  const out: Record<string, unknown> = {};
+  for (const key of keys) {
+    const value = params[key];
+    if (value !== undefined && value !== '' && !(Array.isArray(value) && value.length === 0)) out[key] = value;
+  }
+  return out as Partial<DreamHouseParams>;
+}
+
 const XMP_HEADER = 'http://ns.adobe.com/xap/1.0/\0';
 const PNG_SIGNATURE = [0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a];
 const PNG_XMP_KEYWORD = 'XML:com.adobe.xmp';
