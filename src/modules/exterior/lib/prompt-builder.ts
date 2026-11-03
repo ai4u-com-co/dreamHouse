@@ -1,24 +1,44 @@
 import { DreamHouseParams } from '@/types';
 
 const PROJECT_TYPE_MAP: Record<string, string> = {
+  "A-frame": "A-frame cabin with a steeply pitched triangular roof reaching the ground",
   "Apartamento/Penthouse": "penthouse apartment",
   "Biblioteca": "library",
+  "Cabaña": "timber cabin",
+  "Café/Cafetería": "specialty café",
+  "Capilla/Iglesia": "chapel",
+  "Casa contenedor": "house built from repurposed shipping containers",
+  "Casa de campo/Finca": "country house (finca) set in a rural landscape",
+  "Casa de playa": "beach house",
+  "Casa en el árbol": "treehouse elevated among tree trunks",
+  "Casa prefabricada/Modular": "modular prefabricated house",
   "Casa unifamiliar": "single-family house",
   "Centro cultural": "cultural center",
   "Clínica/Hospital": "medical clinic",
+  "Co-living": "co-living residential building",
+  "Dúplex/Townhouse": "townhouse",
   "Edificio educativo": "educational building",
   "Edificio residencial": "residential building",
+  "Estudio/Taller de arte": "artist studio and workshop",
+  "Gimnasio": "fitness gym building",
+  "Glamping/Domo": "glamping lodge with a geodesic dome",
+  "Hacienda": "hacienda-style estate house organized around a courtyard",
   "Hotel boutique": "boutique hotel",
   "Hotel resort": "resort hotel",
+  "Loft": "loft-style building with open double-height spaces",
   "Mixed-use": "mixed-use building",
   "Museo/Galería": "museum",
   "Oficinas corporativas": "corporate office building",
+  "Pabellón": "freestanding pavilion",
   "Restaurante/Bar": "restaurant",
   "Retail/Tienda": "retail store",
   "Sauna": "modern sauna and wellness facility",
   "Spa/Wellness": "wellness spa",
   "Teatro/Auditorio": "theater",
-  "Villa de lujo": "luxury villa"
+  "Tiny house": "tiny house, a very small compact dwelling with a minimal footprint",
+  "Turco": "Turkish bath (hammam) and wellness facility",
+  "Villa de lujo": "luxury villa",
+  "Zona húmeda": "wet-area wellness facility with sauna, Turkish bath and pool"
 };
 
 const VOLUMETRIC_SCALE_MAP: Record<string, string> = {
@@ -27,7 +47,7 @@ const VOLUMETRIC_SCALE_MAP: Record<string, string> = {
   "Mansión (500-1000m²)": "grand-scale extensive massing",
   "Mediana (150-300m²)": "mid-sized architectural volume",
   "Pequeña (50-150m²)": "compact residential-scale structure",
-  "Tiny House (<50m²)": "minimal intimate pavilion"
+  "Tiny House (<50m²)": "very small structure with a minimal footprint"
 };
 
 const FORM_ORGANIZATION_MAP: Record<string, string> = {
