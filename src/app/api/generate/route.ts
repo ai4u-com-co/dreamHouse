@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { GoogleGenAI, Part } from '@google/genai';
 import OpenAI from 'openai';
+import sharp from 'sharp';
 import { DreamHouseParams } from '@/types';
 import { buildExteriorPrompt } from '@/modules/exterior/lib/prompt-builder';
 import { buildInteriorPrompt } from '@/modules/interior/lib/prompt-builder';
@@ -14,6 +15,45 @@ export const maxDuration = 120; // Increased to 120s to allow for image generati
 const MAX_IMAGE_SIZE = 100 * 1024 * 1024; // 100MB per image
 const MAX_TOTAL_PAYLOAD_SIZE = 100 * 1024 * 1024; // 100MB total payload
 const MAX_REFERENCE_IMAGES = 14; // Nano Banana 2 support up to 14
+
+// Base + máscara de edición: el cliente las exporta como PNG de hasta 2048 px por lado
+const EDIT_MASK_MAX_SIDE = 2048;
+const EDIT_MASK_MAX_BYTES = 25 * 1024 * 1024; // por archivo
+const EDIT_MASK_MAX_PIXELS = EDIT_MASK_MAX_SIDE * EDIT_MASK_MAX_SIDE;
+const PNG_SIGNATURE = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
+// La imagen que devuelve OpenAI puede llegar a 8,3 MP (límite de la API)
+const OPENAI_RESULT_MAX_PIXELS = 8_500_000;
+
+// Valida el par base + máscara en el servidor (no se confía en el tipo MIME ni en los límites del cliente):
+// firma PNG real, límite de bytes, límite de píxeles ANTES de decodificar, y mismas dimensiones.
+async function validateEditMaskPair(baseFile: File, maskFile: File): Promise<string | null> {
+  const dims: Array<{ width: number; height: number }> = [];
+  for (const [file, label] of [[baseFile, 'Edit base image'], [maskFile, 'Edit mask']] as const) {
+    if (file.size > EDIT_MASK_MAX_BYTES) {
+      return `${label} exceeds maximum size of ${EDIT_MASK_MAX_BYTES / 1024 / 1024}MB.`;
+    }
+    const buf = Buffer.from(await file.arrayBuffer());
+    if (buf.length < PNG_SIGNATURE.length || !buf.subarray(0, PNG_SIGNATURE.length).equals(PNG_SIGNATURE)) {
+      return `${label} must be a PNG.`;
+    }
+    try {
+      const meta = await sharp(buf, { limitInputPixels: EDIT_MASK_MAX_PIXELS }).metadata();
+      if (meta.format !== 'png' || !meta.width || !meta.height) {
+        return `${label} must be a PNG.`;
+      }
+      if (meta.width > EDIT_MASK_MAX_SIDE || meta.height > EDIT_MASK_MAX_SIDE) {
+        return `${label} exceeds ${EDIT_MASK_MAX_SIDE}px per side.`;
+      }
+      dims.push({ width: meta.width, height: meta.height });
+    } catch {
+      return `${label} is not a valid image or is too large.`;
+    }
+  }
+  if (dims[0].width !== dims[1].width || dims[0].height !== dims[1].height) {
+    return 'Edit base image and mask must have identical dimensions.';
+  }
+  return null;
+}
 
 // Helper function to validate image size
 function validateImageSize(file: File, fieldName: string, skipSizeLimit: boolean = false): { valid: boolean; error?: string } {
@@ -32,7 +72,72 @@ function validateImageSize(file: File, fieldName: string, skipSizeLimit: boolean
   return { valid: true };
 }
 
-// Helper function to calculate a valid size parameter for gpt-image-2
+// Selección de modelo OpenAI según la opción elegida en la UI.
+// - Sunburst: modelo base de GPT Image 2.5, el más preciso editando (default).
+// - Flare: modelo pequeño y rápido, pensado para borradores.
+// Cualquier valor anterior (p. ej. "GPT Image 2 (OpenAI)") cae en Sunburst.
+type OpenAIImageModel = 'gpt-image-2.5-sunburst' | 'gpt-image-2.5-flare';
+type OpenAIImageQuality = 'low' | 'medium' | 'high';
+
+function getOpenAIImageSettings(aiModel: string, thinkingLevel: string): { model: OpenAIImageModel; quality: OpenAIImageQuality } {
+  if (aiModel.includes('Flare')) {
+    return { model: 'gpt-image-2.5-flare', quality: 'low' };
+  }
+  return { model: 'gpt-image-2.5-sunburst', quality: thinkingLevel === 'High' ? 'high' : 'medium' };
+}
+
+// Formato de salida de OpenAI: JPEG es más rápido que PNG y mantiene la respuesta
+// por debajo del límite de 4,5 MB del cuerpo de respuesta de una función de Vercel.
+const OPENAI_OUTPUT_FORMAT = 'jpeg' as const;
+const OPENAI_OUTPUT_COMPRESSION = 95;
+
+// La máscara de OpenAI es una guía, no una garantía: el modelo puede tocar fuera de la zona.
+// Para que lo no marcado quede idéntico píxel a píxel, se compone el resultado sobre la
+// imagen original usando la propia máscara (con un borde suavizado para que no se note el corte).
+// Devuelve null si no se puede componer (p. ej. la relación de aspecto cambió): se usa entonces
+// la imagen del modelo tal cual.
+async function compositeMaskedEdit(baseFile: File, maskFile: File, resultBase64: string): Promise<string | null> {
+  try {
+    const baseBuf = Buffer.from(await baseFile.arrayBuffer());
+    const maskBuf = Buffer.from(await maskFile.arrayBuffer());
+    const resultBuf = Buffer.from(resultBase64, 'base64');
+
+    const baseMeta = await sharp(baseBuf, { limitInputPixels: EDIT_MASK_MAX_PIXELS }).metadata();
+    const resultMeta = await sharp(resultBuf, { limitInputPixels: OPENAI_RESULT_MAX_PIXELS }).metadata();
+    if (!baseMeta.width || !baseMeta.height || !resultMeta.width || !resultMeta.height) return null;
+    const { width, height } = baseMeta;
+    if (Math.abs(resultMeta.width / resultMeta.height - width / height) > 0.01) return null;
+
+    // Zona editable = parte transparente de la máscara, con borde suavizado
+    const editableAlpha = await sharp(maskBuf, { limitInputPixels: EDIT_MASK_MAX_PIXELS })
+      .resize(width, height)
+      .ensureAlpha()
+      .extractChannel(3)
+      .negate()
+      .blur(2)
+      .raw()
+      .toBuffer();
+
+    // joinChannel debe ir en una llamada aparte: dentro de la misma cadena que removeAlpha no añade el canal
+    const editedRgb = await sharp(resultBuf, { limitInputPixels: OPENAI_RESULT_MAX_PIXELS }).resize(width, height).removeAlpha().png().toBuffer();
+    const editedPatch = await sharp(editedRgb)
+      .joinChannel(editableAlpha, { raw: { width, height, channels: 1 } })
+      .png()
+      .toBuffer();
+
+    const final = await sharp(baseBuf, { limitInputPixels: EDIT_MASK_MAX_PIXELS })
+      .removeAlpha()
+      .composite([{ input: editedPatch }])
+      .jpeg({ quality: OPENAI_OUTPUT_COMPRESSION })
+      .toBuffer();
+    return final.toString('base64');
+  } catch (error) {
+    console.error('Masked edit compositing failed, using model output as is:', error);
+    return null;
+  }
+}
+
+// Helper function to calculate a valid size parameter for GPT Image (2 / 2.5)
 function getGptImage2Size(aspectRatio: string, resolutionPreset: string): string {
   let widthRatio = 16;
   let heightRatio = 9;
@@ -42,6 +147,11 @@ function getGptImage2Size(aspectRatio: string, resolutionPreset: string): string
     widthRatio = parseInt(parts[0], 10) || 16;
     heightRatio = parseInt(parts[1], 10) || 9;
   }
+
+  // La API exige una relación de aspecto entre 1:3 y 3:1
+  const clampedRatio = Math.min(3, Math.max(1 / 3, widthRatio / heightRatio));
+  widthRatio = clampedRatio;
+  heightRatio = 1;
 
   // Target total pixels based on preset
   let targetPixels = 1024 * 1024; // Default "1K" (~1MP)
@@ -147,6 +257,8 @@ export async function POST(req: NextRequest) {
     const floorPlanImage = formData.get('floorPlanImage') as File | null;
     const editCompositeFile = formData.get('editCompositeFile') as File | null;
     const objectImages = formData.getAll('objectImages') as File[];
+    const editBaseFile = formData.get('editBaseFile') as File | null;
+    const editMaskFile = formData.get('editMaskFile') as File | null;
 
     // Validate number of reference images
     if (files.length > MAX_REFERENCE_IMAGES) {
@@ -191,6 +303,16 @@ export async function POST(req: NextRequest) {
       const validation = validateImageSize(editCompositeFile, 'Edit Composite image', true);
       if (!validation.valid) {
         return NextResponse.json({ message: validation.error }, { status: 400 });
+      }
+    }
+
+    if (editBaseFile || editMaskFile) {
+      if (!editBaseFile || !editMaskFile) {
+        return NextResponse.json({ message: 'Edit base image and mask must be sent together.' }, { status: 400 });
+      }
+      const maskError = await validateEditMaskPair(editBaseFile, editMaskFile);
+      if (maskError) {
+        return NextResponse.json({ message: maskError }, { status: 400 });
       }
     }
 
@@ -278,6 +400,51 @@ export async function POST(req: NextRequest) {
       narrativePrompt = `USER EDIT PROMPT: ${params.editPrompt}`;
     }
 
+    // --- OpenAI: imágenes de entrada con su rol ---
+    // La primera imagen es la base de la edición; cada una se describe por número en el prompt
+    // (la API no recibe etiquetas como Gemini, así que el rol va dentro del texto).
+    const openaiInputs: Array<{ file: File; role: string }> = [];
+    if (useOpenAI) {
+      if (params.mode === 'edit' && editBaseFile && editMaskFile) {
+        openaiInputs.push({
+          file: editBaseFile,
+          role: "the original image to edit; only the area made transparent by the mask may change",
+        });
+      } else if (params.mode === 'edit' && editCompositeFile) {
+        openaiInputs.push({
+          file: editCompositeFile,
+          role: "the original image with the user's sketch and notes drawn on top; the drawings are edit instructions, not content to keep",
+        });
+      } else {
+        if (exteriorReferenceImage) {
+          openaiInputs.push({
+            file: exteriorReferenceImage,
+            role: "the existing house (structural base): keep its general volumes, shape and structure while applying the requested styles and materials",
+          });
+        }
+        if (floorPlanImage) {
+          openaiInputs.push({ file: floorPlanImage, role: "the floor plan (geometric reference for layout and proportions)" });
+        }
+        if (lotImage) {
+          openaiInputs.push({ file: lotImage, role: "the lot or terrain photo (site context to integrate the building into)" });
+        }
+        const refRole = params.mode === 'vistas'
+          ? "the reference house; produce a new view of this exact house"
+          : params.mode === 'exterior'
+            ? "a conceptual style reference (take mood, material palette and proportions; do not copy specific buildings or facades)"
+            : "a style reference for the overall look, material palette and atmosphere";
+        files.forEach(file => openaiInputs.push({ file, role: refRole }));
+        objectImages.forEach(file => openaiInputs.push({
+          file,
+          role: "a specific furniture piece or object that must appear in the final design; preserve its exact shape, color, material and design",
+        }));
+      }
+    }
+    const openaiMaskFile = useOpenAI && params.mode === 'edit' && editBaseFile && editMaskFile ? editMaskFile : null;
+    const openaiImageGuide = openaiInputs.length > 0
+      ? `INPUT IMAGES:\n${openaiInputs.map((input, i) => `- Image ${i + 1}: ${input.role}.`).join('\n')}`
+      : "";
+
     let mandate = "";
     if (useOpenAI) {
       if (params.mode === "interior") {
@@ -295,10 +462,16 @@ export async function POST(req: NextRequest) {
       } else if (params.mode === "vistas") {
         mandate = `ARCHITECTURAL PORTFOLIO MANDATE:
 - Maintain design style, materials, and geometry identical to the reference image.`;
+      } else if (openaiMaskFile) {
+        mandate = `IMAGE EDITING MANDATE (MASKED EDIT):
+- Change only the masked area, following the edit instruction above.
+- Keep everything outside the mask identical: camera angle, framing, perspective, lighting direction and color temperature, materials, proportions, surrounding objects and resolution.
+- Blend the changed area seamlessly with its surroundings, matching the original light, style and perspective.`;
       } else {
         mandate = `IMAGE EDITING MANDATE (SURGICAL EDIT):
-- Modify only the areas marked/indicated in the user's sketch.
-- Keep everything else identical. Do not alter surrounding design, camera angle, colors, or resolution.`;
+- Change only the areas marked or described in the user's sketch and notes.
+- Keep everything else identical: camera angle, framing, perspective, lighting direction and color temperature, materials, proportions, surrounding objects, saturation, contrast and resolution.
+- The sketch lines, arrows and notes drawn on the image are instructions only; they must not appear in the output.`;
       }
     } else {
       if (params.mode === "interior") {
@@ -331,12 +504,16 @@ export async function POST(req: NextRequest) {
 
     let fullPrompt = "";
     if (useOpenAI) {
-      fullPrompt = `${narrativePrompt}
+      // El constructor de prompt ya define estilo, luz, textura y exclusiones de composición;
+      // aquí solo se agregan lo estructural (mandato), las exclusiones del usuario y las imágenes de entrada.
+      const userExclusions = params.negativePrompt?.trim()
+        ? `\n- Also avoid: ${params.negativePrompt.trim()}`
+        : "";
+      fullPrompt = `${openaiImageGuide ? `${openaiImageGuide}\n\n` : ""}${narrativePrompt}
 
 [MANDATES & CONSTRAINTS]
-${mandate}
-- Look & Quality: The output must be a clean, photorealistic photograph with honest material textures (wood grain, concrete formwork texture, glass specularity, etc.) and physical depth. Soft shadows. No plastic or overly smooth surfaces.
-- Exclusions: No neighboring buildings, no adjacent houses, no party walls. No watermarks, logos, or text inside the image.`.trim();
+${mandate}${userExclusions}
+- No watermarks, logos or text inside the image.`.trim();
     } else {
       fullPrompt = `${narrativePrompt}
 
@@ -411,44 +588,42 @@ VERIFICATION STEPS:
     let groundingMetadata = null;
 
     if (useOpenAI && openaiClient) {
-      // Collect image references for multi-image input support in gpt-image-2
-      const imageFiles: File[] = [];
-      if (params.mode === 'edit' && editCompositeFile) {
-        imageFiles.push(editCompositeFile);
-      } else {
-        if (floorPlanImage) imageFiles.push(floorPlanImage);
-        if (lotImage) imageFiles.push(lotImage);
-        if (exteriorReferenceImage) imageFiles.push(exteriorReferenceImage);
-        files.forEach(file => imageFiles.push(file));
-      }
-
+      const imageFiles = openaiInputs.map(input => input.file);
       const sizeStr = getGptImage2Size(params.renderAspectRatio, params.renderOutputResolution);
-      const qualityVal = params.thinkingLevel === "High" ? "high" : "medium";
+      const { model: openaiModel, quality: qualityVal } = getOpenAIImageSettings(params.aiModel, params.thinkingLevel);
 
       let result;
       if (imageFiles.length > 0) {
-        console.log(`Editing/Compositing with OpenAI (GPT Image 2) using ${imageFiles.length} image files. Size: ${sizeStr}, Quality: ${qualityVal}`);
+        console.log(`Editing/Compositing with OpenAI (${openaiModel}) using ${imageFiles.length} image files. Size: ${sizeStr}, Quality: ${qualityVal}`);
         result = await openaiClient.images.edit({
-          model: "gpt-image-2",
-          image: imageFiles as unknown as File,
+          model: openaiModel,
+          image: imageFiles,
+          ...(openaiMaskFile ? { mask: openaiMaskFile } : {}),
           prompt: fullPrompt,
-          size: sizeStr as unknown as "1024x1024",
-          quality: qualityVal as unknown as "standard"
+          size: sizeStr as `${number}x${number}`,
+          quality: qualityVal,
+          output_format: OPENAI_OUTPUT_FORMAT,
+          output_compression: OPENAI_OUTPUT_COMPRESSION,
         });
       } else {
-        console.log(`Generating text-to-image with OpenAI (GPT Image 2). Size: ${sizeStr}, Quality: ${qualityVal}`);
+        console.log(`Generating text-to-image with OpenAI (${openaiModel}). Size: ${sizeStr}, Quality: ${qualityVal}`);
         result = await openaiClient.images.generate({
-          model: "gpt-image-2",
+          model: openaiModel,
           prompt: fullPrompt,
-          size: sizeStr as unknown as "1024x1024",
-          quality: qualityVal as unknown as "standard"
+          size: sizeStr as `${number}x${number}`,
+          quality: qualityVal,
+          output_format: OPENAI_OUTPUT_FORMAT,
+          output_compression: OPENAI_OUTPUT_COMPRESSION,
         });
       }
-      
+
       const imageBase64 = result?.data?.[0]?.b64_json;
       const imageUrlResult = result?.data?.[0]?.url;
       if (imageBase64) {
-        imageUrl = `data:image/png;base64,${imageBase64}`;
+        const composited = openaiMaskFile && editBaseFile
+          ? await compositeMaskedEdit(editBaseFile, openaiMaskFile, imageBase64)
+          : null;
+        imageUrl = `data:image/${OPENAI_OUTPUT_FORMAT};base64,${composited ?? imageBase64}`;
       } else if (imageUrlResult) {
         imageUrl = imageUrlResult;
       } else {

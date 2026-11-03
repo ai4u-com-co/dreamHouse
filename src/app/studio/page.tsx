@@ -24,6 +24,7 @@ import HistoryGallery from '@/components/HistoryGallery';
 import { GenerationRecord } from '@/lib/db';
 import { LightboxProvider } from '@/context/LightboxContext';
 import MemoryGuard from '@/components/MemoryGuard';
+import type { EditMaskPayload } from '@/components/SketchCanvas';
 
 
 export default function StudioPage() {
@@ -41,6 +42,7 @@ function StudioContent() {
   const [exteriorReferenceFile, setExteriorReferenceFile] = useState<File | null>(null);
   const [floorPlanFile, setFloorPlanFile] = useState<File | null>(null);
   const [editCompositeFile, setEditCompositeFile] = useState<File | null>(null);
+  const [editMask, setEditMask] = useState<EditMaskPayload | null>(null);
   const [objectFiles, setObjectFiles] = useState<File[]>([]);
   const [params, setParams] = useState<DreamHouseParams>(DEFAULT_PARAMS);
   const [imageUrl, setImageUrl] = useState<string | null>(null);
@@ -84,6 +86,7 @@ function StudioContent() {
     setExteriorReferenceFile(null);
     setFloorPlanFile(null);
     setEditCompositeFile(null);
+    setEditMask(null);
     setObjectFiles([]);
     setHouseName(null);
     showToast("Parameters reset to default");
@@ -244,6 +247,11 @@ function StudioContent() {
         }
         if (params.mode === 'edit' && editCompositeFile) {
           formData.append('editCompositeFile', editCompositeFile);
+          if (editMask) {
+            // Base limpia + máscara: el servidor las usa solo con OpenAI (inpainting por zona)
+            formData.append('editBaseFile', editMask.base);
+            formData.append('editMaskFile', editMask.mask);
+          }
         }
         if (params.mode === 'interior') {
           objectFiles.forEach((file) => formData.append('objectImages', file));
@@ -324,6 +332,7 @@ function StudioContent() {
     setExteriorReferenceFile(null);
     setFloorPlanFile(null);
     setEditCompositeFile(null);
+    setEditMask(null);
     setObjectFiles([]);
     
     showToast(`Cargado diseño ${record.mode} de ${new Date(record.timestamp).toLocaleDateString()}`);
@@ -570,6 +579,7 @@ function StudioContent() {
               baseImage={lotFile}
               onBaseImageUpdate={setLotFile}
               onCompositeImageUpdate={setEditCompositeFile}
+              onMaskUpdate={setEditMask}
             />
           ) : (
             <VistasForm

@@ -2,10 +2,27 @@ import React, { useRef, useState, useEffect, useCallback } from 'react';
 import { Button } from './ui/Button';
 import { Undo, Trash2, Pencil, ImagePlus } from 'lucide-react';
 
+export interface EditMaskPayload {
+  /** Imagen original limpia (sin trazos), en PNG, del mismo tamaño que la máscara */
+  base: File;
+  /** PNG con canal alfa: la zona transparente es la que el modelo puede cambiar */
+  mask: File;
+}
+
 interface SketchCanvasProps {
   baseImage: File | null;
   onCompositeImageUpdate: (file: File | null) => void;
+  /** Se llama con base + máscara cuando hay zona pintada, o con null si no hay */
+  onMaskUpdate?: (payload: EditMaskPayload | null) => void;
 }
+
+type DrawMode = 'notas' | 'zona';
+
+// Lado máximo de la base y la máscara enviadas al modelo (mantiene el PNG por debajo de los límites de carga)
+const MASK_EXPORT_MAX_SIDE = 2048;
+// El pincel de zona es más grueso que el de notas: se pinta un área, no una línea
+const ZONE_BRUSH_FACTOR = 10;
+const ZONE_BRUSH_MIN = 40;
 
 interface Point {
   x: number;
@@ -16,9 +33,20 @@ interface Line {
   points: Point[];
   color: string;
   size: number;
+  kind: DrawMode;
 }
 
-export default function SketchCanvas({ baseImage, onCompositeImageUpdate }: SketchCanvasProps) {
+function zoneLineWidth(size: number): number {
+  return Math.max(size * ZONE_BRUSH_FACTOR, ZONE_BRUSH_MIN);
+}
+
+function canvasToPngFile(canvas: HTMLCanvasElement, name: string): Promise<File | null> {
+  return new Promise((resolve) => {
+    canvas.toBlob((blob) => resolve(blob ? new File([blob], name, { type: 'image/png' }) : null), 'image/png');
+  });
+}
+
+export default function SketchCanvas({ baseImage, onCompositeImageUpdate, onMaskUpdate }: SketchCanvasProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   
@@ -26,6 +54,7 @@ export default function SketchCanvas({ baseImage, onCompositeImageUpdate }: Sket
   const [isDrawing, setIsDrawing] = useState(false);
   const [color, setColor] = useState('#EF4444'); // Red by default for notes
   const [brushSize, setBrushSize] = useState(3);
+  const [mode, setMode] = useState<DrawMode>('notas');
   const [imageObj, setImageObj] = useState<HTMLImageElement | null>(null);
 
   // Load the image object when baseImage changes
@@ -90,8 +119,13 @@ export default function SketchCanvas({ baseImage, onCompositeImageUpdate }: Sket
       for (let i = 1; i < line.points.length; i++) {
         ctx.lineTo(line.points[i].x, line.points[i].y);
       }
-      ctx.strokeStyle = line.color;
-      ctx.lineWidth = line.size;
+      if (line.kind === 'zona') {
+        ctx.strokeStyle = 'rgba(239, 68, 68, 0.45)';
+        ctx.lineWidth = zoneLineWidth(line.size);
+      } else {
+        ctx.strokeStyle = line.color;
+        ctx.lineWidth = line.size;
+      }
       ctx.lineCap = 'round';
       ctx.lineJoin = 'round';
       ctx.stroke();
@@ -110,13 +144,72 @@ export default function SketchCanvas({ baseImage, onCompositeImageUpdate }: Sket
     }, 'image/png', 0.95);
   }, [baseImage, onCompositeImageUpdate]);
 
+  // Exporta la base limpia y la máscara (alfa) a partir de los trazos de "zona".
+  // Las notas no entran en la máscara: siguen yendo solo en la imagen compuesta.
+  const generateMaskFiles = useCallback(async () => {
+    const canvas = canvasRef.current;
+    const zoneLines = lines.filter((l) => l.kind === 'zona' && l.points.length > 0);
+    if (!onMaskUpdate) return;
+    if (!canvas || !imageObj || zoneLines.length === 0) {
+      onMaskUpdate(null);
+      return;
+    }
+
+    const scale = Math.min(1, MASK_EXPORT_MAX_SIDE / Math.max(imageObj.width, imageObj.height));
+    const w = Math.round(imageObj.width * scale);
+    const h = Math.round(imageObj.height * scale);
+    const toExport = w / canvas.width; // del canvas visible al tamaño de exportación
+
+    const baseCanvas = document.createElement('canvas');
+    baseCanvas.width = w;
+    baseCanvas.height = h;
+    baseCanvas.getContext('2d')?.drawImage(imageObj, 0, 0, w, h);
+
+    const maskCanvas = document.createElement('canvas');
+    maskCanvas.width = w;
+    maskCanvas.height = h;
+    const mctx = maskCanvas.getContext('2d');
+    if (!mctx) { onMaskUpdate(null); return; }
+    // Todo opaco = se conserva; lo pintado se vuelve transparente = editable
+    mctx.fillStyle = '#000000';
+    mctx.fillRect(0, 0, w, h);
+    mctx.globalCompositeOperation = 'destination-out';
+    mctx.lineCap = 'round';
+    mctx.lineJoin = 'round';
+    mctx.strokeStyle = '#000000';
+    mctx.fillStyle = '#000000';
+    zoneLines.forEach((line) => {
+      const width = zoneLineWidth(line.size) * toExport;
+      mctx.lineWidth = width;
+      if (line.points.length === 1) {
+        mctx.beginPath();
+        mctx.arc(line.points[0].x * toExport, line.points[0].y * toExport, width / 2, 0, Math.PI * 2);
+        mctx.fill();
+        return;
+      }
+      mctx.beginPath();
+      mctx.moveTo(line.points[0].x * toExport, line.points[0].y * toExport);
+      for (let i = 1; i < line.points.length; i++) {
+        mctx.lineTo(line.points[i].x * toExport, line.points[i].y * toExport);
+      }
+      mctx.stroke();
+    });
+
+    const [base, mask] = await Promise.all([
+      canvasToPngFile(baseCanvas, 'edit_base.png'),
+      canvasToPngFile(maskCanvas, 'edit_mask.png'),
+    ]);
+    onMaskUpdate(base && mask ? { base, mask } : null);
+  }, [lines, imageObj, onMaskUpdate]);
+
   // Export the composite only when the user finishes a stroke or changes lines
   // while not drawing (undo, clear). Never during active drawing.
   useEffect(() => {
     if (!isDrawing) {
       generateCompositeFile();
+      void generateMaskFiles();
     }
-  }, [lines, isDrawing, generateCompositeFile]);
+  }, [lines, isDrawing, generateCompositeFile, generateMaskFiles]);
 
   // Drawing event handlers
   const getCoordinates = (e: React.MouseEvent<HTMLCanvasElement> | React.TouchEvent<HTMLCanvasElement>): Point | null => {
@@ -147,7 +240,7 @@ export default function SketchCanvas({ baseImage, onCompositeImageUpdate }: Sket
     setIsDrawing(true);
     const coords = getCoordinates(e);
     if (coords) {
-      setLines([...lines, { points: [coords], color, size: brushSize }]);
+      setLines([...lines, { points: [coords], color, size: brushSize, kind: mode }]);
     }
   };
 
@@ -200,8 +293,25 @@ export default function SketchCanvas({ baseImage, onCompositeImageUpdate }: Sket
           <span className="text-xs font-bold uppercase tracking-widest text-muted-foreground">Herramientas</span>
         </div>
         
+        {/* Modo de dibujo */}
+        <div className="flex items-center gap-1 rounded-lg border border-border p-1" role="group" aria-label="Modo de dibujo">
+          {([['notas', 'Notas'], ['zona', 'Zona a cambiar']] as const).map(([value, label]) => (
+            <button
+              key={value}
+              type="button"
+              onClick={() => setMode(value)}
+              aria-pressed={mode === value}
+              className={`min-h-[44px] px-3 text-xs font-semibold rounded-md cursor-pointer transition-colors ${mode === value ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:text-foreground'}`}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+
+        <div className="h-6 w-px bg-border" />
+
         {/* Colors */}
-        <div className="flex items-center gap-2">
+        <div className={`flex items-center gap-2 ${mode === 'zona' ? 'opacity-40 pointer-events-none' : ''}`}>
           {['#EF4444', '#3B82F6', '#10B981', '#F59E0B', '#000000', '#FFFFFF'].map((c) => (
             <button
               key={c}
@@ -263,7 +373,9 @@ export default function SketchCanvas({ baseImage, onCompositeImageUpdate }: Sket
       </div>
       <p className="text-xs text-muted-foreground text-center flex items-center justify-center gap-2">
         <Pencil className="w-3 h-3" />
-        Dibuja sobre la imagen para señalar exactamente qué quieres modificar.
+        {mode === 'zona'
+          ? 'Pinta la zona que quieres cambiar. Con OpenAI solo se modificará esa zona; el resto de la imagen se conserva.'
+          : 'Dibuja sobre la imagen para señalar exactamente qué quieres modificar.'}
       </p>
     </div>
   );

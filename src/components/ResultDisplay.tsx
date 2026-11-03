@@ -5,6 +5,14 @@ import { Button } from './ui/Button';
 import clsx from 'clsx';
 import { useLightbox } from '@/context/LightboxContext';
 
+// Extensión del archivo según el tipo real de la imagen (el render puede ser jpeg o png)
+function imageExtension(url: string): string {
+  const match = /^data:image\/([a-z0-9+.-]+);/i.exec(url);
+  const type = match?.[1]?.toLowerCase();
+  if (type === 'jpeg') return 'jpg';
+  return type || 'png';
+}
+
 // Mensajes para el estado de carga
 const LOADING_MESSAGES = [
   { emoji: "○", main: "Analizando tu visión...", sub: "Interpretando cada detalle arquitectónico" },
@@ -230,7 +238,7 @@ export default function ResultDisplay({
                     </Button>
                     <a
                       href={imageUrl || vistasImages![activeVistaIndex]!.url!}
-                      download={houseName ? `${houseName.replace(/\s+/g, '-')}.png` : "dreamhouse-render.png"}
+                      download={`${houseName ? houseName.replace(/\s+/g, '-') : "dreamhouse-render"}.${imageExtension(imageUrl || vistasImages![activeVistaIndex]!.url!)}`}
                       className="inline-flex items-center justify-center gap-2 px-4 py-2 text-sm font-semibold text-primary-foreground bg-primary rounded-lg hover:shadow-lg hover:shadow-primary/30 transition-all hover:scale-105"
                     >
                       <Download className="w-4 h-4" />

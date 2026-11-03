@@ -4,7 +4,7 @@ import * as SC from '../../shared/constants';
 import { Section } from '@/components/ui/Section';
 import { Select } from '@/components/ui/Select';
 import { PenLine, ImageIcon, Trash2 } from 'lucide-react';
-import SketchCanvas from '@/components/SketchCanvas';
+import SketchCanvas, { type EditMaskPayload } from '@/components/SketchCanvas';
 import LotUploader from '@/components/LotUploader';
 import { DebouncedInput } from '@/components/ui/DebouncedInput';
 
@@ -17,6 +17,7 @@ interface EditFormProps {
   baseImage: File | null;
   onBaseImageUpdate: (file: File | null) => void;
   onCompositeImageUpdate: (file: File | null) => void;
+  onMaskUpdate: (payload: EditMaskPayload | null) => void;
 }
 
 function SectionDescription({ children }: { children: React.ReactNode }) {
@@ -35,7 +36,8 @@ export default function EditForm({
   onSectionChange,
   baseImage,
   onBaseImageUpdate,
-  onCompositeImageUpdate
+  onCompositeImageUpdate,
+  onMaskUpdate
 }: EditFormProps) {
   const handleChange = <K extends keyof DreamHouseParams>(key: K, value: DreamHouseParams[K]) => {
     onChange({ ...params, [key]: value });
@@ -80,7 +82,7 @@ export default function EditForm({
                   Quitar imagen base
                 </button>
               </div>
-              <SketchCanvas baseImage={baseImage} onCompositeImageUpdate={onCompositeImageUpdate} />
+              <SketchCanvas baseImage={baseImage} onCompositeImageUpdate={onCompositeImageUpdate} onMaskUpdate={onMaskUpdate} />
             </div>
           )}
         </div>

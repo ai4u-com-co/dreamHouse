@@ -31,10 +31,10 @@ TASK:
 - Action: Generate a new ${viewType} of the house provided in the reference image.
 - Camera Perspective: ${vistaDescription}
 
-CRITICAL COMPOSITION RULE:
-- Subject: The building is the SOLE PROTAGONIST.
-- Background: Must be completely neutral (open sky, landscape, or vegetation).
-- Exclude: NEVER include neighboring buildings, adjacent houses, other structures, visible neighbors, party walls, or competing architecture. The subject must stand completely alone.
+COMPOSITION:
+- Subject: the building is the sole protagonist, standing completely alone.
+- Background: neutral (open sky, landscape or vegetation).
+- Exclude: neighboring buildings, adjacent houses, other structures, party walls and competing architecture.
 
 ARCHITECTURAL STYLE & CONSISTENCY:
 - Constraint: The building must be IDENTICAL in form, materials, and character to the reference image. Same house, different camera angle. All massing, openings, roof geometry, and material palettes are fixed.

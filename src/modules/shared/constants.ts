@@ -253,7 +253,8 @@ export const RENDER_STYLES = [
 
 export const AI_MODELS = [
   "Gemini 3.1 Flash Image Preview",
-  "GPT Image 2 (OpenAI)"
+  "GPT Image 2.5 Sunburst (OpenAI)",
+  "GPT Image 2.5 Flare · borrador rápido (OpenAI)"
 ];
 
 export interface CameraPreset {
