@@ -124,3 +124,18 @@ test('los valores vacíos no ocupan espacio en el archivo', () => {
   const out = pickEmbeddableParams(DEFAULT_PARAMS);
   assert.ok(!('mood' in out) && !('materials' in out));
 });
+
+test('JPEG con JFIF (como los de OpenAI): el APP0 sigue justo después de SOI y el XMP viene tras él', async () => {
+  const plain = new Uint8Array(await makeJpeg());
+  const jfif = new Uint8Array([0xff, 0xe0, 0x00, 0x10, 0x4a, 0x46, 0x49, 0x46, 0x00, 0x01, 0x01, 0x00, 0x00, 0x01, 0x00, 0x01, 0x00, 0x00]);
+  // Se arma un JPEG que declara JFIF: SOI + APP0 + el resto (si sharp ya lo trajera, se parte de ese)
+  const withJfif = plain[2] === 0xff && plain[3] === 0xe0 ? plain : new Uint8Array([...plain.subarray(0, 2), ...jfif, ...plain.subarray(2)]);
+  await sharp(Buffer.from(withJfif)).raw().toBuffer(); // sigue siendo una imagen válida
+
+  const out = embedImageMetadata(withJfif, meta());
+  assert.deepEqual([out[0], out[1], out[2], out[3]], [0xff, 0xd8, 0xff, 0xe0]); // SOI + APP0 (JFIF)
+  const jfifLength = (out[4] << 8) | out[5];
+  assert.deepEqual([out[4 + jfifLength], out[4 + jfifLength + 1]], [0xff, 0xe1]); // APP1 (XMP) justo después
+  assert.deepEqual(readImageMetadata(out), meta());
+  await sharp(Buffer.from(out)).raw().toBuffer(); // y la imagen final sigue decodificando
+});

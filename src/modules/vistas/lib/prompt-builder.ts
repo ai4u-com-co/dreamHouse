@@ -1,6 +1,7 @@
 import { DreamHouseParams } from '@/types';
 import { VISTA_DESCRIPTIONS, VISTA_KINDS, type VistaKind } from '../constants';
 import { PROJECT_TYPE_MAP } from '@/modules/exterior/lib/prompt-builder';
+import { sanitizeSourceParams } from '@/lib/assistant-params';
 import {
   cameraSentence,
   joinList,
@@ -35,8 +36,10 @@ const INHERITED_KEYS = [
  * vacío se hereda de los parámetros con los que se generó el render original (si se conocen).
  */
 export function effectiveVistaParams(params: DreamHouseParams): DreamHouseParams {
-  const source = params.sourceRender?.params;
-  if (!source) return params;
+  // El render de origen lo envía el cliente (y sus parámetros pueden venir de los metadatos de una imagen
+  // ajena): se vuelve a validar aquí, y solo entran valores que el formulario ofrece.
+  const source = params.sourceRender ? sanitizeSourceParams(params.sourceRender.params) : undefined;
+  if (!source || Object.keys(source).length === 0) return params;
   const merged = { ...params } as Record<string, unknown>;
   for (const key of INHERITED_KEYS) {
     if (!present(merged[key]) && present((source as Record<string, unknown>)[key])) {

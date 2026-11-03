@@ -158,7 +158,10 @@ function embedInJpeg(bytes: Uint8Array, meta: DreamHouseImageMetadata): Uint8Arr
   const segment = concat(new Uint8Array([0xff, 0xe1, (length >> 8) & 0xff, length & 0xff]), body);
   // Tras el marcador SOI (los dos primeros bytes). Se reemplaza un XMP previo, si lo hubiera.
   const cleaned = removeJpegXmp(bytes);
-  return concat(cleaned.subarray(0, 2), segment, cleaned.subarray(2));
+  // JFIF exige que su segmento APP0 vaya inmediatamente después de SOI: el XMP se inserta tras él
+  let offset = 2;
+  if (cleaned[2] === 0xff && cleaned[3] === 0xe0) offset = 4 + ((cleaned[4] << 8) | cleaned[5]);
+  return concat(cleaned.subarray(0, offset), segment, cleaned.subarray(offset));
 }
 
 function removeJpegXmp(bytes: Uint8Array): Uint8Array {

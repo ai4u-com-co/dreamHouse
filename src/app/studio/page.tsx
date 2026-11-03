@@ -26,7 +26,8 @@ import { LightboxProvider } from '@/context/LightboxContext';
 import MemoryGuard from '@/components/MemoryGuard';
 import type { EditMaskPayload } from '@/components/SketchCanvas';
 import { readImageMetadataFromFile } from '@/lib/image-metadata';
-import { sanitizeAssistantParams } from '@/lib/assistant-params';
+import { sanitizeAssistantParams, sanitizeSourceParams, cleanLabel } from '@/lib/assistant-params';
+import type { DreamHouseImageMetadata } from '@/lib/image-metadata';
 
 
 export default function StudioPage() {
@@ -92,6 +93,20 @@ function StudioContent() {
     if (lotFile) showToast(`Se conserva la foto cargada: en ${MODE_NAMES[mode]} se usará como ${LOT_ROLE[mode]}.`);
   };
 
+  /** Metadatos de una imagen -> render de origen. Vienen de un archivo, así que se validan y se acotan. */
+  const toSourceRender = (meta: DreamHouseImageMetadata | null): DreamHouseParams['sourceRender'] => {
+    if (!meta) return undefined;
+    const safeParams = sanitizeSourceParams(meta.params);
+    if (Object.keys(safeParams).length === 0) return undefined;
+    return {
+      id: cleanLabel(meta.id, 64) ?? 'desconocido',
+      mode: meta.mode,
+      houseName: cleanLabel(meta.houseName),
+      model: cleanLabel(meta.model, 60),
+      params: safeParams,
+    };
+  };
+
   /** Si la imagen subida fue generada por DreamHouse, recupera los parámetros con los que se creó */
   const applySourceRender = async (file: File | null) => {
     if (!file) {
@@ -99,11 +114,9 @@ function StudioContent() {
       return;
     }
     const meta = await readImageMetadataFromFile(file);
-    setParams(prev => ({
-      ...prev,
-      sourceRender: meta ? { id: meta.id, mode: meta.mode, houseName: meta.houseName, model: meta.model, params: meta.params } : undefined,
-    }));
-    if (meta) showToast(`Detectamos los parámetros de "${meta.houseName || 'tu render'}": se usarán para mantener la fidelidad.`);
+    const source = toSourceRender(meta);
+    setParams(prev => ({ ...prev, sourceRender: source }));
+    if (source) showToast(`Detectamos los parámetros de "${source.houseName || 'tu render'}": se usarán para mantener la fidelidad.`);
   };
 
   const handleLotFileChange = (file: File | null) => {
@@ -130,14 +143,10 @@ function StudioContent() {
       setLotFile(file);
       setEditCompositeFile(null);
       setEditMask(null);
-      const meta = await readImageMetadataFromFile(file);
-      setParams(prev => ({
-        ...prev,
-        mode: target,
-        sourceRender: meta ? { id: meta.id, mode: meta.mode, houseName: meta.houseName, model: meta.model, params: meta.params } : undefined,
-      }));
+      const source = toSourceRender(await readImageMetadataFromFile(file));
+      setParams(prev => ({ ...prev, mode: target, sourceRender: source }));
       setActiveSection(FIRST_SECTION[target]);
-      showToast(meta
+      showToast(source
         ? `Render cargado como base de ${MODE_NAMES[target]} con sus parámetros originales.`
         : `Render cargado como base de ${MODE_NAMES[target]}.`);
       setTimeout(() => document.getElementById('studio')?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 100);

@@ -114,13 +114,14 @@ test('sin estilo elegido se mantiene el look fotorrealista histórico', () => {
 
 // ---------- vistas ----------
 
+// Valores reales de los catálogos: el servidor descarta cualquier valor que el formulario no ofrezca
 const SOURCE = {
   id: 'render-1',
   mode: 'exterior',
   params: {
-    projectType: 'Tiny house', levels: 1, materials: ['Madera', 'Concreto'], finishLevel: 'Premium',
-    architecturalStyles: ['Minimalista'], roofType: 'Cubierta verde', environment: 'Bosque',
-    timeOfDay: 'Hora dorada', season: 'Otoño', lighting: 'Luz cálida',
+    projectType: 'Tiny house', levels: 1, materials: ['Madera', 'Concreto'], finishLevel: 'Premium/Alto',
+    architecturalStyles: ['Minimalista'], roofType: 'A cuatro aguas', environment: 'Bosque',
+    timeOfDay: 'Amanecer (Golden Hour)', season: 'Otoño', lighting: 'Ambiental difusa',
   },
 };
 
@@ -128,7 +129,7 @@ test('vistas: lo que el usuario dejó vacío se hereda del render original', () 
   const eff = effectiveVistaParams(p({ sourceRender: SOURCE }));
   assert.deepEqual(eff.materials, ['Madera', 'Concreto']);
   assert.equal(eff.levels, 1);
-  assert.equal(eff.roofType, 'Cubierta verde');
+  assert.equal(eff.roofType, 'A cuatro aguas');
 });
 
 test('vistas: lo que el usuario eligió manda sobre el render original', () => {
@@ -142,8 +143,8 @@ test('vistas: los hechos de diseño del render original llegan al prompt', () =>
     assert.match(out, /tiny house/i);
     assert.match(out, /Exactly 1 floor/);
     assert.match(out, /Madera/);
-    assert.match(out, /Cubierta verde/);
-    assert.match(out, /Hora dorada/, 'continuidad de la hora entre vistas');
+    assert.match(out, /A cuatro aguas/);
+    assert.match(out, /Amanecer \(Golden Hour\)/, 'continuidad de la hora entre vistas');
   }
 });
 
@@ -161,7 +162,7 @@ test('vistas: las que muestran lo que NO se ve piden extrapolar con cuidado', ()
 
 test('vistas: las de iluminación no heredan la hora del render original', () => {
   const out = buildVistasPrompt(p({ sourceRender: SOURCE }), 'Vista Nocturna', OPENAI);
-  assert.ok(!/Time of day: Hora dorada/.test(out));
+  assert.ok(!/Time of day: Amanecer/.test(out));
   assert.match(out, /Only the time of day and the lighting change/);
 });
 
