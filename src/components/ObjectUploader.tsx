@@ -238,7 +238,7 @@ export default function ObjectUploader({ files, onFilesChange, disabled }: Objec
       {/* Tip */}
       {files.length === 0 && (
         <p className="text-[11px] text-muted-foreground/60 text-center font-mono tracking-tight">
-          Hasta {MAX_OBJECTS} piezas · Gemini las colocará en el espacio según el layout.
+          Hasta {MAX_OBJECTS} piezas · La IA las colocará en el espacio según el layout.
         </p>
       )}
     </div>

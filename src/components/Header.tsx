@@ -177,7 +177,7 @@ export default function Header() {
                   whiteSpace: 'nowrap',
                 }}
               >
-                {geminiApiKey ? 'Gemini Active' : 'Gemini Required'}
+                {geminiApiKey ? 'Gemini Active' : 'Gemini Optional'}
               </Typography>
               <OutlinedInput
                 type={keyVisible ? 'text' : 'password'}
@@ -394,7 +394,7 @@ export default function Header() {
                 mb: 2,
               }}
             >
-              Gemini API Key
+              Gemini API Key (opcional)
             </Typography>
             <OutlinedInput
               type="password"
@@ -422,7 +422,7 @@ export default function Header() {
                 mt: 4,
               }}
             >
-              OpenAI API Key
+              OpenAI API Key (predeterminada)
             </Typography>
             <OutlinedInput
               type="password"

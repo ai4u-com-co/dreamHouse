@@ -244,7 +244,7 @@ export const THINKING_LEVELS = ["High", "Minimal"];
 /** Calidad de render (OpenAI): etiqueta de la UI → valor de la API (ver generate/route.ts) */
 export const RENDER_QUALITIES = ["Borrador", "Estándar", "Alta", "Máxima"] as const;
 export const RENDER_QUALITY_HINTS: Record<string, string> = {
-  "Borrador": "Rápido y barato, para explorar ideas",
+  "Borrador": "Rápido y barato, para explorar ideas (predeterminada)",
   "Estándar": "Equilibrio entre detalle, costo y velocidad",
   "Alta": "Más detalle y fidelidad; recomendado para vistas y entregas",
   "Máxima": "El mayor detalle; lento y el más costoso",
@@ -260,10 +260,11 @@ export const RENDER_STYLES = [
   "Render artístico / Painterly"
 ];
 
+/** El primero es el predeterminado de la app (ver DEFAULT_PARAMS en types.ts) */
 export const AI_MODELS = [
-  "Gemini 3.1 Flash Image Preview",
   "GPT Image 2.5 Sunburst (OpenAI)",
-  "GPT Image 2.5 Flare · borrador rápido (OpenAI)"
+  "GPT Image 2.5 Flare · borrador rápido (OpenAI)",
+  "Gemini 3.1 Flash Image Preview"
 ];
 
 export interface CameraPreset {
