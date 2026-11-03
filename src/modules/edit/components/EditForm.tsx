@@ -17,6 +17,8 @@ interface EditFormProps {
   onSectionChange: (id: string) => void;
   baseImage: File | null;
   onBaseImageUpdate: (file: File | null) => void;
+  /** Archivo original de la base, antes de recomprimirlo (para leer sus metadatos) */
+  onBaseOriginalSelected?: (file: File) => void;
   onCompositeImageUpdate: (file: File | null) => void;
   onMaskUpdate: (payload: EditMaskPayload | null) => void;
 }
@@ -37,6 +39,7 @@ export default function EditForm({
   onSectionChange,
   baseImage,
   onBaseImageUpdate,
+  onBaseOriginalSelected,
   onCompositeImageUpdate,
   onMaskUpdate
 }: EditFormProps) {
@@ -68,6 +71,7 @@ export default function EditForm({
             <LotUploader 
               file={baseImage} 
               onFileChange={onBaseImageUpdate} 
+              onOriginalSelected={onBaseOriginalSelected}
               title="Sube la imagen a editar" 
               description="Sube la base sobre la que harás los trazos."
               skipSizeValidation={true}

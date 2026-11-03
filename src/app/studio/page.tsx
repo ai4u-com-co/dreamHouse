@@ -119,9 +119,11 @@ function StudioContent() {
     if (source) showToast(`Detectamos los parámetros de "${source.houseName || 'tu render'}": se usarán para mantener la fidelidad.`);
   };
 
+  // Los metadatos se leen del archivo ORIGINAL (onOriginalSelected): el que llega aquí ya fue
+  // recomprimido en un canvas y no los conserva.
   const handleLotFileChange = (file: File | null) => {
     setLotFile(file);
-    void applySourceRender(file);
+    if (!file) void applySourceRender(null);
   };
 
   /** En edición, al cambiar o quitar la base se descarta el boceto y la máscara de la imagen anterior */
@@ -129,7 +131,7 @@ function StudioContent() {
     setLotFile(file);
     setEditCompositeFile(null);
     setEditMask(null);
-    void applySourceRender(file);
+    if (!file) void applySourceRender(null);
   };
 
   /** Convierte el render mostrado en la imagen base de otro módulo (sus parámetros viajan en el archivo) */
@@ -638,7 +640,8 @@ function StudioContent() {
           <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
             <LotUploader 
               file={lotFile} 
-              onFileChange={handleLotFileChange} 
+              onFileChange={handleLotFileChange}
+              onOriginalSelected={(original) => void applySourceRender(original)} 
               title={
                   params.mode === 'interior' ? "Espacio Principal (Foto Actual)" :
                   "Cargar Foto de la Casa"
@@ -718,6 +721,7 @@ function StudioContent() {
               onSectionChange={toggleSection}
               baseImage={lotFile}
               onBaseImageUpdate={handleEditBaseChange}
+              onBaseOriginalSelected={(original) => void applySourceRender(original)}
               onCompositeImageUpdate={setEditCompositeFile}
               onMaskUpdate={setEditMask}
             />
