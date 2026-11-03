@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { GoogleGenAI, Part } from '@google/genai';
 import OpenAI from 'openai';
+import sharp from 'sharp';
 import { DreamHouseParams } from '@/types';
 import { buildExteriorPrompt } from '@/modules/exterior/lib/prompt-builder';
 import { buildInteriorPrompt } from '@/modules/interior/lib/prompt-builder';
@@ -50,6 +51,52 @@ function getOpenAIImageSettings(aiModel: string, thinkingLevel: string): { model
 // por debajo del límite de 4,5 MB del cuerpo de respuesta de una función de Vercel.
 const OPENAI_OUTPUT_FORMAT = 'jpeg' as const;
 const OPENAI_OUTPUT_COMPRESSION = 95;
+
+// La máscara de OpenAI es una guía, no una garantía: el modelo puede tocar fuera de la zona.
+// Para que lo no marcado quede idéntico píxel a píxel, se compone el resultado sobre la
+// imagen original usando la propia máscara (con un borde suavizado para que no se note el corte).
+// Devuelve null si no se puede componer (p. ej. la relación de aspecto cambió): se usa entonces
+// la imagen del modelo tal cual.
+async function compositeMaskedEdit(baseFile: File, maskFile: File, resultBase64: string): Promise<string | null> {
+  try {
+    const baseBuf = Buffer.from(await baseFile.arrayBuffer());
+    const maskBuf = Buffer.from(await maskFile.arrayBuffer());
+    const resultBuf = Buffer.from(resultBase64, 'base64');
+
+    const baseMeta = await sharp(baseBuf).metadata();
+    const resultMeta = await sharp(resultBuf).metadata();
+    if (!baseMeta.width || !baseMeta.height || !resultMeta.width || !resultMeta.height) return null;
+    const { width, height } = baseMeta;
+    if (Math.abs(resultMeta.width / resultMeta.height - width / height) > 0.01) return null;
+
+    // Zona editable = parte transparente de la máscara, con borde suavizado
+    const editableAlpha = await sharp(maskBuf)
+      .resize(width, height)
+      .ensureAlpha()
+      .extractChannel(3)
+      .negate()
+      .blur(2)
+      .raw()
+      .toBuffer();
+
+    // joinChannel debe ir en una llamada aparte: dentro de la misma cadena que removeAlpha no añade el canal
+    const editedRgb = await sharp(resultBuf).resize(width, height).removeAlpha().png().toBuffer();
+    const editedPatch = await sharp(editedRgb)
+      .joinChannel(editableAlpha, { raw: { width, height, channels: 1 } })
+      .png()
+      .toBuffer();
+
+    const final = await sharp(baseBuf)
+      .removeAlpha()
+      .composite([{ input: editedPatch }])
+      .jpeg({ quality: OPENAI_OUTPUT_COMPRESSION })
+      .toBuffer();
+    return final.toString('base64');
+  } catch (error) {
+    console.error('Masked edit compositing failed, using model output as is:', error);
+    return null;
+  }
+}
 
 // Helper function to calculate a valid size parameter for GPT Image (2 / 2.5)
 function getGptImage2Size(aspectRatio: string, resolutionPreset: string): string {
@@ -171,6 +218,8 @@ export async function POST(req: NextRequest) {
     const floorPlanImage = formData.get('floorPlanImage') as File | null;
     const editCompositeFile = formData.get('editCompositeFile') as File | null;
     const objectImages = formData.getAll('objectImages') as File[];
+    const editBaseFile = formData.get('editBaseFile') as File | null;
+    const editMaskFile = formData.get('editMaskFile') as File | null;
 
     // Validate number of reference images
     if (files.length > MAX_REFERENCE_IMAGES) {
@@ -215,6 +264,21 @@ export async function POST(req: NextRequest) {
       const validation = validateImageSize(editCompositeFile, 'Edit Composite image', true);
       if (!validation.valid) {
         return NextResponse.json({ message: validation.error }, { status: 400 });
+      }
+    }
+
+    if (editBaseFile || editMaskFile) {
+      if (!editBaseFile || !editMaskFile) {
+        return NextResponse.json({ message: 'Edit base image and mask must be sent together.' }, { status: 400 });
+      }
+      for (const [file, label] of [[editBaseFile, 'Edit base image'], [editMaskFile, 'Edit mask']] as const) {
+        const validation = validateImageSize(file, label, true);
+        if (!validation.valid) {
+          return NextResponse.json({ message: validation.error }, { status: 400 });
+        }
+        if (file.type !== 'image/png') {
+          return NextResponse.json({ message: `${label} must be a PNG.` }, { status: 400 });
+        }
       }
     }
 
@@ -307,7 +371,12 @@ export async function POST(req: NextRequest) {
     // (la API no recibe etiquetas como Gemini, así que el rol va dentro del texto).
     const openaiInputs: Array<{ file: File; role: string }> = [];
     if (useOpenAI) {
-      if (params.mode === 'edit' && editCompositeFile) {
+      if (params.mode === 'edit' && editBaseFile && editMaskFile) {
+        openaiInputs.push({
+          file: editBaseFile,
+          role: "the original image to edit; only the area made transparent by the mask may change",
+        });
+      } else if (params.mode === 'edit' && editCompositeFile) {
         openaiInputs.push({
           file: editCompositeFile,
           role: "the original image with the user's sketch and notes drawn on top; the drawings are edit instructions, not content to keep",
@@ -337,6 +406,7 @@ export async function POST(req: NextRequest) {
         }));
       }
     }
+    const openaiMaskFile = useOpenAI && params.mode === 'edit' && editBaseFile && editMaskFile ? editMaskFile : null;
     const openaiImageGuide = openaiInputs.length > 0
       ? `INPUT IMAGES:\n${openaiInputs.map((input, i) => `- Image ${i + 1}: ${input.role}.`).join('\n')}`
       : "";
@@ -358,6 +428,11 @@ export async function POST(req: NextRequest) {
       } else if (params.mode === "vistas") {
         mandate = `ARCHITECTURAL PORTFOLIO MANDATE:
 - Maintain design style, materials, and geometry identical to the reference image.`;
+      } else if (openaiMaskFile) {
+        mandate = `IMAGE EDITING MANDATE (MASKED EDIT):
+- Change only the masked area, following the edit instruction above.
+- Keep everything outside the mask identical: camera angle, framing, perspective, lighting direction and color temperature, materials, proportions, surrounding objects and resolution.
+- Blend the changed area seamlessly with its surroundings, matching the original light, style and perspective.`;
       } else {
         mandate = `IMAGE EDITING MANDATE (SURGICAL EDIT):
 - Change only the areas marked or described in the user's sketch and notes.
@@ -489,6 +564,7 @@ VERIFICATION STEPS:
         result = await openaiClient.images.edit({
           model: openaiModel,
           image: imageFiles,
+          ...(openaiMaskFile ? { mask: openaiMaskFile } : {}),
           prompt: fullPrompt,
           size: sizeStr as `${number}x${number}`,
           quality: qualityVal,
@@ -510,7 +586,10 @@ VERIFICATION STEPS:
       const imageBase64 = result?.data?.[0]?.b64_json;
       const imageUrlResult = result?.data?.[0]?.url;
       if (imageBase64) {
-        imageUrl = `data:image/${OPENAI_OUTPUT_FORMAT};base64,${imageBase64}`;
+        const composited = openaiMaskFile && editBaseFile
+          ? await compositeMaskedEdit(editBaseFile, openaiMaskFile, imageBase64)
+          : null;
+        imageUrl = `data:image/${OPENAI_OUTPUT_FORMAT};base64,${composited ?? imageBase64}`;
       } else if (imageUrlResult) {
         imageUrl = imageUrlResult;
       } else {
