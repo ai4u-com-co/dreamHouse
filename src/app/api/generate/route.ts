@@ -4,6 +4,9 @@ import OpenAI from 'openai';
 import sharp from 'sharp';
 import { embedImageMetadata, pickEmbeddableParams, METADATA_APP, METADATA_VERSION, type DreamHouseImageMetadata } from '@/lib/image-metadata';
 import { DreamHouseParams } from '@/types';
+import { getOpenAIImageSettings, type OpenAIImageQuality } from '@/lib/openai-image-settings';
+import { lookup } from '@/lib/safe-lookup';
+import { normalizeRenderSettings } from '@/lib/render-settings';
 import { buildExteriorPrompt } from '@/modules/exterior/lib/prompt-builder';
 import { buildInteriorPrompt } from '@/modules/interior/lib/prompt-builder';
 import { buildVistasPrompt } from '@/modules/vistas/lib/prompt-builder';
@@ -88,27 +91,6 @@ function validateImageSize(file: File, fieldName: string, skipSizeLimit: boolean
     };
   }
   return { valid: true };
-}
-
-// Selección de modelo OpenAI según la opción elegida en la UI.
-// - Sunburst: modelo base de GPT Image 2.5, el más preciso editando (default).
-// - Flare: modelo pequeño y rápido, pensado para borradores.
-// Cualquier valor anterior (p. ej. "GPT Image 2 (OpenAI)") cae en Sunburst.
-type OpenAIImageModel = 'gpt-image-2.5-sunburst' | 'gpt-image-2.5-flare';
-type OpenAIImageQuality = 'low' | 'medium' | 'high' | 'xhigh';
-
-const QUALITY_BY_LABEL: Record<string, OpenAIImageQuality> = {
-  'Borrador': 'low',
-  'Estándar': 'medium',
-  'Alta': 'high',
-  'Máxima': 'xhigh',
-};
-
-function getOpenAIImageSettings(aiModel: string, thinkingLevel: string, renderQuality?: string): { model: OpenAIImageModel; quality: OpenAIImageQuality } {
-  const model: OpenAIImageModel = aiModel.includes('Flare') ? 'gpt-image-2.5-flare' : 'gpt-image-2.5-sunburst';
-  // Registros anteriores al selector de calidad solo traen thinkingLevel
-  const quality = QUALITY_BY_LABEL[renderQuality ?? ''] ?? (thinkingLevel === 'High' ? 'high' : 'medium');
-  return { model, quality };
 }
 
 // Formato de salida de OpenAI: JPEG es más rápido que PNG y mantiene la respuesta
@@ -237,7 +219,13 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ message: 'Missing parameters' }, { status: 400 });
     }
 
-    const params: DreamHouseParams = JSON.parse(paramsJson);
+    const rawParams: unknown = JSON.parse(paramsJson);
+    if (!rawParams || typeof rawParams !== 'object' || Array.isArray(rawParams)) {
+      return NextResponse.json({ message: 'Invalid parameters' }, { status: 400 });
+    }
+    // El cliente puede enviar cualquier cosa: se normalizan modelo, calidad, ratio y resolución, y lo que
+    // falte usa los mismos predeterminados que la interfaz (GPT Image 2.5, calidad más baja y 16:9)
+    const params = normalizeRenderSettings(rawParams as DreamHouseParams);
     const useOpenAI = params.aiModel && params.aiModel.includes('OpenAI');
     requestedOpenAI = !!useOpenAI;
 
@@ -282,7 +270,7 @@ export async function POST(req: NextRequest) {
     }
 
     // Cada módulo usa solo sus propios archivos: lo que quedó cargado de otro módulo no se envía.
-    const modeInputs = INPUTS_BY_MODE[params.mode] ?? INPUTS_BY_MODE.exterior;
+    const modeInputs = lookup(INPUTS_BY_MODE, params.mode) ?? INPUTS_BY_MODE.exterior;
     const files = modeInputs.files ? (formData.getAll('files') as File[]) : [];
     const lotImage = modeInputs.lot ? (formData.get('lotImage') as File | null) : null;
     const exteriorReferenceImage = modeInputs.exteriorRef ? (formData.get('exteriorReferenceImage') as File | null) : null;
@@ -653,9 +641,9 @@ VERIFICATION STEPS:
       // Con la clave del servidor (no la del usuario) se acota el costo: calidad máxima "medium" y resolución máxima 2K
       const effectiveResolution = usingServerOpenAIKey && params.renderOutputResolution === '4K' ? '2K' : params.renderOutputResolution;
       const sizeStr = params.mode === 'edit' ? 'auto' : getGptImage2Size(params.renderAspectRatio, effectiveResolution);
-      const requested = getOpenAIImageSettings(params.aiModel, params.thinkingLevel, params.renderQuality);
+      const requested = getOpenAIImageSettings(params.aiModel, params.renderQuality);
       const openaiModel = requested.model;
-      const qualityVal: OpenAIImageQuality = usingServerOpenAIKey && (requested.quality === 'high' || requested.quality === 'xhigh') ? 'medium' : requested.quality;
+      const qualityVal: OpenAIImageQuality = usingServerOpenAIKey && requested.quality !== 'low' && requested.quality !== 'medium' ? 'medium' : requested.quality;
       usedModel = openaiModel;
       usedQuality = qualityVal;
       usedSize = sizeStr;

@@ -81,7 +81,8 @@ git push
 
 | Variable | Descripción | Dónde Obtenerla |
 |----------|-------------|-----------------|
-| `GEMINI_API_KEY` | API Key de Google Gemini para generación de imágenes | [Google AI Studio](https://makersuite.google.com/app/apikey) |
+| `OPENAI_API_KEY` | Opcional. Respaldo en el servidor para GPT Image 2.5, el modelo predeterminado (cada usuario pega su propia clave en la app). Con esta clave la calidad se limita a "Estándar" y la resolución a 2K | [OpenAI Platform](https://platform.openai.com/api-keys) |
+| `GEMINI_API_KEY` | Opcional. Solo se usa si se elige el modelo Gemini | [Google AI Studio](https://makersuite.google.com/app/apikey) |
 
 ### Configuración de Build
 

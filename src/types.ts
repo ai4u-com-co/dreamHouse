@@ -123,14 +123,14 @@ export const DEFAULT_PARAMS: DreamHouseParams = {
   renderAspectRatio: "16:9",
   renderOutputResolution: "",
   thinkingLevel: "Minimal",
-  renderQuality: "Estándar",
+  renderQuality: "Borrador",
   embedMetadata: true,
   embedDetails: false,
   technicalNotes: "",
   artDirection: "",
   negativePrompt: "",
   editPrompt: "",
-  aiModel: "Gemini 3.1 Flash Image Preview",
+  aiModel: "GPT Image 2.5 Sunburst (OpenAI)",
 
   // Exterior
   projectType: "",

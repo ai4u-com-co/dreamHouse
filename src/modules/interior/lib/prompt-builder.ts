@@ -1,4 +1,5 @@
 import { DreamHouseParams } from '@/types';
+import { lookup } from '@/lib/safe-lookup';
 import {
   bulletSection,
   cameraSentence,
@@ -60,7 +61,7 @@ function getRoomScaleDesc(m2: number): string {
 }
 
 export function buildInteriorPrompt(params: DreamHouseParams, targetModel?: string, hasSpacePhoto: boolean = false): string {
-  const roomDesc = ROOM_MAP[params.roomType] || "a beautifully designed interior space";
+  const roomDesc = lookup(ROOM_MAP, params.roomType) || "a beautifully designed interior space";
   const scaleDesc = getRoomScaleDesc(params.roomSizeM2);
   const isOpenAI = targetModel?.includes('OpenAI') || false;
   const style = resolveRenderStyle(params.renderStyle);
@@ -68,8 +69,8 @@ export function buildInteriorPrompt(params: DreamHouseParams, targetModel?: stri
 
   const styleDesc = joinList(params.architecturalStyles) || "contemporary";
   const architectDesc = joinList(params.architect, '&');
-  const furnitureDesc = joinList((params.furnitureStyle ?? []).map(s => FURNITURE_MAP[s] || s));
-  const lightingDesc = (params.interiorLighting ?? []).map(l => INTERIOR_LIGHTING_MAP[l] || l).join(', complemented by ');
+  const furnitureDesc = joinList((params.furnitureStyle ?? []).map(s => lookup(FURNITURE_MAP, s) || s));
+  const lightingDesc = (params.interiorLighting ?? []).map(l => lookup(INTERIOR_LIGHTING_MAP, l) || l).join(', complemented by ');
   const materialList = (params.materials ?? []).filter(present).join(', ');
   const colorDesc = joinList(params.colorPalette);
   const camera = style.photographic ? cameraSentence(params) : "";

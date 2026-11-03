@@ -1,4 +1,5 @@
 import type { DreamHouseParams } from '@/types';
+import { lookup } from '@/lib/safe-lookup';
 
 // ============================================
 // Ayudas compartidas por los constructores de prompt
@@ -49,7 +50,7 @@ const RENDER_STYLE_MAP: Record<string, RenderStyleDirective> = {
 
 /** Sin estilo elegido = fotorrealista (el comportamiento histórico de la app) */
 export function resolveRenderStyle(style: string | undefined): RenderStyleDirective {
-  return RENDER_STYLE_MAP[style ?? ''] ?? RENDER_STYLE_MAP["Fotorrealista"];
+  return lookup(RENDER_STYLE_MAP, style) ?? RENDER_STYLE_MAP["Fotorrealista"];
 }
 
 // ---------- fotografía ----------

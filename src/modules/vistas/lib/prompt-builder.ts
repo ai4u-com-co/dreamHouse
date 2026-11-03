@@ -1,4 +1,5 @@
 import { DreamHouseParams } from '@/types';
+import { lookup } from '@/lib/safe-lookup';
 import { VISTA_DESCRIPTIONS, VISTA_KINDS, type VistaKind } from '../constants';
 import { PROJECT_TYPE_MAP } from '@/modules/exterior/lib/prompt-builder';
 import { sanitizeSourceParams } from '@/lib/assistant-params';
@@ -51,7 +52,7 @@ export function effectiveVistaParams(params: DreamHouseParams): DreamHouseParams
 
 /** "DESIGN FACTS": lo que se sabe del diseño y que no puede cambiar entre vistas */
 function designFactLines(p: DreamHouseParams): string[] {
-  const projectType = PROJECT_TYPE_MAP[p.projectType] || p.projectType;
+  const projectType = lookup(PROJECT_TYPE_MAP, p.projectType) || p.projectType;
   const site = [p.environment, p.climate, p.city].filter(present).join(', ');
   return [
     when(projectType, (v) => `Building type: ${v}`),
@@ -90,8 +91,8 @@ function continuityLines(p: DreamHouseParams, kind: VistaKind): string[] {
  */
 export function buildVistasPrompt(rawParams: DreamHouseParams, viewType: string, targetModel?: string): string {
   const params = effectiveVistaParams(rawParams);
-  const vistaDescription = VISTA_DESCRIPTIONS[viewType] || "A professional architectural view.";
-  const kind: VistaKind = VISTA_KINDS[viewType] ?? 'seen';
+  const vistaDescription = lookup(VISTA_DESCRIPTIONS, viewType) || "A professional architectural view.";
+  const kind: VistaKind = lookup(VISTA_KINDS, viewType) ?? 'seen';
   const isOpenAI = targetModel?.includes('OpenAI') || false;
   const style = resolveRenderStyle(params.renderStyle);
   const hasSource = !!rawParams.sourceRender;

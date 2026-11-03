@@ -207,11 +207,6 @@ function StudioContent() {
 
     const isExt = params.mode === 'exterior';
     const isInt = params.mode === 'interior';
-    // La API de OpenAI admite relaciones de aspecto entre 1:3 y 3:1
-    const safeRatios = SC.ASPECT_RATIOS.filter((r) => {
-      const [w, h] = r.split(':').map(Number);
-      return w / h <= 3 && w / h >= 1 / 3;
-    });
     const randomProjectType = pick(EC.PROJECT_TYPES);
     // Metros cuadrados coherentes con el tipo: una tiny house no puede ser una mansión
     const randomSize = randomProjectType === 'Tiny house' ? '35' : String(60 + Math.floor(Math.random() * 740));
@@ -228,8 +223,6 @@ function StudioContent() {
       season: pick(SC.SEASONS),
       lighting: pick(SC.LIGHTING_TYPES),
       humanContext: pick(SC.HUMAN_CONTEXT),
-      renderOutputResolution: pick(SC.OUTPUT_RESOLUTIONS),
-      renderAspectRatio: pick(safeRatios.length ? safeRatios : SC.ASPECT_RATIOS),
       renderStyle: pick(SC.RENDER_STYLES),
 
       // Exterior
