@@ -3,8 +3,10 @@ import { GoogleGenAI, Part } from '@google/genai';
 import OpenAI from 'openai';
 import sharp from 'sharp';
 import { embedImageMetadata, pickEmbeddableParams, METADATA_APP, METADATA_VERSION, type DreamHouseImageMetadata } from '@/lib/image-metadata';
-import { DreamHouseParams, DEFAULT_PARAMS } from '@/types';
+import { DreamHouseParams } from '@/types';
 import { getOpenAIImageSettings, type OpenAIImageQuality } from '@/lib/openai-image-settings';
+import { lookup } from '@/lib/safe-lookup';
+import { normalizeRenderSettings } from '@/lib/render-settings';
 import { buildExteriorPrompt } from '@/modules/exterior/lib/prompt-builder';
 import { buildInteriorPrompt } from '@/modules/interior/lib/prompt-builder';
 import { buildVistasPrompt } from '@/modules/vistas/lib/prompt-builder';
@@ -217,11 +219,13 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ message: 'Missing parameters' }, { status: 400 });
     }
 
-    const params: DreamHouseParams = JSON.parse(paramsJson);
-    // Mismos predeterminados que la interfaz: GPT Image 2.5, calidad más baja y 16:9
-    params.aiModel = params.aiModel || DEFAULT_PARAMS.aiModel;
-    params.renderQuality = params.renderQuality || DEFAULT_PARAMS.renderQuality;
-    params.renderAspectRatio = params.renderAspectRatio || DEFAULT_PARAMS.renderAspectRatio;
+    const rawParams: unknown = JSON.parse(paramsJson);
+    if (!rawParams || typeof rawParams !== 'object' || Array.isArray(rawParams)) {
+      return NextResponse.json({ message: 'Invalid parameters' }, { status: 400 });
+    }
+    // El cliente puede enviar cualquier cosa: se normalizan modelo, calidad, ratio y resolución, y lo que
+    // falte usa los mismos predeterminados que la interfaz (GPT Image 2.5, calidad más baja y 16:9)
+    const params = normalizeRenderSettings(rawParams as DreamHouseParams);
     const useOpenAI = params.aiModel && params.aiModel.includes('OpenAI');
     requestedOpenAI = !!useOpenAI;
 
@@ -266,7 +270,7 @@ export async function POST(req: NextRequest) {
     }
 
     // Cada módulo usa solo sus propios archivos: lo que quedó cargado de otro módulo no se envía.
-    const modeInputs = INPUTS_BY_MODE[params.mode] ?? INPUTS_BY_MODE.exterior;
+    const modeInputs = lookup(INPUTS_BY_MODE, params.mode) ?? INPUTS_BY_MODE.exterior;
     const files = modeInputs.files ? (formData.getAll('files') as File[]) : [];
     const lotImage = modeInputs.lot ? (formData.get('lotImage') as File | null) : null;
     const exteriorReferenceImage = modeInputs.exteriorRef ? (formData.get('exteriorReferenceImage') as File | null) : null;
@@ -639,7 +643,7 @@ VERIFICATION STEPS:
       const sizeStr = params.mode === 'edit' ? 'auto' : getGptImage2Size(params.renderAspectRatio, effectiveResolution);
       const requested = getOpenAIImageSettings(params.aiModel, params.renderQuality);
       const openaiModel = requested.model;
-      const qualityVal: OpenAIImageQuality = usingServerOpenAIKey && (requested.quality === 'high' || requested.quality === 'xhigh') ? 'medium' : requested.quality;
+      const qualityVal: OpenAIImageQuality = usingServerOpenAIKey && requested.quality !== 'low' && requested.quality !== 'medium' ? 'medium' : requested.quality;
       usedModel = openaiModel;
       usedQuality = qualityVal;
       usedSize = sizeStr;

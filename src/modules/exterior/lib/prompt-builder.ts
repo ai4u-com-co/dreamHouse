@@ -1,4 +1,5 @@
 import { DreamHouseParams } from '@/types';
+import { lookup } from '@/lib/safe-lookup';
 import {
   bulletSection,
   cameraSentence,
@@ -105,17 +106,17 @@ export function getLightingPhysics(timeOfDay: string, rawLightingType: string, s
 }
 
 export function buildExteriorPrompt(params: DreamHouseParams, hasStructuralReference: boolean = false, targetModel?: string): string {
-  const projectType = PROJECT_TYPE_MAP[params.projectType] || params.projectType || "building";
+  const projectType = lookup(PROJECT_TYPE_MAP, params.projectType) || params.projectType || "building";
   let scaleDesc = "modern structure";
   if (params.size) {
     const numericMeters = parseFloat(params.size);
     if (!isNaN(numericMeters) && numericMeters > 0) {
       scaleDesc = `${numericMeters}m² architectural structure`;
     } else {
-      scaleDesc = VOLUMETRIC_SCALE_MAP[params.size] || params.size || "modern structure";
+      scaleDesc = lookup(VOLUMETRIC_SCALE_MAP, params.size) || params.size || "modern structure";
     }
   }
-  const organizationDesc = FORM_ORGANIZATION_MAP[params.layoutType] ? `, ${FORM_ORGANIZATION_MAP[params.layoutType]}` : "";
+  const organizationDesc = lookup(FORM_ORGANIZATION_MAP, params.layoutType) ? `, ${lookup(FORM_ORGANIZATION_MAP, params.layoutType)}` : "";
   const isOpenAI = targetModel?.includes('OpenAI') || false;
   const style = resolveRenderStyle(params.renderStyle);
   const detailLines = exteriorDetailLines(params);
@@ -140,7 +141,7 @@ SCENE & CONTEXT:
 
 ARCHITECTURAL SPECIFICATION:
 - Style: ${styleDesc} character${architectDesc ? `, drawing from the language of ${architectDesc}` : ""}
-${params.layoutType ? `- Layout: Organized with a ${FORM_ORGANIZATION_MAP[params.layoutType] || params.layoutType} configuration\n` : ""}${params.levels > 0 ? `- Levels: Distributed across exactly ${params.levels} floors\n` : ""}- Materials: ${materialDesc || "traditional architectural facade materials"}
+${params.layoutType ? `- Layout: Organized with a ${lookup(FORM_ORGANIZATION_MAP, params.layoutType) || params.layoutType} configuration\n` : ""}${params.levels > 0 ? `- Levels: Distributed across exactly ${params.levels} floors\n` : ""}- Materials: ${materialDesc || "traditional architectural facade materials"}
 - Material Detail: Honest textures with physical thickness, weathering at base, and clear joint shadow lines. No digital smoothness or plastic sheen.
 ${bulletSection('ADDITIONAL DESIGN SPECIFICATION', detailLines)}
 ${style.photographic ? 'PHOTOGRAPHY & LIGHTING' : 'VISUAL TREATMENT & LIGHTING'}:
