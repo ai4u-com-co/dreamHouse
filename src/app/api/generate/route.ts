@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { GoogleGenAI, Part } from '@google/genai';
 import OpenAI from 'openai';
 import sharp from 'sharp';
+import { prepareEditMask, blendEditedOntoBase, type PreparedEditMask } from '@/lib/edit-mask';
 import { embedImageMetadata, pickEmbeddableParams, METADATA_APP, METADATA_VERSION, type DreamHouseImageMetadata } from '@/lib/image-metadata';
 import { DreamHouseParams } from '@/types';
 import { getOpenAIImageSettings, type OpenAIImageQuality } from '@/lib/openai-image-settings';
@@ -100,44 +101,44 @@ const OPENAI_OUTPUT_FORMAT = 'jpeg' as const;
 const OPENAI_OUTPUT_COMPRESSION = 95;
 
 // La máscara de OpenAI es una guía, no una garantía: el modelo puede tocar fuera de la zona.
-// Para que lo no marcado quede idéntico píxel a píxel, se compone el resultado sobre la
-// imagen original usando la propia máscara (con un borde suavizado para que no se note el corte).
-// Devuelve null si no se puede componer (p. ej. la relación de aspecto cambió): se usa entonces
-// la imagen del modelo tal cual.
-async function compositeMaskedEdit(baseFile: File, maskFile: File, resultBase64: string): Promise<string | null> {
+// Para que lo no marcado quede idéntico píxel a píxel, se compone el resultado sobre la imagen
+// original. El trazo del usuario es aproximado, así que ni se entrega literal ni se corta en seco:
+// la zona se amplía un margen y el borde se mezcla con un degradado proporcional a la imagen
+// (ver src/lib/edit-mask.ts), para que el cambio se acomode a la arquitectura y no deje costura.
+
+// Prepara la máscara ampliada (para el modelo) y el peso de mezcla. Devuelve null si no se puede
+// (p. ej. imagen ilegible): se usa entonces la máscara tal como la dibujó el usuario.
+async function prepareMaskedEdit(baseFile: File, maskFile: File): Promise<PreparedEditMask | null> {
   try {
     const baseBuf = Buffer.from(await baseFile.arrayBuffer());
     const maskBuf = Buffer.from(await maskFile.arrayBuffer());
-    const resultBuf = Buffer.from(resultBase64, 'base64');
-
     const baseMeta = await sharp(baseBuf, { limitInputPixels: EDIT_MASK_MAX_PIXELS }).metadata();
+    if (!baseMeta.width || !baseMeta.height) return null;
+    return await prepareEditMask(maskBuf, baseMeta.width, baseMeta.height, EDIT_MASK_MAX_PIXELS);
+  } catch (error) {
+    console.error('Edit mask preparation failed, using the mask as drawn:', error);
+    return null;
+  }
+}
+
+// Compone el resultado del modelo sobre la imagen original con el peso de mezcla preparado.
+// Devuelve null si no se puede componer (p. ej. la relación de aspecto cambió): se usa entonces
+// la imagen del modelo tal cual.
+async function compositeMaskedEdit(baseFile: File, prepared: PreparedEditMask, resultBase64: string): Promise<string | null> {
+  try {
+    const baseBuf = Buffer.from(await baseFile.arrayBuffer());
+    const resultBuf = Buffer.from(resultBase64, 'base64');
     const resultMeta = await sharp(resultBuf, { limitInputPixels: OPENAI_RESULT_MAX_PIXELS }).metadata();
-    if (!baseMeta.width || !baseMeta.height || !resultMeta.width || !resultMeta.height) return null;
-    const { width, height } = baseMeta;
-    if (Math.abs(resultMeta.width / resultMeta.height - width / height) > 0.01) return null;
+    if (!resultMeta.width || !resultMeta.height) return null;
+    if (Math.abs(resultMeta.width / resultMeta.height - prepared.width / prepared.height) > 0.01) return null;
 
-    // Zona editable = parte transparente de la máscara, con borde suavizado
-    const editableAlpha = await sharp(maskBuf, { limitInputPixels: EDIT_MASK_MAX_PIXELS })
-      .resize(width, height)
-      .ensureAlpha()
-      .extractChannel(3)
-      .negate()
-      .blur(2)
-      .raw()
-      .toBuffer();
-
-    // joinChannel debe ir en una llamada aparte: dentro de la misma cadena que removeAlpha no añade el canal
-    const editedRgb = await sharp(resultBuf, { limitInputPixels: OPENAI_RESULT_MAX_PIXELS }).resize(width, height).removeAlpha().png().toBuffer();
-    const editedPatch = await sharp(editedRgb)
-      .joinChannel(editableAlpha, { raw: { width, height, channels: 1 } })
-      .png()
-      .toBuffer();
-
-    const final = await sharp(baseBuf, { limitInputPixels: EDIT_MASK_MAX_PIXELS })
-      .removeAlpha()
-      .composite([{ input: editedPatch }])
-      .jpeg({ quality: OPENAI_OUTPUT_COMPRESSION })
-      .toBuffer();
+    const final = await blendEditedOntoBase(
+      baseBuf,
+      resultBuf,
+      prepared,
+      { base: EDIT_MASK_MAX_PIXELS, result: OPENAI_RESULT_MAX_PIXELS },
+      OPENAI_OUTPUT_COMPRESSION,
+    );
     return final.toString('base64');
   } catch (error) {
     console.error('Masked edit compositing failed, using model output as is:', error);
@@ -429,7 +430,7 @@ export async function POST(req: NextRequest) {
       if (params.mode === 'edit' && editBaseFile && editMaskFile) {
         openaiInputs.push({
           file: editBaseFile,
-          role: "the original image to edit; only the area made transparent by the mask may change",
+          role: "the original image to edit; the transparent area of the mask is approximately where the change belongs, and it must blend with the architecture around it",
         });
       } else if (params.mode === 'edit' && editCompositeFile) {
         openaiInputs.push({
@@ -474,6 +475,11 @@ export async function POST(req: NextRequest) {
       }
     }
     const openaiMaskFile = useOpenAI && params.mode === 'edit' && editBaseFile && editMaskFile ? editMaskFile : null;
+    // Máscara ampliada para el modelo + peso de mezcla del borde (la validada, dibujada por el usuario, queda de respaldo)
+    const preparedMask = openaiMaskFile && editBaseFile ? await prepareMaskedEdit(editBaseFile, openaiMaskFile) : null;
+    const maskForModel = preparedMask
+      ? new File([new Uint8Array(preparedMask.modelMaskPng)], 'edit_mask.png', { type: 'image/png' })
+      : openaiMaskFile;
     const openaiImageGuide = openaiInputs.length > 0
       ? `INPUT IMAGES:\n${openaiInputs.map((input, i) => `- Image ${i + 1}: ${input.role}.`).join('\n')}`
       : "";
@@ -502,8 +508,10 @@ export async function POST(req: NextRequest) {
       } else if (openaiMaskFile) {
         mandate = `IMAGE EDITING MANDATE (MASKED EDIT):
 - Change only the masked area, following the edit instruction above.
-- Keep everything outside the mask identical: camera angle, framing, perspective, lighting direction and color temperature, materials, proportions, surrounding objects and resolution.
-- Blend the changed area seamlessly with its surroundings, matching the original light, style and perspective.`;
+- The mask was painted by hand, so its outline is APPROXIMATE: it marks where the change is wanted, not an exact cut line. Never reproduce the brush outline as a visible edge, halo, seam or tone shift.
+- Let the change follow the architecture and logic of the space. Carry the new surface, material, color or object up to the natural boundaries nearby (wall corners, ceiling and floor lines, baseboards, window and door frames, joints between planes, furniture edges) and stop there, never in the middle of a continuous plane.
+- Respect the original perspective and vanishing lines, the light direction and color temperature, the shadows and reflections, and the scale of the surroundings, so the edited area reads as part of the same space.
+- Inside the thin band around the mask you may adjust slightly where it is needed to make the junction coherent. Everything beyond that band stays identical: camera angle, framing, perspective, lighting, materials, proportions, surrounding objects and resolution.`;
       } else {
         mandate = `IMAGE EDITING MANDATE (SURGICAL EDIT):
 - Change only the areas marked or described in the user's sketch and notes.
@@ -658,7 +666,7 @@ VERIFICATION STEPS:
         result = await openaiClient.images.edit({
           model: openaiModel,
           image: imageFiles,
-          ...(openaiMaskFile ? { mask: openaiMaskFile } : {}),
+          ...(maskForModel ? { mask: maskForModel } : {}),
           prompt: fullPrompt,
           size: sizeStr as `${number}x${number}` | 'auto',
           quality: qualityVal,
@@ -680,8 +688,8 @@ VERIFICATION STEPS:
       const imageBase64 = result?.data?.[0]?.b64_json;
       const imageUrlResult = result?.data?.[0]?.url;
       if (imageBase64) {
-        const composited = openaiMaskFile && editBaseFile
-          ? await compositeMaskedEdit(editBaseFile, openaiMaskFile, imageBase64)
+        const composited = preparedMask && editBaseFile
+          ? await compositeMaskedEdit(editBaseFile, preparedMask, imageBase64)
           : null;
         imageUrl = `data:image/${OPENAI_OUTPUT_FORMAT};base64,${composited ?? imageBase64}`;
       } else if (imageUrlResult) {
