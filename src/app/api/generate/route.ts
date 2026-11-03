@@ -32,7 +32,26 @@ function validateImageSize(file: File, fieldName: string, skipSizeLimit: boolean
   return { valid: true };
 }
 
-// Helper function to calculate a valid size parameter for gpt-image-2
+// Selección de modelo OpenAI según la opción elegida en la UI.
+// - Sunburst: modelo base de GPT Image 2.5, el más preciso editando (default).
+// - Flare: modelo pequeño y rápido, pensado para borradores.
+// Cualquier valor anterior (p. ej. "GPT Image 2 (OpenAI)") cae en Sunburst.
+type OpenAIImageModel = 'gpt-image-2.5-sunburst' | 'gpt-image-2.5-flare';
+type OpenAIImageQuality = 'low' | 'medium' | 'high';
+
+function getOpenAIImageSettings(aiModel: string, thinkingLevel: string): { model: OpenAIImageModel; quality: OpenAIImageQuality } {
+  if (aiModel.includes('Flare')) {
+    return { model: 'gpt-image-2.5-flare', quality: 'low' };
+  }
+  return { model: 'gpt-image-2.5-sunburst', quality: thinkingLevel === 'High' ? 'high' : 'medium' };
+}
+
+// Formato de salida de OpenAI: JPEG es más rápido que PNG y mantiene la respuesta
+// por debajo del límite de 4,5 MB del cuerpo de respuesta de una función de Vercel.
+const OPENAI_OUTPUT_FORMAT = 'jpeg' as const;
+const OPENAI_OUTPUT_COMPRESSION = 95;
+
+// Helper function to calculate a valid size parameter for GPT Image (2 / 2.5)
 function getGptImage2Size(aspectRatio: string, resolutionPreset: string): string {
   let widthRatio = 16;
   let heightRatio = 9;
@@ -42,6 +61,11 @@ function getGptImage2Size(aspectRatio: string, resolutionPreset: string): string
     widthRatio = parseInt(parts[0], 10) || 16;
     heightRatio = parseInt(parts[1], 10) || 9;
   }
+
+  // La API exige una relación de aspecto entre 1:3 y 3:1
+  const clampedRatio = Math.min(3, Math.max(1 / 3, widthRatio / heightRatio));
+  widthRatio = clampedRatio;
+  heightRatio = 1;
 
   // Target total pixels based on preset
   let targetPixels = 1024 * 1024; // Default "1K" (~1MP)
@@ -278,6 +302,45 @@ export async function POST(req: NextRequest) {
       narrativePrompt = `USER EDIT PROMPT: ${params.editPrompt}`;
     }
 
+    // --- OpenAI: imágenes de entrada con su rol ---
+    // La primera imagen es la base de la edición; cada una se describe por número en el prompt
+    // (la API no recibe etiquetas como Gemini, así que el rol va dentro del texto).
+    const openaiInputs: Array<{ file: File; role: string }> = [];
+    if (useOpenAI) {
+      if (params.mode === 'edit' && editCompositeFile) {
+        openaiInputs.push({
+          file: editCompositeFile,
+          role: "the original image with the user's sketch and notes drawn on top; the drawings are edit instructions, not content to keep",
+        });
+      } else {
+        if (exteriorReferenceImage) {
+          openaiInputs.push({
+            file: exteriorReferenceImage,
+            role: "the existing house (structural base): keep its general volumes, shape and structure while applying the requested styles and materials",
+          });
+        }
+        if (floorPlanImage) {
+          openaiInputs.push({ file: floorPlanImage, role: "the floor plan (geometric reference for layout and proportions)" });
+        }
+        if (lotImage) {
+          openaiInputs.push({ file: lotImage, role: "the lot or terrain photo (site context to integrate the building into)" });
+        }
+        const refRole = params.mode === 'vistas'
+          ? "the reference house; produce a new view of this exact house"
+          : params.mode === 'exterior'
+            ? "a conceptual style reference (take mood, material palette and proportions; do not copy specific buildings or facades)"
+            : "a style reference for the overall look, material palette and atmosphere";
+        files.forEach(file => openaiInputs.push({ file, role: refRole }));
+        objectImages.forEach(file => openaiInputs.push({
+          file,
+          role: "a specific furniture piece or object that must appear in the final design; preserve its exact shape, color, material and design",
+        }));
+      }
+    }
+    const openaiImageGuide = openaiInputs.length > 0
+      ? `INPUT IMAGES:\n${openaiInputs.map((input, i) => `- Image ${i + 1}: ${input.role}.`).join('\n')}`
+      : "";
+
     let mandate = "";
     if (useOpenAI) {
       if (params.mode === "interior") {
@@ -297,8 +360,9 @@ export async function POST(req: NextRequest) {
 - Maintain design style, materials, and geometry identical to the reference image.`;
       } else {
         mandate = `IMAGE EDITING MANDATE (SURGICAL EDIT):
-- Modify only the areas marked/indicated in the user's sketch.
-- Keep everything else identical. Do not alter surrounding design, camera angle, colors, or resolution.`;
+- Change only the areas marked or described in the user's sketch and notes.
+- Keep everything else identical: camera angle, framing, perspective, lighting direction and color temperature, materials, proportions, surrounding objects, saturation, contrast and resolution.
+- The sketch lines, arrows and notes drawn on the image are instructions only; they must not appear in the output.`;
       }
     } else {
       if (params.mode === "interior") {
@@ -331,12 +395,16 @@ export async function POST(req: NextRequest) {
 
     let fullPrompt = "";
     if (useOpenAI) {
-      fullPrompt = `${narrativePrompt}
+      // El constructor de prompt ya define estilo, luz, textura y exclusiones de composición;
+      // aquí solo se agregan lo estructural (mandato), las exclusiones del usuario y las imágenes de entrada.
+      const userExclusions = params.negativePrompt?.trim()
+        ? `\n- Also avoid: ${params.negativePrompt.trim()}`
+        : "";
+      fullPrompt = `${openaiImageGuide ? `${openaiImageGuide}\n\n` : ""}${narrativePrompt}
 
 [MANDATES & CONSTRAINTS]
-${mandate}
-- Look & Quality: The output must be a clean, photorealistic photograph with honest material textures (wood grain, concrete formwork texture, glass specularity, etc.) and physical depth. Soft shadows. No plastic or overly smooth surfaces.
-- Exclusions: No neighboring buildings, no adjacent houses, no party walls. No watermarks, logos, or text inside the image.`.trim();
+${mandate}${userExclusions}
+- No watermarks, logos or text inside the image.`.trim();
     } else {
       fullPrompt = `${narrativePrompt}
 
@@ -411,44 +479,38 @@ VERIFICATION STEPS:
     let groundingMetadata = null;
 
     if (useOpenAI && openaiClient) {
-      // Collect image references for multi-image input support in gpt-image-2
-      const imageFiles: File[] = [];
-      if (params.mode === 'edit' && editCompositeFile) {
-        imageFiles.push(editCompositeFile);
-      } else {
-        if (floorPlanImage) imageFiles.push(floorPlanImage);
-        if (lotImage) imageFiles.push(lotImage);
-        if (exteriorReferenceImage) imageFiles.push(exteriorReferenceImage);
-        files.forEach(file => imageFiles.push(file));
-      }
-
+      const imageFiles = openaiInputs.map(input => input.file);
       const sizeStr = getGptImage2Size(params.renderAspectRatio, params.renderOutputResolution);
-      const qualityVal = params.thinkingLevel === "High" ? "high" : "medium";
+      const { model: openaiModel, quality: qualityVal } = getOpenAIImageSettings(params.aiModel, params.thinkingLevel);
 
       let result;
       if (imageFiles.length > 0) {
-        console.log(`Editing/Compositing with OpenAI (GPT Image 2) using ${imageFiles.length} image files. Size: ${sizeStr}, Quality: ${qualityVal}`);
+        console.log(`Editing/Compositing with OpenAI (${openaiModel}) using ${imageFiles.length} image files. Size: ${sizeStr}, Quality: ${qualityVal}`);
         result = await openaiClient.images.edit({
-          model: "gpt-image-2",
-          image: imageFiles as unknown as File,
+          model: openaiModel,
+          image: imageFiles,
           prompt: fullPrompt,
-          size: sizeStr as unknown as "1024x1024",
-          quality: qualityVal as unknown as "standard"
+          size: sizeStr as `${number}x${number}`,
+          quality: qualityVal,
+          output_format: OPENAI_OUTPUT_FORMAT,
+          output_compression: OPENAI_OUTPUT_COMPRESSION,
         });
       } else {
-        console.log(`Generating text-to-image with OpenAI (GPT Image 2). Size: ${sizeStr}, Quality: ${qualityVal}`);
+        console.log(`Generating text-to-image with OpenAI (${openaiModel}). Size: ${sizeStr}, Quality: ${qualityVal}`);
         result = await openaiClient.images.generate({
-          model: "gpt-image-2",
+          model: openaiModel,
           prompt: fullPrompt,
-          size: sizeStr as unknown as "1024x1024",
-          quality: qualityVal as unknown as "standard"
+          size: sizeStr as `${number}x${number}`,
+          quality: qualityVal,
+          output_format: OPENAI_OUTPUT_FORMAT,
+          output_compression: OPENAI_OUTPUT_COMPRESSION,
         });
       }
-      
+
       const imageBase64 = result?.data?.[0]?.b64_json;
       const imageUrlResult = result?.data?.[0]?.url;
       if (imageBase64) {
-        imageUrl = `data:image/png;base64,${imageBase64}`;
+        imageUrl = `data:image/${OPENAI_OUTPUT_FORMAT};base64,${imageBase64}`;
       } else if (imageUrlResult) {
         imageUrl = imageUrlResult;
       } else {
