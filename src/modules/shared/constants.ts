@@ -260,11 +260,10 @@ export const RENDER_STYLES = [
   "Render artístico / Painterly"
 ];
 
-/** El primero es el predeterminado de la app (ver DEFAULT_PARAMS en types.ts) */
+/** El primero es el predeterminado de la app (ver DEFAULT_PARAMS en types.ts). Gemini se retiró: solo GPT Image 2.5. */
 export const AI_MODELS = [
   "GPT Image 2.5 Sunburst (OpenAI)",
-  "GPT Image 2.5 Flare · borrador rápido (OpenAI)",
-  "Gemini 3.1 Flash Image Preview"
+  "GPT Image 2.5 Flare · borrador rápido (OpenAI)"
 ];
 
 export interface CameraPreset {

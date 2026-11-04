@@ -13,7 +13,7 @@ DreamHouse es una **PWA**: se instala desde el navegador, sin tienda de apps, y 
 2. Toca **Compartir** → **Añadir a pantalla de inicio** → **Añadir**.
 
 ## Primer uso
-- Pega tu **clave de OpenAI** (y la de Gemini si la usas) en el menú ☰ → se guarda solo en tu teléfono.
+- Entra con tu **cuenta de Google** (botón «Entrar con Google»). No necesitas ninguna clave: el saldo de **créditos** se ve en el encabezado y en el menú ☰.
 - Hace falta internet para generar y editar imágenes. Sin conexión la app abre y muestra un aviso; tus parámetros se conservan.
 
 ## Requisito para el equipo: la URL debe ser pública

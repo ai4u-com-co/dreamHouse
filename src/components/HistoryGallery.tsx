@@ -2,14 +2,15 @@ import React from 'react';
 import Image from 'next/image';
 import { Trash2, Download, RotateCcw, Clock, Layout, Home, Armchair, Wand, ZoomIn } from 'lucide-react';
 import { Button } from './ui/Button';
-import { GenerationRecord, db } from '../lib/db';
+import { GenerationRecord, dbFor } from '../lib/db';
 import { useLightbox } from '../context/LightboxContext';
+import { useAuth } from '../context/AuthContext';
 
 // Descarga el render full-res (Blob) on-demand. Si no existe (registro previo a v2),
-// cae al thumbnail para no dejar al usuario sin descarga.
-async function downloadGeneration(item: GenerationRecord) {
+// cae al thumbnail para no dejar al usuario sin descarga. El historial es de UNA cuenta (`ownerId`).
+async function downloadGeneration(item: GenerationRecord, ownerId: string | null) {
   try {
-    const blob = await db.getFullImage(item.id);
+    const blob = ownerId ? await dbFor(ownerId).getFullImage(item.id) : null;
     const ext = blob?.type === 'image/jpeg' ? 'jpg' : 'png';
     const url = blob ? URL.createObjectURL(blob) : item.imageUrl;
     const a = document.createElement('a');
@@ -41,6 +42,7 @@ export default function HistoryGallery({
   isLoading
 }: HistoryGalleryProps) {
   const { openLightbox } = useLightbox();
+  const { userId } = useAuth();
 
   const formatDate = (timestamp: number) => {
     try {
@@ -140,7 +142,7 @@ export default function HistoryGallery({
               {/* Quick Actions Overlay */}
               <div className="absolute bottom-2 right-2 flex gap-1.5 opacity-0 group-hover:opacity-100 transition-opacity z-10">
                 <button
-                  onClick={(e) => { e.stopPropagation(); downloadGeneration(item); }}
+                  onClick={(e) => { e.stopPropagation(); downloadGeneration(item, userId); }}
                   className="p-1.5 bg-primary text-primary-foreground rounded hover:scale-110 transition-transform"
                   title="Descargar en alta resolución"
                 >

@@ -3,7 +3,8 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { X, ZoomIn, ZoomOut, ChevronLeft, ChevronRight } from 'lucide-react';
 import Image from 'next/image';
-import { db } from '@/lib/db';
+import { dbFor } from '@/lib/db';
+import { useAuth } from '@/context/AuthContext';
 
 interface ImageLightboxProps {
   images: { url: string; type?: string; id?: string }[];
@@ -20,6 +21,7 @@ export default function ImageLightbox({
 }: ImageLightboxProps) {
   const [zoom, setZoom] = useState(1);
   const currentImage = images[currentIndex];
+  const { userId } = useAuth(); // el historial es de UNA cuenta
 
   // Renders full-res cargados on-demand (object URLs), cacheados por id de generación.
   // Solo se mantiene en memoria la imagen visible y las ya visitadas; no las 20 a la vez.
@@ -28,16 +30,16 @@ export default function ImageLightbox({
 
   useEffect(() => {
     const id = currentImage?.id;
-    if (!id || fullUrls[id]) return;
+    if (!id || !userId || fullUrls[id]) return;
     let cancelled = false;
-    db.getFullImage(id).then((blob) => {
+    dbFor(userId).getFullImage(id).then((blob) => {
       if (cancelled || !blob) return;
       const url = URL.createObjectURL(blob);
       objectUrlsRef.current.push(url);
       setFullUrls((prev) => ({ ...prev, [id]: url }));
     }).catch(() => {/* fallback al thumbnail */});
     return () => { cancelled = true; };
-  }, [currentImage?.id, fullUrls]);
+  }, [currentImage?.id, fullUrls, userId]);
 
   // Liberar los object URLs al desmontar.
   useEffect(() => {

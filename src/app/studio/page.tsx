@@ -28,14 +28,27 @@ import type { EditMaskPayload } from '@/components/SketchCanvas';
 import { readImageMetadataFromFile } from '@/lib/image-metadata';
 import { sanitizeAssistantParams, sanitizeSourceParams, cleanLabel } from '@/lib/assistant-params';
 import type { DreamHouseImageMetadata } from '@/lib/image-metadata';
+import { useAuth } from '@/context/AuthContext';
+import { ApiError, callApi } from '@/lib/api-client';
+import AuthGate from '@/components/AuthGate';
 
+/** Respuesta de /api/generate (el saldo `remaining` lo publica callApi en el encabezado). */
+interface GenerateResponse {
+  imageUrl: string;
+  houseName: string;
+}
+
+// Errores que no se arreglan reintentando la siguiente vista: no tiene sentido seguir llamando al servidor.
+const STOP_CODES = new Set(['INSUFFICIENT_CREDITS', 'UNAUTHENTICATED', 'NO_ACCESS']);
 
 export default function StudioPage() {
   return (
-    <LightboxProvider>
-      <StudioContent />
-      <MemoryGuard />
-    </LightboxProvider>
+    <AuthGate>
+      <LightboxProvider>
+        <StudioContent />
+        <MemoryGuard />
+      </LightboxProvider>
+    </AuthGate>
   );
 }
 
@@ -56,8 +69,9 @@ function StudioContent() {
   const [vistasResults, setVistasResults] = useState<{ type: string, url: string | null, loading: boolean }[]>([]);
   const [activeVistaIndex, setActiveVistaIndex] = useState(0);
 
-  // History hook
-  const { history, saveToHistory, deleteFromHistory, clearHistory, isLoading: isHistoryLoading } = useHistory();
+  // El historial es de CADA cuenta: se ata al usuario activo
+  const { userId } = useAuth();
+  const { history, saveToHistory, deleteFromHistory, clearHistory, isLoading: isHistoryLoading } = useHistory(userId);
 
 
 
@@ -286,12 +300,6 @@ function StudioContent() {
         throw new Error('Sube la foto de la casa para generar sus vistas.');
       }
 
-      const useOpenAI = params.aiModel && params.aiModel.includes('OpenAI');
-      const apiKey = useOpenAI ? localStorage.getItem('OPENAI_API_KEY') : localStorage.getItem('GEMINI_API_KEY');
-      if (!apiKey) {
-        throw new Error(`Por favor, configura tu ${useOpenAI ? 'OPENAI_API_KEY' : 'GEMINI_API_KEY'} en el encabezado.`);
-      }
-
       if (isVistasMode) {
         if (params.selectedVistas.length === 0) {
           throw new Error('Por favor, selecciona al menos una vista para generar.');
@@ -320,18 +328,8 @@ function StudioContent() {
             const currentParams = { ...params, viewType, hasExteriorReference: !!exteriorReferenceFile };
             formData.append('params', JSON.stringify(currentParams));
 
-            const apiResponse = await fetch('/api/generate', {
-              method: 'POST',
-              headers: useOpenAI ? { 'x-openai-api-key': apiKey } : { 'x-api-key': apiKey },
-              body: formData,
-            });
-
-            if (!apiResponse.ok) {
-              const failure = await apiResponse.json().catch(() => ({} as { message?: string }));
-              throw new Error(failure.message || `Error en vista ${viewType}`);
-            }
-
-            const data = await apiResponse.json();
+            // Con la sesión de Google (el servidor cobra los créditos); `ownerId` = la cuenta que pidió esta vista
+            const { data, ownerId } = await callApi<GenerateResponse>('/api/generate', formData);
             okCount++;
             
             // Update individual result
@@ -349,20 +347,25 @@ function StudioContent() {
               params: currentParams,
               imageUrl: data.imageUrl,
               houseName: data.houseName
-            });
+            }, ownerId);
 
           } catch (err) {
             console.error(`Error generating vista ${viewType}:`, err);
             failCount++;
             lastVistaError = err instanceof Error ? err.message : String(err);
-            setVistasResults(prev => prev.map((v, idx) => 
+            if (err instanceof ApiError && STOP_CODES.has(err.code)) {
+              // Sin saldo o sin sesión: las vistas que faltan fallarían igual. Se corta aquí (y no se cobra nada más).
+              setVistasResults(prev => prev.map(v => ({ ...v, loading: false })));
+              break;
+            }
+            setVistasResults(prev => prev.map((v, idx) =>
               idx === i ? { ...v, loading: false } : v
             ));
           }
         }
         
         if (okCount === 0) {
-          throw new Error(lastVistaError || 'No se pudo generar ninguna vista. Revisa tu clave y la imagen e inténtalo de nuevo.');
+          throw new Error(lastVistaError || 'No se pudo generar ninguna vista. Revisa la imagen e inténtalo de nuevo.');
         }
         showToast(failCount > 0
           ? `Portafolio parcial: ${okCount} de ${okCount + failCount} vistas (${failCount} fallaron: ${lastVistaError}).`
@@ -396,34 +399,8 @@ function StudioContent() {
         const finalParams = { ...params, hasExteriorReference: !!exteriorReferenceFile };
         formData.append('params', JSON.stringify(finalParams));
 
-        const apiResponse = await fetch('/api/generate', {
-          method: 'POST',
-          headers: useOpenAI ? { 'x-openai-api-key': apiKey } : { 'x-api-key': apiKey },
-          body: formData,
-        });
-
-        if (!apiResponse.ok) {
-          let errorMessage = 'Error generating architecture';
-          try {
-            const errorData = await apiResponse.json();
-            errorMessage = errorData.message || errorMessage;
-          } catch {
-            // If response is not JSON (e.g. HTML 500 error), get the text
-            const errorText = await apiResponse.text();
-            console.error("Non-JSON error response:", errorText);
-            errorMessage = `Server Error (${apiResponse.status}): The server returned an unexpected response format.`;
-          }
-          throw new Error(errorMessage);
-        }
-
-        let data;
-        try {
-          data = await apiResponse.json();
-        } catch {
-          const errorText = await apiResponse.text();
-          console.error("Non-JSON success response (unexpected):", errorText);
-          throw new Error("Failed to parse generation result. The server returned an invalid format.");
-        }
+        // Con la sesión de Google (el servidor cobra los créditos); `ownerId` = la cuenta que pidió este render
+        const { data, ownerId } = await callApi<GenerateResponse>('/api/generate', formData);
         setImageUrl(data.imageUrl);
         setHouseName(data.houseName);
         
@@ -434,7 +411,7 @@ function StudioContent() {
             params: params,
             imageUrl: data.imageUrl,
             houseName: data.houseName
-          });
+          }, ownerId);
         } catch (historyErr) {
           console.error("Failed to save to history:", historyErr);
         }
@@ -839,29 +816,11 @@ function AIAssistantPanel({ mode, onParseSuccess, onError, onToast }: AIAssistan
     setIsParsingNlp(true);
     onError("");
     try {
-      const apiKey = localStorage.getItem('OPENAI_API_KEY');
-      if (!apiKey) {
-        throw new Error('Por favor, configura tu OPENAI_API_KEY en el encabezado para usar el Asistente IA.');
-      }
-
-      const res = await fetch('/api/parse-prompt', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'x-openai-api-key': apiKey
-        },
-        body: JSON.stringify({
-          textPrompt: nlpText,
-          mode: mode
-        })
-      });
-
-      if (!res.ok) {
-        const errData = await res.json();
-        throw new Error(errData.message || 'Error interpretando el prompt.');
-      }
-
-      const parsedData = await res.json();
+      // Con la sesión de Google (el servidor cobra 1 crédito y devuelve el cobro si falla)
+      const { data: parsedData } = await callApi<Partial<DreamHouseParams>>(
+        '/api/parse-prompt',
+        JSON.stringify({ textPrompt: nlpText, mode })
+      );
       onParseSuccess(parsedData);
       onToast("¡Parámetros configurados por IA!");
       setNlpText("");

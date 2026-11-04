@@ -3,6 +3,7 @@ import { Instrument_Sans, JetBrains_Mono } from 'next/font/google';
 import './globals.css';
 import { ThemeProvider } from '@/components/ThemeProvider';
 import { PwaProvider } from '@/components/PwaProvider';
+import { AuthProvider } from '@/context/AuthContext';
 
 const instrumentSans = Instrument_Sans({
   variable: '--font-instrument',
@@ -54,7 +55,9 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           }}
         />
         <ThemeProvider>
-          <PwaProvider>{children}</PwaProvider>
+          <PwaProvider>
+            <AuthProvider>{children}</AuthProvider>
+          </PwaProvider>
         </ThemeProvider>
       </body>
     </html>

@@ -56,12 +56,19 @@ test('frontera de la API: ajustes de tipo incorrecto o fuera de catálogo se ree
 });
 
 test('frontera de la API: valores válidos se respetan y los que faltan toman el predeterminado', () => {
-  const ok = normalizeRenderSettings({ ...DEFAULT_PARAMS, aiModel: 'Gemini 3.1 Flash Image Preview', renderQuality: 'Alta', renderAspectRatio: '1:1', renderOutputResolution: '2K', mode: 'vistas' });
-  assert.deepEqual([ok.aiModel, ok.renderQuality, ok.renderAspectRatio, ok.renderOutputResolution, ok.mode], ['Gemini 3.1 Flash Image Preview', 'Alta', '1:1', '2K', 'vistas']);
+  const FLARE = 'GPT Image 2.5 Flare · borrador rápido (OpenAI)';
+  const ok = normalizeRenderSettings({ ...DEFAULT_PARAMS, aiModel: FLARE, renderQuality: 'Alta', renderAspectRatio: '1:1', renderOutputResolution: '2K', mode: 'vistas' });
+  assert.deepEqual([ok.aiModel, ok.renderQuality, ok.renderAspectRatio, ok.renderOutputResolution, ok.mode], [FLARE, 'Alta', '1:1', '2K', 'vistas']);
   const missing = normalizeRenderSettings({ mode: 'exterior' });
   assert.deepEqual([missing.aiModel, missing.renderQuality, missing.renderAspectRatio], ['GPT Image 2.5 Sunburst (OpenAI)', 'Borrador', '16:9']);
 });
 
 test('frontera de la API: un modelo de registros antiguos que ya no existe en la lista cae en el predeterminado', () => {
   assert.equal(normalizeRenderSettings({ ...DEFAULT_PARAMS, aiModel: 'GPT Image 2 (OpenAI)' }).aiModel, DEFAULT_PARAMS.aiModel);
+});
+
+test('frontera de la API: Gemini se retiró; un cliente (o un registro antiguo) que lo pida cae en GPT Image 2.5, nunca en otro proveedor', () => {
+  const out = normalizeRenderSettings({ ...DEFAULT_PARAMS, aiModel: 'Gemini 3.1 Flash Image Preview' });
+  assert.equal(out.aiModel, DEFAULT_PARAMS.aiModel);
+  assert.match(out.aiModel, /OpenAI/);
 });

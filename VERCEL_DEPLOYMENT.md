@@ -33,39 +33,22 @@ El archivo `src/app/api/generate/route.ts` ya incluye `export const maxDuration 
 
 ### 3. Variable de Entorno Faltante
 
-**Problema:** `GEMINI_API_KEY` no está configurada en Vercel.
+**Problema:** `OPENAI_API_KEY` no está configurada en Vercel (la app responde «El servicio de imágenes no está configurado todavía»).
 
 **Solución:**
 
-#### Paso 1: Obtener API Key de Google Gemini
+#### Paso 1: Crear la clave en OpenAI (una por app, dentro de un proyecto con tope de gasto)
 
-1. Ve a [Google AI Studio](https://makersuite.google.com/app/apikey)
-2. Inicia sesión con tu cuenta de Google
-3. Crea una nueva API Key
-4. Copia la clave (empieza con `AIza...`)
+1. Crea un proyecto en [OpenAI → Projects](https://platform.openai.com/settings/organization/projects) y ponle un presupuesto mensual.
+2. En [API keys](https://platform.openai.com/api-keys), con ese proyecto seleccionado, crea una clave **Restricted** para esta app.
+3. Permisos: **Images** (generar y editar). Para el asistente de texto («Interpretar Idea») habilita también **Chat completions** y permite el modelo `gpt-4o-mini` en el proyecto.
+4. Copia la clave al crearla (OpenAI no la vuelve a mostrar). **Nunca** la pegues en un chat ni la subas al repositorio.
 
 #### Paso 2: Configurar en Vercel
 
-1. Ve a tu proyecto en [Vercel Dashboard](https://vercel.com/dashboard)
-2. Navega a **Settings** → **Environment Variables**
-3. Añade una nueva variable:
-   - **Name:** `GEMINI_API_KEY`
-   - **Value:** Tu API key de Google Gemini
-   - **Environments:** Selecciona `Production`, `Preview`, y `Development`
-4. Haz clic en **Save**
-
-#### Paso 3: Redesplegar
-
-Después de añadir la variable de entorno, necesitas redesplegar:
-
-```bash
-# Opción 1: Desde Vercel Dashboard
-# Ve a Deployments → Click en los tres puntos → Redeploy
-
-# Opción 2: Desde terminal
-git commit --allow-empty -m "Trigger redeploy"
-git push
-```
+1. Ve a **Settings** → **Environment Variables** del proyecto.
+2. Añade `OPENAI_API_KEY` con el valor de la clave, en `Production` y `Preview`, y marca **Sensitive**.
+3. Guarda y **redespliega** (una variable nueva solo aplica a despliegues nuevos).
 
 ### 4. Versión de Next.js
 
@@ -81,8 +64,9 @@ git push
 
 | Variable | Descripción | Dónde Obtenerla |
 |----------|-------------|-----------------|
-| `OPENAI_API_KEY` | Opcional. Respaldo en el servidor para GPT Image 2.5, el modelo predeterminado (cada usuario pega su propia clave en la app). Con esta clave la calidad se limita a "Estándar" y la resolución a 2K | [OpenAI Platform](https://platform.openai.com/api-keys) |
-| `GEMINI_API_KEY` | Opcional. Solo se usa si se elige el modelo Gemini | [Google AI Studio](https://makersuite.google.com/app/apikey) |
+| `OPENAI_API_KEY` | **Requerida.** Clave de GPT Image 2.5 (y del asistente de texto). Vive solo en el servidor; la gente entra con Google y consume **créditos** (los descuenta la base de datos antes de llamar a OpenAI y los devuelve si falla) | [OpenAI Platform](https://platform.openai.com/api-keys) |
+
+No hay variables de Supabase: la URL y la clave publishable son públicas por diseño y están en `src/lib/supabase.ts` y `src/lib/billing.ts`. **No** agregues `SUPABASE_SERVICE_ROLE_KEY`: el cobro funciona sin ella.
 
 ### Configuración de Build
 
@@ -114,7 +98,7 @@ Después del despliegue, verifica:
 
 ## Troubleshooting
 
-### Error: "GEMINI_API_KEY is not configured"
+### Error: "El servicio de imágenes no está configurado todavía"
 
 **Causa:** La variable de entorno no está configurada o el proyecto no se ha redesplegado después de añadirla.
 

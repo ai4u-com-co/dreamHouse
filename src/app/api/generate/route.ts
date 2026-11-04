@@ -1,5 +1,4 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { GoogleGenAI, Part } from '@google/genai';
 import OpenAI from 'openai';
 import sharp from 'sharp';
 import { prepareEditMask, blendEditedOntoBase, type PreparedEditMask } from '@/lib/edit-mask';
@@ -11,6 +10,7 @@ import { normalizeRenderSettings } from '@/lib/render-settings';
 import { buildExteriorPrompt } from '@/modules/exterior/lib/prompt-builder';
 import { buildInteriorPrompt } from '@/modules/interior/lib/prompt-builder';
 import { buildVistasPrompt } from '@/modules/vistas/lib/prompt-builder';
+import { authenticate, charge, chargeFailure, noChargeNote, refund, renderCredits, type Charge } from '@/lib/billing';
 
 // Vercel configuration: maxDuration only works on Pro plan, but it's the correct way to declare it
 // Hobby plan has 10s limit, Pro plan allows up to 300s
@@ -212,7 +212,14 @@ function calculatePayloadSize(files: File[], lotImage: File | null, exteriorRefe
 }
 
 export async function POST(req: NextRequest) {
-  let requestedOpenAI = false; // para que el mensaje de error nombre la clave correcta
+  // Sin sesión de Google válida no se procesa nada (ni siquiera se lee el cuerpo): la clave de OpenAI es de Mariano.
+  const auth = await authenticate(req.headers.get('authorization'));
+  if (!auth) {
+    return NextResponse.json({ code: 'UNAUTHENTICATED', message: 'Inicia sesión para generar renders.' }, { status: 401 });
+  }
+  // Cobro de esta solicitud: si algo falla ANTES de entregar la imagen, el catch lo devuelve (el token no sale del servidor).
+  let charged: Extract<Charge, { ok: true }> | null = null;
+  let delivered = false;
   try {
     const formData = await req.formData();
     const paramsJson = formData.get('params') as string;
@@ -228,48 +235,15 @@ export async function POST(req: NextRequest) {
     // El cliente puede enviar cualquier cosa: se normalizan modelo, calidad, ratio y resolución, y lo que
     // falte usa los mismos predeterminados que la interfaz (GPT Image 2.5, calidad más baja y 16:9)
     const params = normalizeRenderSettings(rawParams as DreamHouseParams);
-    const useOpenAI = params.aiModel && params.aiModel.includes('OpenAI');
-    requestedOpenAI = !!useOpenAI;
+    // Gemini se retiró: normalizeRenderSettings solo deja pasar los modelos de GPT Image 2.5 (cualquier otro cae en el predeterminado)
+    const useOpenAI = true;
 
-    // API Key validation based on selected model
-    let geminiApiKey = null;
-    let openaiApiKey = null;
-    // Si el cliente no trae su propia clave se usa la del servidor: ahí el costo se limita (ver más abajo)
-    let usingServerOpenAIKey = false;
-
-    if (useOpenAI) {
-      usingServerOpenAIKey = !req.headers.get('x-openai-api-key');
-      openaiApiKey = req.headers.get('x-openai-api-key') || process.env.OPENAI_API_KEY;
-      if (!openaiApiKey) {
-        return NextResponse.json(
-          { message: 'OpenAI API Key is missing. Please configure OPENAI_API_KEY in Vercel or provide it.' },
-          { status: 401 }
-        );
-      }
-    } else {
-      geminiApiKey = req.headers.get('x-api-key') || process.env.GEMINI_API_KEY;
-      if (!geminiApiKey) {
-        return NextResponse.json(
-          { message: 'API Key is missing. Please configure GEMINI_API_KEY in Vercel environment variables or provide it in the header.' },
-          { status: 401 }
-        );
-      }
+    // La clave de OpenAI vive SOLO en el servidor (OPENAI_API_KEY en Vercel): el navegador no manda ninguna.
+    const openaiApiKey = process.env.OPENAI_API_KEY;
+    if (!openaiApiKey) {
+      return NextResponse.json({ code: 'SERVER_MISCONFIGURED', message: 'El servicio de imágenes no está configurado todavía.' }, { status: 500 });
     }
-
-    let ai: GoogleGenAI | null = null;
-    if (!useOpenAI && geminiApiKey) {
-      console.log("Initializing Gemini SDK with API Key (truncated):", geminiApiKey.substring(0, 5) + "...");
-      ai = new GoogleGenAI({ 
-        apiKey: geminiApiKey,
-        httpOptions: { timeout: 120000 }
-      });
-    }
-
-    let openaiClient: OpenAI | null = null;
-    if (useOpenAI && openaiApiKey) {
-      console.log("Initializing OpenAI SDK");
-      openaiClient = new OpenAI({ apiKey: openaiApiKey });
-    }
+    const openaiClient = new OpenAI({ apiKey: openaiApiKey });
 
     // Cada módulo usa solo sus propios archivos: lo que quedó cargado de otro módulo no se envía.
     const modeInputs = lookup(INPUTS_BY_MODE, params.mode) ?? INPUTS_BY_MODE.exterior;
@@ -357,57 +331,6 @@ export async function POST(req: NextRequest) {
         },
         { status: 413 }
       );
-    }
-
-    // Process images to base64 for multimodal generation
-    let lotImageBase64 = "";
-    let lotImageMimeType = "";
-    let exteriorRefBase64 = "";
-    let exteriorRefMimeType = "";
-    let floorPlanImageBase64 = "";
-    let floorPlanImageMimeType = "";
-    let editCompositeBase64 = "";
-    let editCompositeMimeType = "";
-    const referenceImagesBase64: Array<{ mimeType: string; data: string }> = [];
-    const objectImagesBase64: Array<{ mimeType: string; data: string }> = [];
-
-    if (lotImage) {
-      const buffer = await lotImage.arrayBuffer();
-      lotImageBase64 = Buffer.from(buffer).toString('base64');
-      lotImageMimeType = lotImage.type;
-    }
-    
-    if (exteriorReferenceImage) {
-      const buffer = await exteriorReferenceImage.arrayBuffer();
-      exteriorRefBase64 = Buffer.from(buffer).toString('base64');
-      exteriorRefMimeType = exteriorReferenceImage.type;
-    }
-
-    if (files.length > 0) {
-      for (const file of files) {
-        const buffer = await file.arrayBuffer();
-        const base64Data = Buffer.from(buffer).toString('base64');
-        referenceImagesBase64.push({ mimeType: file.type, data: base64Data });
-      }
-    }
-
-    if (floorPlanImage) {
-      const buffer = await floorPlanImage.arrayBuffer();
-      floorPlanImageBase64 = Buffer.from(buffer).toString('base64');
-      floorPlanImageMimeType = floorPlanImage.type;
-    }
-
-    if (editCompositeFile) {
-      const buffer = await editCompositeFile.arrayBuffer();
-      editCompositeBase64 = Buffer.from(buffer).toString('base64');
-      editCompositeMimeType = editCompositeFile.type;
-    }
-
-    if (objectImages.length > 0) {
-      for (const file of objectImages) {
-        const buffer = await file.arrayBuffer();
-        objectImagesBase64.push({ mimeType: file.type, data: Buffer.from(buffer).toString('base64') });
-      }
     }
 
     // --- NEW: Narrative Prompt Building ---
@@ -564,98 +487,35 @@ export async function POST(req: NextRequest) {
 [MANDATES & CONSTRAINTS]
 ${mandate}${userExclusions}
 - No watermarks, logos or text inside the image.`.trim();
-    } else {
-      fullPrompt = `${narrativePrompt}
-
-${mandate}
-- QUALITY: The image must feel photographed, not rendered. Every surface needs physical weight: honest texture, natural color variation, controlled imperfections (grain, wear at edges, subtle tonal shifts) that confirm real material. Lighting must have a single clear direction with soft gradient fall-off into shadow. No CGI smoothness, no plastic sheen, no over-sharpened or uniformly perfect surfaces. Shadows reveal depth. Glass reflects its environment.
-
-VERIFICATION STEPS:
-1. Review the generated composition against the text description.
-2. ${params.materials.length ? `Verify that all requested materials (${params.materials.join(', ')}) are clearly visible and rendered with honest texture — not smooth or generic.` : 'Verify that every material is rendered with honest texture — not smooth or generic.'}
-3. Confirm that no forbidden elements appear (Negative Prompt: ${params.negativePrompt || 'None'}).
-4. Check that lighting has a clear direction and casts soft-edged shadows that read the three-dimensional form.
-5. Confirm no surface looks digitally smooth, plastic, or uniformly perfect — introduce micro-imperfections if needed.
-6. If the result is incorrect, reasoning should correct the composition before final output.`.trim();
     }
 
     console.log("Generated Narrative Prompt:", fullPrompt);
 
-    // --- Generate Exterior Image ---
-    const imageGenerationParts: Part[] = [{ text: fullPrompt }];
-
-    if (params.mode === 'edit' && editCompositeBase64) {
-      // In edit mode, we only use the composite file (original + user sketches)
-      imageGenerationParts.push({
-        inlineData: { mimeType: editCompositeMimeType, data: editCompositeBase64 }
-      });
-    } else {
-      // Image order: floor plan (geometric reference) → lot (terrain) → style references
-      if (floorPlanImageBase64) {
-        imageGenerationParts.push({
-          inlineData: { mimeType: floorPlanImageMimeType, data: floorPlanImageBase64 }
-        });
-      }
-
-      if (lotImageBase64) {
-        imageGenerationParts.push({
-          text: params.mode === 'vistas'
-            ? "HOUSE REFERENCE IMAGE: the following image is the house to photograph. The SAME house must appear in the result, identical in form, materials and design; only the camera changes."
-            : params.mode === 'interior'
-              ? "CURRENT SPACE PHOTO: the following image is the existing space to redesign. Keep its architectural shell (walls, openings, ceiling height) and its camera viewpoint."
-              : "LOT / TERRAIN PHOTO: the following image is the site context the building must be integrated into."
-        });
-        imageGenerationParts.push({
-          inlineData: { mimeType: lotImageMimeType, data: lotImageBase64 }
-        });
-      }
-
-      if (exteriorRefBase64) {
-        imageGenerationParts.push({
-          text: "HOUSE REFERENCE IMAGE (STRUCTURAL BASE): The following image is the existing house that must be modified. Maintain its general volume, shape, and architectural structure while applying the new materials, colors, and styles specified in the prompt."
-        });
-        imageGenerationParts.push({
-          inlineData: { mimeType: exteriorRefMimeType, data: exteriorRefBase64 }
-        });
-      }
-
-      if (objectImagesBase64.length > 0) {
-        imageGenerationParts.push({
-          text: `OBJECT REFERENCES (${objectImagesBase64.length} piece${objectImagesBase64.length > 1 ? 's' : ''}): The following images are specific furniture pieces, fixtures, or decorative objects that MUST appear in the final interior design. Incorporate each one faithfully — preserve its exact shape, color, material, and design. Place them naturally within the space according to the room layout and style.`
-        });
-        for (const obj of objectImagesBase64) {
-          imageGenerationParts.push({ inlineData: { mimeType: obj.mimeType, data: obj.data } });
-        }
-      }
-
-      if (referenceImagesBase64.length > 0) {
-        const refLabel = params.mode === 'exterior'
-          ? `CONCEPTUAL STYLE REFERENCES (${referenceImagesBase64.length} image${referenceImagesBase64.length > 1 ? 's' : ''}): The following images are provided as conceptual inspiration ONLY — NOT as literal templates to replicate. Extract from them: architectural style vocabulary, material palette, spatial mood, massing proportions, and compositional sensibility. DO NOT copy specific buildings, facades, windows, or compositions shown. Translate their essence and spirit into the current project's own design language.`
-          : `STYLE REFERENCES (${referenceImagesBase64.length} image${referenceImagesBase64.length > 1 ? 's' : ''}): The following images define the desired aesthetic mood, material palette, and spatial atmosphere. Use them as directional inspiration for the overall look and feel.`;
-        imageGenerationParts.push({ text: refLabel });
-        for (const refImage of referenceImagesBase64) {
-          imageGenerationParts.push({
-            inlineData: { mimeType: refImage.mimeType, data: refImage.data }
-          });
-        }
-      }
-    }
-
     let imageUrl = "";
-    let usedModel = "gemini-3.1-flash-image-preview";
+    let usedModel: string = 'gpt-image-2.5-sunburst';
     let usedQuality: string | undefined;
     let usedSize: string | undefined;
-    let groundingMetadata = null;
+    const groundingMetadata = null; // se conserva en la respuesta por compatibilidad (antes venía de Gemini)
 
     if (useOpenAI && openaiClient) {
       const imageFiles = openaiInputs.map(input => input.file);
       // En edición el tamaño lo decide la imagen de entrada ("auto"): forzar 16:9 deformaría lo editado
-      // Con la clave del servidor (no la del usuario) se acota el costo: calidad máxima "medium" y resolución máxima 2K
-      const effectiveResolution = usingServerOpenAIKey && params.renderOutputResolution === '4K' ? '2K' : params.renderOutputResolution;
+      // Resolución máxima 2K: la respuesta de una función de Vercel no puede pasar de 4,5 MB
+      const effectiveResolution = params.renderOutputResolution === '4K' ? '2K' : params.renderOutputResolution;
       const sizeStr = params.mode === 'edit' ? 'auto' : getGptImage2Size(params.renderAspectRatio, effectiveResolution);
       const requested = getOpenAIImageSettings(params.aiModel, params.renderQuality);
       const openaiModel = requested.model;
-      const qualityVal: OpenAIImageQuality = usingServerOpenAIKey && requested.quality !== 'low' && requested.quality !== 'medium' ? 'medium' : requested.quality;
+      const qualityVal: OpenAIImageQuality = requested.quality;
+
+      // COBRO antes de llamar a OpenAI (atómico; los admin no pagan). Si OpenAI falla, el catch devuelve el cobro.
+      const amount = renderCredits(qualityVal, effectiveResolution, params.mode);
+      const c = await charge(auth.sb, amount, 'render', { mode: params.mode, quality: qualityVal, resolution: effectiveResolution || '1K', model: openaiModel });
+      if (!c.ok) {
+        const failure = chargeFailure(c);
+        return NextResponse.json(failure.body, { status: failure.status });
+      }
+      charged = c;
+
       usedModel = openaiModel;
       usedQuality = qualityVal;
       usedSize = sizeStr;
@@ -698,87 +558,11 @@ VERIFICATION STEPS:
          throw new Error("No image data or URL returned from OpenAI");
       }
     } else {
-      if (!ai) {
-        throw new Error("GoogleGenAI client is not initialized.");
-      }
-      console.log("Generating with Gemini");
-      const generationResponse = await ai.models.generateContent({
-        model: "gemini-3.1-flash-image-preview",
-        contents: [{ parts: imageGenerationParts }],
-        config: {
-          responseModalities: ["TEXT", "IMAGE"],
-          tools: [
-            { 
-              googleSearch: { 
-                searchTypes: {
-                  webSearch: {},
-                  imageSearch: {}
-                }
-              }
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            } as any
-          ],
-          imageConfig: {
-            ...(params.renderAspectRatio && params.mode !== 'edit' ? { aspectRatio: params.renderAspectRatio } : {}),
-            ...(params.renderOutputResolution ? { imageSize: params.renderOutputResolution } : {})
-          },
-          thinkingConfig: {
-            thinkingLevel: params.thinkingLevel === "High" ? "HIGH" : "MINIMAL",
-            includeThoughts: true
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          } as any
-        }
-      });
-
-      const candidates = generationResponse.candidates;
-      if (!candidates || candidates.length === 0) {
-        throw new Error("No image candidates returned");
-      }
-
-      const firstCandidate = candidates[0];
-      const parts = firstCandidate?.content?.parts;
-      const imagePart = parts?.find((part: Part) => part.inlineData);
-
-      if (!imagePart || !imagePart.inlineData) {
-        throw new Error("No image data found in response");
-      }
-
-      const imageBase64 = imagePart.inlineData.data;
-      const mimeType = imagePart.inlineData.mimeType || "image/png";
-      imageUrl = `data:${mimeType};base64,${imageBase64}`;
-      groundingMetadata = firstCandidate.groundingMetadata;
+      throw new Error('OpenAI client is not initialized.');
     }
 
-    // --- Generate House Name using Economical Model (Gemini 1.5 Flash) ---
-    let houseName = "DreamHouse Project";
-    try {
-      const namePrompt = `Generate an inspirational 3-word name (in Spanish) for an architectural house with these characteristics:
-- Style: ${params.architecturalStyles.join(', ') || 'Modern'}
-- Mode: ${params.mode}
-- Mood: ${params.mood}
-- Materials: ${params.materials.join(', ')}
-- Location: ${params.city || 'Any'}
-- Context: ${params.environment}
-
-Return ONLY the 3-word name, no quotes, no extra text. Focus on what makes it unique.`;
-      
-      let nameText = "";
-      if (ai) {
-        const nameResult = await ai.models.generateContent({
-          model: "gemini-1.5-flash",
-          contents: [{ parts: [{ text: namePrompt }] }]
-        });
-        nameText = nameResult.candidates?.[0]?.content?.parts?.[0]?.text?.trim() || "";
-      }
-      
-      if (nameText && nameText.split(/\s+/).length <= 6) { // Sanity check on length
-        houseName = nameText;
-      }
-    } catch (nameError) {
-      console.error("Failed to generate house name:", nameError);
-      // Fallback to project name based on style
-      houseName = `${params.architecturalStyles[0] || 'Modern'} Design House`;
-    }
+    // Nombre del proyecto: lo escribía Gemini (y solo con ese modelo); con GPT Image 2.5 siempre fue el predeterminado.
+    const houseName = "DreamHouse Project";
 
     // --- Metadatos incrustados: los parámetros viajan dentro del archivo ---
     const metadataId = crypto.randomUUID();
@@ -801,46 +585,65 @@ Return ONLY the 3-word name, no quotes, no extra text. Focus on what makes it un
       });
     }
 
-    return NextResponse.json({ imageUrl, groundingMetadata, houseName, metadataId });
+    delivered = true;
+    return NextResponse.json({ imageUrl, groundingMetadata, houseName, metadataId, remaining: charged?.remaining });
 
   } catch (error: unknown) {
     console.error("API Error Detailed:", error);
+
+    // Si ya se cobró y la imagen no llegó a entregarse, se devuelve el cobro (el token de devolución jamás sale del servidor).
+    let remaining: number | undefined;
+    let refunded = true;
+    if (charged && !delivered) {
+      const r = await refund(auth.sb, charged);
+      remaining = r.remaining;
+      refunded = r.refunded;
+    }
+    const note = charged ? noChargeNote(refunded) : '';
 
     let errorMessage = "Ocurrió un error inesperado al generar el render.";
     let statusCode = 500;
     let errorCode = "UNKNOWN_ERROR";
 
     if (error instanceof Error) {
-      errorMessage = error.message;
+      const sdkError = error as { status?: number; code?: string | number | null };
+      const text = error.message;
 
-      // Handle common gRPC/API error strings
-      if (errorMessage.includes('Deadline expired') || errorMessage.includes('timeout') || errorMessage.includes('TIMEOUT')) {
-        errorMessage = "El tiempo de espera ha expirado (timeout). La generación está tomando más tiempo de lo esperado en los servidores de Google. Por favor, intenta de nuevo.";
+      if (text.includes('Deadline expired') || text.includes('timeout') || text.includes('TIMEOUT') || text.includes('Timed out')) {
+        errorMessage = "El tiempo de espera expiró: la generación tardó más de lo esperado.";
         statusCode = 504;
         errorCode = "TIMEOUT";
-      } else if (errorMessage.includes('payload') || errorMessage.includes('too large')) {
-        errorMessage = "El tamaño de los archivos es demasiado grande. Por favor, reduce el tamaño o la cantidad de imágenes.";
+      } else if (text.includes('payload') || text.includes('too large')) {
+        errorMessage = "El tamaño de los archivos es demasiado grande. Reduce el tamaño o la cantidad de imágenes.";
         statusCode = 413;
         errorCode = "PAYLOAD_TOO_LARGE";
-      } else if (errorMessage.includes('API_KEY') || errorMessage.includes('authentication') || errorMessage.includes('401')) {
-        errorMessage = `Error de autenticación: la ${requestedOpenAI ? 'OPENAI_API_KEY' : 'GEMINI_API_KEY'} no es válida o falta.`;
-        statusCode = 401;
-        errorCode = "AUTH_ERROR";
-      } else if (errorMessage.includes('503') || errorMessage.includes('Service Unavailable')) {
-        errorMessage = "El servicio de Google AI no está disponible temporalmente (503). Por favor, intenta de nuevo en unos momentos.";
+      } else if (sdkError.code === 'moderation_blocked' || text.includes('safety system')) {
+        errorMessage = "Los filtros de seguridad de OpenAI bloquearon la solicitud; ajusta la descripción o las imágenes.";
+        statusCode = 422;
+        errorCode = "MODERATION_BLOCKED";
+      } else if (sdkError.status === 401 || sdkError.status === 403) {
+        // La clave del SERVIDOR falló: no es culpa de la sesión de la persona, así que NO se responde 401 (el navegador pediría volver a entrar).
+        errorMessage = "El servicio de imágenes no está disponible por ahora. Avisa al administrador.";
+        statusCode = 502;
+        errorCode = "UPSTREAM_AUTH";
+      } else if (sdkError.status === 429 || sdkError.status === 503 || text.includes('Service Unavailable')) {
+        errorMessage = "El servicio de imágenes está saturado en este momento; inténtalo de nuevo en un minuto.";
         statusCode = 503;
         errorCode = "SERVICE_UNAVAILABLE";
-      }
-
-      // If it's a specific SDK ApiError, it should have a status code
-      const sdkError = error as { status?: number; code?: number };
-      if (sdkError.status) {
-        statusCode = sdkError.status;
+      } else if (charged) {
+        // Error no reconocido: no se reenvía el texto crudo de OpenAI (puede traer datos internos); queda en el registro del servidor.
+        errorMessage = "No se pudo generar el render.";
+        statusCode = 502;
+        errorCode = "GENERATION_FAILED";
+      } else {
+        // Antes de cobrar solo hay errores de validación propios de esta ruta: su texto es seguro y útil.
+        errorMessage = text;
+        statusCode = sdkError.status && sdkError.status >= 400 && sdkError.status < 500 && sdkError.status !== 401 ? sdkError.status : 500;
       }
     }
 
     return NextResponse.json(
-      { message: errorMessage, code: errorCode },
+      { message: `${errorMessage}${note}`, code: errorCode, ...(remaining !== undefined ? { remaining } : {}) },
       { status: statusCode }
     );
   }
