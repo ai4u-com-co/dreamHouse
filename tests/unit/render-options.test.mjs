@@ -42,9 +42,11 @@ test('registros antiguos: valores que ya no existen se normalizan a lo barato y 
 test('el costo crece con cada opción cara y el tamaño personalizado se valida', () => {
   const base = quoteRender(DEFAULT_PARAMS, { estimate: true, inputImagePixels: [] }).value.options.credits;
   const cost = (over) => quoteRender({ ...DEFAULT_PARAMS, ...over }, { estimate: true, inputImagePixels: [] }).value.options.credits;
-  assert.ok(cost({ renderQuality: 'Estándar' }) > base);
+  // Con créditos ENTEROS, en lo más barato dos opciones vecinas pueden redondear igual (16:9 en 1K: Borrador y Estándar = 2; 1K y 2K = 2,
+  // aunque cuestan ~80 % y ~28 % más en dinero real). La monotonía estricta por calidad se comprueba en el núcleo con precios altos.
+  assert.ok(cost({ renderQuality: 'Estándar' }) >= base);
   assert.ok(cost({ renderQuality: 'Máxima' }) > cost({ renderQuality: 'Muy alta' }));
-  assert.ok(cost({ renderOutputResolution: '2K' }) > base);
+  assert.ok(cost({ renderOutputResolution: '2K' }) >= base);
   // la API cobra entrada y salida por cada variante; con el redondeo hacia arriba no es exactamente base×3
   assert.ok(cost({ renderVariants: 3 }) > base && cost({ renderVariants: 3 }) <= base * 3);
   assert.equal(cost({ renderOutputResolution: 'Personalizado', renderCustomSize: '1280x720' }) >= 1, true);
