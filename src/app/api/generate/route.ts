@@ -5,7 +5,7 @@ import { prepareEditMask, blendEditedOntoBase, type PreparedEditMask } from '@/l
 import { embedImageMetadata, pickEmbeddableParams, METADATA_APP, METADATA_VERSION, type DreamHouseImageMetadata } from '@/lib/image-metadata';
 import { DreamHouseParams } from '@/types';
 import { quoteRender } from '@/lib/render-options';
-import { FALLBACK_MODEL, mimeFor, usageForLog } from '@/lib/openai-image-core.ts';
+import { FALLBACK_MODEL, mimeFor, promptCostUnits, usageForLog } from '@/lib/openai-image-core.ts';
 import { openaiImageFields } from '@/lib/openai-image-server.ts';
 import { lookup } from '@/lib/safe-lookup';
 import { normalizeRenderSettings } from '@/lib/render-settings';
@@ -469,7 +469,7 @@ ${mandate}${userExclusions}
     // El rol se consulta (con el JWT de la persona) solo cuando la solicitud pide algo reservado a admin
     const wantsAdminOption = (rawParams as Record<string, unknown>).renderModeration === 'low';
     const callerIsAdmin = wantsAdminOption ? await isAdmin(auth.sb, auth.userId) : false;
-    const quote = quoteRender(rawParams as Record<string, unknown>, { inputImagePixels, isAdmin: callerIsAdmin, promptChars: Buffer.byteLength(fullPrompt) });
+    const quote = quoteRender(rawParams as Record<string, unknown>, { inputImagePixels, isAdmin: callerIsAdmin, promptChars: promptCostUnits(fullPrompt) });
     if (!quote.ok) {
       // Moderación baja sin ser admin: 403; cualquier otra opción inválida: 400. En ambos casos, ANTES de cobrar.
       if (quote.code === 'forbidden_moderation') {
@@ -482,7 +482,7 @@ ${mandate}${userExclusions}
 
     // COBRO antes de llamar a OpenAI (atómico; los admin no pagan). Si OpenAI falla, el catch devuelve el cobro.
     const c = await charge(auth.sb, v.credits, 'render', {
-      mode: params.mode, model: v.modelId, quality: v.quality, size: apiSize, n: v.n, format: v.format, background: v.background, inputs: imageFiles.length, chars: Buffer.byteLength(fullPrompt),
+      mode: params.mode, model: v.modelId, quality: v.quality, size: apiSize, n: v.n, format: v.format, background: v.background, inputs: imageFiles.length, chars: promptCostUnits(fullPrompt),
     });
     if (!c.ok) {
       const failure = chargeFailure(c);
