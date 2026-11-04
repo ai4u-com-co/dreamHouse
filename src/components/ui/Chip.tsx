@@ -27,7 +27,7 @@ export function Chip({
       onClick={onToggle}
       className={twMerge(
         'group relative px-4 py-2 text-sm font-bold uppercase tracking-wide transition-all duration-200',
-        'flex items-center gap-2 border rounded-none',
+        'flex items-center gap-2 border rounded-none [@media(pointer:coarse)]:min-h-11',
         selected
           ? 'bg-foreground text-background border-foreground'
           : 'bg-transparent text-muted-foreground border-border hover:border-foreground hover:text-foreground',

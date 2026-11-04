@@ -114,7 +114,7 @@ export default function ObjectUploader({ files, onFilesChange, disabled }: Objec
           </div>
           <div>
             <p id="object-uploader-title" className="text-sm font-semibold text-foreground">Objetos a incluir en la escena</p>
-            <p className="text-[11px] text-muted-foreground mt-0.5 font-mono">
+            <p className="text-xs text-muted-foreground mt-0.5 font-mono">
               Silla, cama, lámpara, mesa… la IA los integrará fielmente.
             </p>
           </div>
@@ -160,7 +160,7 @@ export default function ObjectUploader({ files, onFilesChange, disabled }: Objec
               <button
                 onClick={(e) => { e.stopPropagation(); removeFile(index); }}
                 disabled={disabled}
-                className="flex items-center gap-1 px-2 py-1 text-[10px] font-bold text-white bg-destructive/80 backdrop-blur-sm hover:bg-destructive transition-colors"
+                className="flex items-center gap-1 px-2 py-1 text-xs font-bold text-white bg-destructive/80 backdrop-blur-sm hover:bg-destructive transition-colors"
                 aria-label={`Eliminar objeto ${index + 1}`}
               >
                 <Trash2 className="w-2.5 h-2.5" />
@@ -168,7 +168,7 @@ export default function ObjectUploader({ files, onFilesChange, disabled }: Objec
               </button>
             </div>
             <div className={clsx(
-              "absolute top-1 left-1 w-5 h-5 flex items-center justify-center text-[9px] font-bold border transition-all",
+              "absolute top-1 left-1 w-5 h-5 flex items-center justify-center text-xs font-bold border transition-all",
               hoveredIndex === index
                 ? "bg-primary text-primary-foreground border-primary"
                 : "bg-black/60 text-white border-white/20"
@@ -215,7 +215,7 @@ export default function ObjectUploader({ files, onFilesChange, disabled }: Objec
               )}
             </div>
             <span className={clsx(
-              "text-[9px] font-medium mt-0.5 transition-colors",
+              "text-xs font-medium mt-0.5 transition-colors",
               (isDragging || isProcessing) ? "text-primary" : "text-muted-foreground group-hover:text-foreground"
             )}>
               {isProcessing ? 'Bajando...' : isDragging ? 'Suelta' : 'Agregar'}
@@ -237,7 +237,7 @@ export default function ObjectUploader({ files, onFilesChange, disabled }: Objec
 
       {/* Tip */}
       {files.length === 0 && (
-        <p className="text-[11px] text-muted-foreground/60 text-center font-mono tracking-tight">
+        <p className="text-xs text-muted-foreground/60 text-center font-mono tracking-tight">
           Hasta {MAX_OBJECTS} piezas · La IA las colocará en el espacio según el layout.
         </p>
       )}

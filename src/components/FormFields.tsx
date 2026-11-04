@@ -50,7 +50,7 @@ export function ChipsField({
     <fieldset className="flex flex-col gap-2">
       <div className="flex flex-col gap-1 px-1">
         <label className="text-xs font-semibold text-muted-foreground uppercase tracking-widest">{label}</label>
-        <p className="text-[11px] text-muted-foreground opacity-60 font-mono tracking-tight">{helpText}</p>
+        <p className="text-xs text-muted-foreground opacity-60 font-mono tracking-tight">{helpText}</p>
       </div>
       <div className={clsx('flex flex-wrap gap-2 p-1', scrollable && 'max-h-56 overflow-y-auto custom-scrollbar border border-border/20 bg-card/30')}>
         {options.map((opt) => (
@@ -99,7 +99,7 @@ export function EssenceFields({
             options={EC.PROJECT_TYPES}
             disabled={disabled}
           />
-          {projectTypeHelp && <p className="text-[11px] text-muted-foreground opacity-70 font-mono tracking-tight">{projectTypeHelp}</p>}
+          {projectTypeHelp && <p className="text-xs text-muted-foreground opacity-70 font-mono tracking-tight">{projectTypeHelp}</p>}
         </div>
         <Select label="Atmósfera / Mood" value={params.mood} onChange={(e) => onChange('mood', e.target.value)} options={SC.MOODS} disabled={disabled} />
         {children}

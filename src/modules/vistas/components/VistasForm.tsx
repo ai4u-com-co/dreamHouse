@@ -68,7 +68,7 @@ export default function VistasForm({ params, onChange, disabled, activeSection, 
                 </span>
                 <span className="flex flex-col min-w-0">
                   <span className="text-xs font-bold uppercase tracking-wide leading-tight">{vista}</span>
-                  <span className={clsx('text-[10px] font-mono leading-snug mt-0.5 truncate',
+                  <span className={clsx('text-xs font-mono leading-snug mt-0.5 truncate',
                     isSelected ? 'opacity-70' : 'opacity-50'
                   )}>
                     {VC.VISTA_SHORT_DESC[vista]}
@@ -79,7 +79,7 @@ export default function VistasForm({ params, onChange, disabled, activeSection, 
           })}
         </div>
         {selected.length > 0 && (
-          <p className="mt-3 text-[11px] text-muted-foreground font-mono opacity-60">
+          <p className="mt-3 text-xs text-muted-foreground font-mono opacity-60">
             {selected.length} vista{selected.length > 1 ? 's' : ''} seleccionada{selected.length > 1 ? 's' : ''}
           </p>
         )}

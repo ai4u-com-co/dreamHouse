@@ -808,9 +808,9 @@ function StudioContent() {
           <div>
             <h2 className="text-4xl font-bold uppercase tracking-tighter mb-6">DreamHouse AI</h2>
             <div className="flex gap-8 text-sm font-medium uppercase tracking-wide opacity-80">
-              <a href="#" className="hover:text-primary transition-colors">Terms</a>
-              <a href="#" className="hover:text-primary transition-colors">Privacy</a>
-              <a href="#" className="hover:text-primary transition-colors">Contact</a>
+              <a href="#" className="inline-flex items-center min-h-11 hover:text-primary transition-colors">Terms</a>
+              <a href="#" className="inline-flex items-center min-h-11 hover:text-primary transition-colors">Privacy</a>
+              <a href="#" className="inline-flex items-center min-h-11 hover:text-primary transition-colors">Contact</a>
             </div>
           </div>
           <div className="text-right">

@@ -170,7 +170,7 @@ export default function LotUploader({
               <div className="flex flex-col items-center">
                 <Loader2 className="w-8 h-8 text-green-500 animate-spin mb-2" />
                 <p className="text-sm font-medium text-foreground">Procesando imagen...</p>
-                <p className="text-[10px] text-muted-foreground mt-1">Reduciendo tamaño para un envío óptimo</p>
+                <p className="text-xs text-muted-foreground mt-1">Reduciendo tamaño para un envío óptimo</p>
               </div>
             ) : (
               <>
@@ -184,7 +184,7 @@ export default function LotUploader({
                 <p className="text-sm font-medium text-muted-foreground group-hover:text-foreground transition-colors">
                   <span className="text-green-500 font-semibold">Haz clic para subir</span> o arrastra la foto aquí
                 </p>
-                <p className="text-[10px] text-muted-foreground mt-1">
+                <p className="text-xs text-muted-foreground mt-1">
                   Cualquier tamaño · Optimización automática
                 </p>
               </>

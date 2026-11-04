@@ -283,7 +283,7 @@ export default function ReferenceUploader({ files, onFilesChange }: ReferenceUpl
             </span>
             
             {/* Subtle hint */}
-            <span className="text-[10px] text-muted mt-1 opacity-0 group-hover:opacity-100 transition-opacity">
+            <span className="text-xs text-muted mt-1 opacity-0 group-hover:opacity-100 transition-opacity">
               Optimización automática aplicada
             </span>
           </div>

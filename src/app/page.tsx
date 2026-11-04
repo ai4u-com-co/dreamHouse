@@ -206,7 +206,7 @@ export default function Home() {
           <Typography
             sx={{
               fontFamily: t.fontMono,
-              fontSize: '9px',
+              fontSize: '12px',
               fontWeight: t.weight.bold,
               letterSpacing: t.tracking.caps,
               textTransform: 'uppercase',
@@ -523,6 +523,9 @@ export default function Home() {
                     component="a"
                     href="#"
                     sx={{
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      minHeight: 44,
                       fontFamily: t.fontMono,
                       fontSize: t.size.xs,
                       fontWeight: t.weight.bold,
