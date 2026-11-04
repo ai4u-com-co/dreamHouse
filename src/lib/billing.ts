@@ -100,3 +100,32 @@ export async function recordUsage(sb: SupabaseClient, logId: number, token: stri
     /* no afecta la entrega */
   }
 }
+
+/**
+ * Liquidación con el uso real: el precio previo es una ESTIMACIÓN. Si lo real (`real`) supera lo cobrado, cobra la diferencia con
+ * consume_credits (`image_topup`); si el saldo no alcanza, cobra lo que quede. Los admin no pagan (sin refundToken no hay cobro extra).
+ * NUNCA lanza ni devuelve créditos de más: una generación que ya salió bien no se rompe. Devuelve lo cobrado de más y el saldo actualizado.
+ */
+export async function topUp(sb: SupabaseClient, c: Extract<Charge, { ok: true }>, real: number): Promise<{ extra: number; remaining: number }> {
+  let remaining = c.remaining;
+  let extra = 0;
+  const missing = real - c.amount;
+  if (!c.refundToken || !(missing > 0)) return { extra, remaining };
+  try {
+    const ask = async (n: number) =>
+      (await sb.schema('core').rpc('consume_credits', { p_app: APP_ID, p_amount: n, p_action: 'image_topup', p_meta: { log_id: c.logId, charged: c.amount, real } })).data;
+    let asked = missing;
+    let top = await ask(asked);
+    if (!top?.ok && Number.isInteger(top?.remaining) && top.remaining >= 1 && top.remaining < missing) {
+      asked = top.remaining; // no alcanza para todo: cobra lo que quede
+      top = await ask(asked);
+    }
+    if (top?.ok) {
+      extra = asked;
+      remaining = Number.isInteger(top.remaining) ? top.remaining : remaining - asked;
+    }
+  } catch {
+    /* la imagen ya salió: no se rompe; el uso real queda en record_usage */
+  }
+  return { extra, remaining };
+}

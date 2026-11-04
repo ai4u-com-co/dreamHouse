@@ -39,6 +39,10 @@ globalThis.fetch = async (input, init = {}) => {
   const url = typeof input === 'string' ? input : input instanceof URL ? input.href : input.url;
   world.calls.push({ url, init });
   if (url.includes('/auth/v1/user')) return world.userOk ? j(200, { id: 'u1', aud: 'authenticated', role: 'authenticated', email: 'a@b.co' }) : j(401, { msg: 'bad jwt' });
+  if (url.includes('/rest/v1/rpc/consume_credits') && typeof init.body === 'string' && JSON.parse(init.body).p_action === 'image_topup') {
+    if (world.topupThrows) throw new Error('red caída');
+    return Array.isArray(world.topup) ? j(200, world.topup.shift()) : j(200, world.topup ?? { ok: true, remaining: 5 });
+  }
   if (url.includes('/rest/v1/rpc/consume_credits')) return world.consumeError ? j(world.consumeError.http, world.consumeError.body) : j(200, world.consume);
   if (url.includes('/rest/v1/rpc/refund_credits')) return j(200, world.refund);
   if (url.includes('/rest/v1/rpc/record_usage')) return world.recordUsageStatus === 200 ? j(200, { ok: true }) : j(500, { message: 'boom' });
@@ -395,4 +399,70 @@ test('parse-prompt: si la clave del servidor no tiene permiso de texto (clave so
   assert.ok(!text.includes(TOKEN));
   assert.equal(called('refund_credits').length, 1);
   assert.match(text, /No se te cobró/);
+});
+
+// ── Liquidación con el uso real (el precio previo es una estimación; lo real manda) ──────────────────────────────────────────────
+// Uso real de 364 tokens de salida y 1151 de texto: 364*30 + 1151*5 = US$0,01667 → 4 créditos; el render por defecto cobra menos.
+const usoCaro = { input_tokens: 1151, input_tokens_details: { image_tokens: 0, text_tokens: 1151 }, output_tokens: 364 };
+const okConUso = (usage) => ({ status: 200, body: { data: [{ b64_json: JPEG_B64 }], usage } });
+const topups = () => called('/rpc/consume_credits').filter((c) => JSON.parse(c.init.body).p_action === 'image_topup');
+
+test('liquidación: si el uso real supera lo cobrado se cobra la diferencia (consume_credits image_topup) y se informa el saldo', async () => {
+  reset({ openai: okConUso(usoCaro), topup: { ok: true, remaining: 7 } });
+  const r = await generate.POST(genReq());
+  assert.equal(r.status, 200);
+  const cobro = rpcBody('consume_credits');
+  assert.ok(cobro.p_amount < 4, 'la prueba necesita que lo cobrado sea menor que lo real');
+  assert.equal(topups().length, 1);
+  const b = JSON.parse(topups()[0].init.body);
+  assert.equal(b.p_amount, 4 - cobro.p_amount);
+  assert.equal(b.p_meta.real, 4);
+  assert.equal(b.p_meta.charged, cobro.p_amount);
+  const text = await r.clone().text();
+  assert.equal((await r.json()).remaining, 7);
+  assert.ok(!text.includes(TOKEN));
+});
+
+test('liquidación: si no alcanza el saldo cobra lo que quede y la imagen sale igual', async () => {
+  reset({ openai: okConUso(usoCaro), topup: [{ ok: false, remaining: 1 }, { ok: true, remaining: 0 }] });
+  const r = await generate.POST(genReq());
+  assert.equal(r.status, 200);
+  const falta = 4 - rpcBody('consume_credits').p_amount;
+  assert.ok(falta >= 2, 'la prueba necesita que falten al menos 2 créditos');
+  assert.deepEqual(topups().map((c) => JSON.parse(c.init.body).p_amount), [falta, 1]);
+  assert.equal((await r.json()).remaining, 0);
+});
+
+test('liquidación: sin saldo en absoluto no cobra más, no falla y no devuelve nada', async () => {
+  reset({ openai: okConUso(usoCaro), topup: { ok: false, remaining: 0 } });
+  const r = await generate.POST(genReq());
+  assert.equal(r.status, 200);
+  assert.equal((await r.json()).remaining, 9);
+  assert.equal(called('refund_credits').length, 0);
+});
+
+test('liquidación: un fallo de red en el cobro extra NO rompe la imagen ya generada', async () => {
+  reset({ openai: okConUso(usoCaro), topupThrows: true });
+  const r = await generate.POST(genReq());
+  assert.equal(r.status, 200);
+  assert.match((await r.json()).imageUrl, /^data:image\//);
+  assert.equal(called('refund_credits').length, 0);
+});
+
+test('liquidación: si el uso real es menor o igual, o no hay uso, NO se cobra nada extra (y nunca se devuelve de más)', async () => {
+  for (const usage of [{ input_tokens_details: { text_tokens: 14 }, output_tokens: 196 }, undefined]) {
+    reset({ openai: okConUso(usage) });
+    const r = await generate.POST(genReq());
+    assert.equal(r.status, 200);
+    assert.equal(topups().length, 0);
+    assert.equal((await r.json()).remaining, 9);
+  }
+});
+
+test('liquidación: los admin no pagan, así que no hay cobro extra aunque el uso sea caro', async () => {
+  reset({ consume: { ok: true, remaining: 0, log_id: 7, refund_token: null }, openai: okConUso(usoCaro) });
+  const r = await generate.POST(genReq());
+  assert.equal(r.status, 200);
+  assert.equal(called('/rpc/consume_credits').length, 1);
+  assert.equal((await r.json()).remaining, 0);
 });
