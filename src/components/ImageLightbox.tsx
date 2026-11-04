@@ -89,7 +89,7 @@ export default function ImageLightbox({
       <div className="absolute top-0 inset-x-0 h-20 flex items-center justify-between px-6 bg-gradient-to-b from-black/60 to-transparent pointer-events-none">
         <div className="flex items-center gap-4 pointer-events-auto">
           <div className="px-3 py-1.5 bg-white/10 rounded-full border border-white/10 backdrop-blur-md">
-            <p className="text-white/90 text-[10px] font-mono uppercase tracking-widest leading-none">
+            <p className="text-white/90 text-xs font-mono uppercase tracking-widest leading-none">
               {currentImage.type || 'Vista'} · <span className="text-primary font-bold">{currentIndex + 1}</span> / {images.length}
             </p>
           </div>
@@ -167,7 +167,7 @@ export default function ImageLightbox({
       </div>
 
       {/* Instructions */}
-      <div className="absolute bottom-10 right-10 text-white/30 text-[10px] font-mono tracking-tighter hidden lg:block uppercase">
+      <div className="absolute bottom-10 right-10 text-white/30 text-xs font-mono tracking-tighter hidden lg:block uppercase">
         Navegar: ← → · Zoom: + - · Cerrar: ESC
       </div>
     </div>

@@ -54,7 +54,7 @@ export const typography = {
 
   // Scale — minor third (1.200) + arquitectura de tamaños
   size: {
-    '2xs': '0.625rem',   // 10px  — labels, caps
+    '2xs': '0.75rem',    // 12px  — labels, caps (mínimo legible: nada por debajo de 12px)
     xs:    '0.75rem',    // 12px  — captions, meta
     sm:    '0.875rem',   // 14px  — body small
     base:  '1rem',       // 16px  — body

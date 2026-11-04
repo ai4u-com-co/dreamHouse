@@ -93,7 +93,7 @@ export default function HistoryGallery({
             variant="outline" 
             size="sm" 
             onClick={onClear}
-            className="text-[10px] uppercase font-bold tracking-tighter opacity-50 hover:opacity-100 transition-opacity"
+            className="text-xs uppercase font-bold tracking-tighter opacity-50 hover:opacity-100 transition-opacity"
           >
             Limpiar Todo
           </Button>
@@ -132,7 +132,7 @@ export default function HistoryGallery({
               </div>
 
               {/* Mode Badge */}
-              <div className="absolute top-2 left-2 flex items-center gap-1.5 px-2 py-1 bg-black/60 backdrop-blur-md rounded text-[10px] font-bold uppercase tracking-tighter text-white border border-white/10">
+              <div className="absolute top-2 left-2 flex items-center gap-1.5 px-2 py-1 bg-black/60 backdrop-blur-md rounded text-xs font-bold uppercase tracking-tighter text-white border border-white/10">
                 {getModeIcon(item.mode)}
                 {getModeLabel(item.mode)}
               </div>
@@ -164,14 +164,14 @@ export default function HistoryGallery({
             <div className="p-4 flex-1 flex flex-col justify-between gap-4">
               <div className="space-y-1">
                 <div className="flex justify-between items-start">
-                  <span className="text-[10px] font-mono text-muted-foreground uppercase">{formatDate(item.timestamp)}</span>
+                  <span className="text-xs font-mono text-muted-foreground uppercase">{formatDate(item.timestamp)}</span>
                 </div>
                 {item.params.city && (
                   <p className="text-xs font-bold uppercase truncate">{item.params.city}</p>
                 )}
                 <div className="flex flex-wrap gap-1 mt-2">
                   {item.params.architecturalStyles.slice(0, 2).map((s, i) => (
-                    <span key={i} className="text-[9px] px-1.5 py-0.5 bg-muted rounded font-medium text-muted-foreground uppercase truncate max-w-[80px]">
+                    <span key={i} className="text-xs px-1.5 py-0.5 bg-muted rounded font-medium text-muted-foreground uppercase truncate max-w-[80px]">
                       {s}
                     </span>
                   ))}
@@ -180,7 +180,7 @@ export default function HistoryGallery({
 
               <Button
                 onClick={() => onLoad(item)}
-                className="w-full py-4 text-[10px] font-black uppercase tracking-widest bg-foreground text-background hover:bg-primary hover:text-primary-foreground transition-colors mt-auto"
+                className="w-full py-4 text-xs font-black uppercase tracking-widest bg-foreground text-background hover:bg-primary hover:text-primary-foreground transition-colors mt-auto"
               >
                 <RotateCcw className="w-3 h-3 mr-2" />
                 Cargar Parámetros

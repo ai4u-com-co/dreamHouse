@@ -36,7 +36,7 @@ export function OutputOptions({ params, onChange, disabled }: ExtrasProps) {
         <label className="flex items-start gap-3 min-h-[44px] py-2 cursor-pointer text-sm">
           <input
             type="checkbox"
-            className="mt-1 h-4 w-4 accent-primary"
+            className="mt-0.5 h-5 w-5 accent-primary"
             checked={params.embedMetadata}
             onChange={(e) => onChange('embedMetadata', e.target.checked)}
             disabled={disabled}
@@ -53,7 +53,7 @@ export function OutputOptions({ params, onChange, disabled }: ExtrasProps) {
           <label className="flex items-start gap-3 min-h-[44px] py-2 pl-7 cursor-pointer text-sm">
             <input
               type="checkbox"
-              className="mt-1 h-4 w-4 accent-primary"
+              className="mt-0.5 h-5 w-5 accent-primary"
               checked={params.embedDetails}
               onChange={(e) => onChange('embedDetails', e.target.checked)}
               disabled={disabled}

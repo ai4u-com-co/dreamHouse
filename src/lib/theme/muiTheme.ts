@@ -515,7 +515,7 @@ export const darkTheme = createTheme({
         badge: {
           borderRadius: 0,
           fontFamily: typography.fontMono,
-          fontSize: '9px',
+          fontSize: '12px',
           fontWeight: typography.weight.black,
           letterSpacing: '0.05em',
           height: '16px',

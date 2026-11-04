@@ -245,7 +245,7 @@ export default function PromptPreview({ params, loadedFiles = [] }: PromptPrevie
           </div>
           <div>
             <h3 className="text-xs font-bold uppercase tracking-[0.2em] text-foreground">Design Spec</h3>
-            <p className="text-[10px] text-muted-foreground font-mono">
+            <p className="text-xs text-muted-foreground font-mono">
               {totalParams > 0 ? `${totalParams} PARAMS ACTIVE` : 'NO PARAMS SET'}
             </p>
           </div>
@@ -259,7 +259,7 @@ export default function PromptPreview({ params, loadedFiles = [] }: PromptPrevie
 
       {totalParams === 0 && loadedFiles.length === 0 ? (
         <div className="flex-1 flex items-center justify-center">
-          <p className="text-[10px] font-mono text-muted-foreground/50 uppercase tracking-widest text-center">
+          <p className="text-xs font-mono text-muted-foreground/50 uppercase tracking-widest text-center">
             Configure parameters<br />to see the spec
           </p>
         </div>
@@ -274,9 +274,9 @@ export default function PromptPreview({ params, loadedFiles = [] }: PromptPrevie
               >
                 {/* Section Header */}
                 <div className="flex items-center gap-1.5 mb-2">
-                  <span className="text-[9px] font-mono text-muted-foreground/40">{group.number}</span>
+                  <span className="text-xs font-mono text-muted-foreground/40">{group.number}</span>
                   <span className="text-muted-foreground">{group.icon}</span>
-                  <span className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground/80">
+                  <span className="text-xs font-bold uppercase tracking-widest text-muted-foreground/80">
                     {group.title}
                   </span>
                 </div>
@@ -290,7 +290,7 @@ export default function PromptPreview({ params, loadedFiles = [] }: PromptPrevie
                         key={`${i}-${vIdx}`}
                         className="group flex items-baseline gap-3 transition-all"
                       >
-                        <span className="text-[10px] font-mono text-muted-foreground/50 w-[4.5rem] shrink-0 uppercase tracking-tight text-right group-hover:text-primary/70 transition-colors">
+                        <span className="text-xs font-mono text-muted-foreground/50 w-[4.5rem] shrink-0 uppercase tracking-tight text-right group-hover:text-primary/70 transition-colors">
                           {item.label}
                         </span>
                         <span className="text-xs font-medium text-foreground border-b border-dashed border-border/50 pb-0.5 group-hover:border-primary/30 transition-colors leading-tight break-words min-w-0">
@@ -309,19 +309,19 @@ export default function PromptPreview({ params, loadedFiles = [] }: PromptPrevie
             <div className="relative pl-3 border-l border-border/40">
               <div className="flex items-center gap-1.5 mb-2">
                 <span className="text-muted-foreground"><Paperclip className="w-3.5 h-3.5" /></span>
-                <span className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground/80">Archivos</span>
+                <span className="text-xs font-bold uppercase tracking-widest text-muted-foreground/80">Archivos</span>
               </div>
               <div className="grid grid-cols-1 gap-1.5">
                 {usedFiles.map((f, i) => (
                   <div key={`u-${i}`} className="flex items-baseline gap-3">
-                    <span className="text-[10px] font-mono text-muted-foreground/50 w-[4.5rem] shrink-0 uppercase tracking-tight text-right">{f.label}</span>
+                    <span className="text-xs font-mono text-muted-foreground/50 w-[4.5rem] shrink-0 uppercase tracking-tight text-right">{f.label}</span>
                     <span className="text-xs font-medium text-foreground leading-tight break-words min-w-0">{f.name}</span>
                   </div>
                 ))}
                 {ignoredFiles.map((f, i) => (
                   <div key={`i-${i}`} className="flex items-baseline gap-3 opacity-60">
-                    <span className="text-[10px] font-mono text-muted-foreground/50 w-[4.5rem] shrink-0 uppercase tracking-tight text-right">{f.label}</span>
-                    <span className="text-xs leading-tight break-words min-w-0">{f.name} <em className="text-[10px] not-italic text-muted-foreground">(no se usa en {MODE_LABELS[mode]})</em></span>
+                    <span className="text-xs font-mono text-muted-foreground/50 w-[4.5rem] shrink-0 uppercase tracking-tight text-right">{f.label}</span>
+                    <span className="text-xs leading-tight break-words min-w-0">{f.name} <em className="text-xs not-italic text-muted-foreground">(no se usa en {MODE_LABELS[mode]})</em></span>
                   </div>
                 ))}
               </div>

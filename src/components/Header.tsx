@@ -20,9 +20,12 @@ import CloseIcon from '@mui/icons-material/Close';
 import KeyIcon from '@mui/icons-material/KeyOutlined';
 import CheckCircleOutlineIcon from '@mui/icons-material/CheckCircleOutlined';
 import ErrorOutlineIcon from '@mui/icons-material/ErrorOutlined';
+import InstallMobileIcon from '@mui/icons-material/InstallMobile';
+import IosShareIcon from '@mui/icons-material/IosShare';
 
 import { DhButton, DhLogo, DhBadge } from '@/components/brand';
 import { useTheme } from '@/components/ThemeProvider';
+import { usePwa } from '@/components/PwaProvider';
 import { palette, typography as t } from '@/lib/theme/tokens';
 
 const NAV_LINKS = [
@@ -40,6 +43,7 @@ export default function Header() {
   const [keyVisible, setKeyVisible] = useState(false);
   const { theme, toggleTheme }      = useTheme();
   const pathname                    = usePathname();
+  const { canInstall, needsIosInstructions, promptInstall } = usePwa();
 
   useEffect(() => {
     const savedGemini = localStorage.getItem('GEMINI_API_KEY');
@@ -169,7 +173,7 @@ export default function Header() {
               <Typography
                 sx={{
                   fontFamily: t.fontMono,
-                  fontSize: '9px',
+                  fontSize: '12px',
                   fontWeight: t.weight.bold,
                   letterSpacing: t.tracking.caps,
                   textTransform: 'uppercase',
@@ -207,7 +211,7 @@ export default function Header() {
                 onClick={() => setKeyVisible(!keyVisible)}
                 sx={{
                   fontFamily: t.fontMono,
-                  fontSize: '9px',
+                  fontSize: '12px',
                   fontWeight: t.weight.bold,
                   letterSpacing: t.tracking.wide,
                   textTransform: 'uppercase',
@@ -242,7 +246,7 @@ export default function Header() {
               <Typography
                 sx={{
                   fontFamily: t.fontMono,
-                  fontSize: '9px',
+                  fontSize: '12px',
                   fontWeight: t.weight.bold,
                   letterSpacing: t.tracking.caps,
                   textTransform: 'uppercase',
@@ -280,7 +284,7 @@ export default function Header() {
                 onClick={() => setKeyVisible(!keyVisible)}
                 sx={{
                   fontFamily: t.fontMono,
-                  fontSize: '9px',
+                  fontSize: '12px',
                   fontWeight: t.weight.bold,
                   letterSpacing: t.tracking.wide,
                   textTransform: 'uppercase',
@@ -318,13 +322,18 @@ export default function Header() {
             spacing={1}
             sx={{ display: { xs: 'flex', lg: 'none' }, alignItems: 'center' }}
           >
-            <IconButton onClick={toggleTheme} size="small">
+            {canInstall && (
+              <IconButton onClick={() => void promptInstall()} aria-label="Instalar la app en tu celular" sx={{ width: 44, height: 44, color: palette.lime }}>
+                <InstallMobileIcon sx={{ fontSize: 22 }} />
+              </IconButton>
+            )}
+            <IconButton onClick={toggleTheme} aria-label="Cambiar tema claro u oscuro" sx={{ width: 44, height: 44 }}>
               {theme === 'light'
-                ? <DarkModeOutlinedIcon sx={{ fontSize: 18 }} />
-                : <LightModeOutlinedIcon sx={{ fontSize: 18 }} />
+                ? <DarkModeOutlinedIcon sx={{ fontSize: 20 }} />
+                : <LightModeOutlinedIcon sx={{ fontSize: 20 }} />
               }
             </IconButton>
-            <IconButton onClick={() => setDrawerOpen(!drawerOpen)} size="small">
+            <IconButton onClick={() => setDrawerOpen(!drawerOpen)} aria-label={drawerOpen ? 'Cerrar menú' : 'Abrir menú'} sx={{ width: 44, height: 44 }}>
               {drawerOpen ? <CloseIcon /> : <MenuIcon />}
             </IconButton>
           </Stack>
@@ -440,7 +449,7 @@ export default function Header() {
             <Typography
               sx={{
                 fontFamily: t.fontMono,
-                fontSize: '10px',
+                fontSize: '12px',
                 color: palette.stone600,
                 mt: 1,
               }}
@@ -448,6 +457,29 @@ export default function Header() {
               Stored locally in your browser.
             </Typography>
           </Box>
+
+          {(canInstall || needsIosInstructions) && (
+            <Box sx={{ border: `1px solid ${palette.stone800}`, p: 2.5 }}>
+              <Typography sx={{ fontFamily: t.fontMono, fontSize: t.size.xs, fontWeight: t.weight.bold, letterSpacing: t.tracking.caps, textTransform: 'uppercase', color: palette.lime, mb: 1 }}>
+                Instalar en tu celular
+              </Typography>
+              {canInstall ? (
+                <>
+                  <Typography sx={{ fontSize: t.size.sm, color: 'text.secondary', mb: 2 }}>
+                    Ábrela como una app, a pantalla completa y desde tu pantalla de inicio.
+                  </Typography>
+                  <DhButton variant="outlined" color="primary" size="large" fullWidth onClick={() => { void promptInstall(); setDrawerOpen(false); }}>
+                    Instalar DreamHouse
+                  </DhButton>
+                </>
+              ) : (
+                <Typography sx={{ fontSize: t.size.sm, color: 'text.secondary', lineHeight: 1.6 }}>
+                  En Safari toca el botón <IosShareIcon sx={{ fontSize: 16, verticalAlign: 'text-bottom' }} /> <strong>Compartir</strong> y elige
+                  {' '}<strong>«Añadir a pantalla de inicio»</strong>.
+                </Typography>
+              )}
+            </Box>
+          )}
 
           <Link href="/studio" onClick={() => setDrawerOpen(false)} style={{ textDecoration: 'none' }}>
             <DhButton variant="contained" color="primary" size="large" fullWidth>

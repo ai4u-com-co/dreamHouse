@@ -71,7 +71,7 @@ export function Section({
             <div className="flex flex-col gap-1">
                 <div className="flex items-center gap-3">
                    {badge && (
-                    <span className="text-[10px] font-bold uppercase tracking-widest px-2 py-0.5 bg-foreground text-background">
+                    <span className="text-xs font-bold uppercase tracking-widest px-2 py-0.5 bg-foreground text-background">
                       {badge}
                     </span>
                   )}
@@ -81,7 +81,7 @@ export function Section({
                   </h3>
                 </div>
                 {!isOpen && summary && (
-                  <p className="text-[11px] text-muted-foreground font-mono tracking-wider uppercase mt-1 pl-1 opacity-70">
+                  <p className="text-xs text-muted-foreground font-mono tracking-wider uppercase mt-1 pl-1 opacity-70">
                     {summary}
                   </p>
                 )}

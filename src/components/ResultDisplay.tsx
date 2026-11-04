@@ -110,11 +110,11 @@ export default function ResultDisplay({
           </div>
           <div className="flex items-center gap-3">
             {vistasImages && (
-              <span className="text-[10px] font-mono text-muted-foreground">
+              <span className="text-xs font-mono text-muted-foreground">
                 {vistasImages.filter(v => v.url).length} / {vistasImages.length} Vistas
               </span>
             )}
-            <span className="text-[10px] font-mono uppercase tracking-widest text-muted-foreground px-3 py-1.5 bg-card rounded-full border border-border">
+            <span className="text-xs font-mono uppercase tracking-widest text-muted-foreground px-3 py-1.5 bg-card rounded-full border border-border">
               {isLoading ? 'Generando...' : 'Completado'}
             </span>
           </div>
@@ -141,13 +141,13 @@ export default function ResultDisplay({
                 {vista.loading ? (
                   <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 p-2 text-center">
                     <RefreshCw className="w-4 h-4 animate-spin text-primary" />
-                    <span className="text-[9px] uppercase font-bold text-muted-foreground leading-tight">Generando {vista.type}</span>
+                    <span className="text-xs uppercase font-bold text-muted-foreground leading-tight">Generando {vista.type}</span>
                   </div>
                 ) : vista.url ? (
                   <>
                     <Image src={vista.url} alt={vista.type} fill className="object-cover transition-transform duration-500 group-hover:scale-110" unoptimized />
                     <div className="absolute inset-x-0 bottom-0 bg-black/60 p-1.5 backdrop-blur-sm transform translate-y-full group-hover:translate-y-0 transition-transform duration-300">
-                      <p className="text-[9px] text-white font-bold uppercase truncate">{vista.type}</p>
+                      <p className="text-xs text-white font-bold uppercase truncate">{vista.type}</p>
                     </div>
                     <div className="absolute inset-0 bg-black/20 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
                        <Maximize2 className="w-6 h-6 text-white drop-shadow-lg" />
@@ -155,7 +155,7 @@ export default function ResultDisplay({
                   </>
                 ) : (
                   <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 p-2 text-center opacity-40">
-                    <span className="text-[9px] uppercase font-bold text-muted-foreground leading-tight">{vista.type}</span>
+                    <span className="text-xs uppercase font-bold text-muted-foreground leading-tight">{vista.type}</span>
                     <span className="text-[8px] text-muted-foreground">En espera</span>
                   </div>
                 )}
@@ -185,7 +185,7 @@ export default function ResultDisplay({
                 <div className="w-48 h-1 bg-border rounded-full overflow-hidden">
                   <div className="h-full w-1/2 bg-gradient-to-r from-transparent via-primary to-transparent shimmer" />
                 </div>
-                <p className="text-[10px] text-muted uppercase tracking-wider mt-2">Esto puede tomar 30-60 segundos</p>
+                <p className="text-xs text-muted uppercase tracking-wider mt-2">Esto puede tomar 30-60 segundos</p>
               </div>
             ) : imageUrl || (vistasImages && vistasImages[activeVistaIndex]?.url) ? (
               <>
@@ -207,7 +207,7 @@ export default function ResultDisplay({
                 />
                 <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500 pointer-events-none" />
                 <div className="absolute top-4 left-4 px-3 py-1.5 bg-black/50 backdrop-blur-sm rounded-full border border-white/10 opacity-0 group-hover:opacity-100 transition-opacity duration-300">
-                  <span className="text-[10px] font-medium text-white/80 flex items-center gap-1.5">
+                  <span className="text-xs font-medium text-white/80 flex items-center gap-1.5">
                     <Maximize2 className="w-3 h-3" />
                     Clic para ampliar
                   </span>

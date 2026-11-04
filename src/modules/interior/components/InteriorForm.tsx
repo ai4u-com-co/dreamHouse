@@ -120,7 +120,7 @@ export default function InteriorForm({ params, onChange, disabled, activeSection
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
             <div className="flex flex-col gap-2">
               <label htmlFor="field-room-size" className="text-xs font-semibold text-muted-foreground uppercase tracking-widest px-1">Superficie del espacio</label>
-              <p className="text-[11px] text-muted-foreground opacity-60 font-mono tracking-tight px-1">m² aproximados — define la escala y proporción de la escena</p>
+              <p className="text-xs text-muted-foreground opacity-60 font-mono tracking-tight px-1">m² aproximados — define la escala y proporción de la escena</p>
               <div className="relative">
                 <DebouncedInput
                   id="field-room-size"

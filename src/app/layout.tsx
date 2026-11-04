@@ -1,7 +1,8 @@
-import type { Metadata } from 'next';
+import type { Metadata, Viewport } from 'next';
 import { Instrument_Sans, JetBrains_Mono } from 'next/font/google';
 import './globals.css';
 import { ThemeProvider } from '@/components/ThemeProvider';
+import { PwaProvider } from '@/components/PwaProvider';
 
 const instrumentSans = Instrument_Sans({
   variable: '--font-instrument',
@@ -21,6 +22,18 @@ export const metadata: Metadata = {
   title: 'DreamHouse | AI Architecture Studio',
   description: 'Where Vision Meets Structure — AI-powered architectural exterior generation.',
   keywords: ['architecture', 'AI', 'exterior design', 'Colombia', 'DreamHouse'],
+  applicationName: 'DreamHouse',
+  // iPhone/iPad: ícono y modo app al "Añadir a pantalla de inicio" (el manifest lo cubre Android)
+  icons: { icon: '/icons/icon-192.png', apple: '/icons/apple-touch-icon.png' },
+  appleWebApp: { capable: true, title: 'DreamHouse', statusBarStyle: 'black-translucent' },
+  formatDetection: { telephone: false },
+};
+
+export const viewport: Viewport = {
+  width: 'device-width',
+  initialScale: 1,
+  viewportFit: 'cover', // usa el área completa en teléfonos con muesca; el contenido respeta safe-area
+  themeColor: '#050505',
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
@@ -40,7 +53,9 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
             zIndex: 0,
           }}
         />
-        <ThemeProvider>{children}</ThemeProvider>
+        <ThemeProvider>
+          <PwaProvider>{children}</PwaProvider>
+        </ThemeProvider>
       </body>
     </html>
   );

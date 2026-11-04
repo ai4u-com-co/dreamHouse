@@ -154,7 +154,7 @@ export default function FloorPlanUploader({
               <div className="flex flex-col items-center">
                 <Loader2 className="w-8 h-8 text-blue-500 animate-spin mb-2" />
                 <p className="text-sm font-medium text-foreground">Procesando plano...</p>
-                <p className="text-[10px] text-muted-foreground mt-1">Optimizando geometría para la IA</p>
+                <p className="text-xs text-muted-foreground mt-1">Optimizando geometría para la IA</p>
               </div>
             ) : (
               <>
@@ -168,7 +168,7 @@ export default function FloorPlanUploader({
                 <p className="text-sm font-medium text-muted-foreground group-hover:text-foreground transition-colors">
                   <span className="text-blue-500 font-semibold">Haz clic para subir</span> o arrastra el plano aquí
                 </p>
-                <p className="text-[10px] text-muted-foreground mt-1">
+                <p className="text-xs text-muted-foreground mt-1">
                   Cualquier tamaño · Optimización automática
                 </p>
               </>
