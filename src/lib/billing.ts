@@ -6,22 +6,15 @@
 //
 // Vive aparte de las rutas para poder probarlo sin cargar Next (igual que openai-image-settings).
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
-import type { OpenAIImageQuality } from '@/lib/openai-image-settings';
 
 export const APP_ID = 'dreamhouse';
 const SUPABASE_URL = 'https://dmracybffqdvcltkarag.supabase.co';
 const SUPABASE_PUBLISHABLE_KEY = 'sb_publishable_EP0yPI9NexntnxQ4_dG5jg_dH5z_zWU';
 
-/** Créditos por render según la calidad (×2 en 2K/4K y en edición). */
-const QUALITY_CREDITS: Record<OpenAIImageQuality, number> = { low: 1, medium: 4, high: 15, xhigh: 30 };
 /** El asistente de texto (gpt-4o-mini) cuesta una fracción de centavo: 1 crédito, el mínimo que admite la base. */
 export const ASSISTANT_CREDITS = 1;
-
-export function renderCredits(quality: OpenAIImageQuality, resolution: string, mode: string): number {
-  const base = Object.hasOwn(QUALITY_CREDITS, quality) ? QUALITY_CREDITS[quality] : QUALITY_CREDITS.low;
-  const big = resolution === '2K' || resolution === '4K' || mode === 'edit'; // edición: el tamaño lo decide la imagen de entrada
-  return base * (big ? 2 : 1);
-}
+// El costo de un render lo calcula el núcleo compartido (src/lib/openai-image-core.ts, `creditsFor`): tokens de salida × variantes
+// + 1 crédito por imagen de entrada. Ver src/lib/render-options.ts.
 
 export interface Authenticated {
   sb: SupabaseClient;
@@ -88,3 +81,22 @@ export function chargeFailure(c: Exclude<Charge, { ok: true }>): { status: numbe
 /** Sufijo honesto: promete «no se te cobró» solo si de verdad se devolvió el cobro. */
 export const noChargeNote = (refunded: boolean) =>
   refunded ? ' No se te cobró; inténtalo de nuevo.' : ' No pudimos devolverte los créditos automáticamente: escríbenos y lo corregimos.';
+
+/** ¿Es administrador ACTIVO de DreamHouse? Se consulta con el JWT de la persona y se filtra por su id verificado. */
+export async function isAdmin(sb: SupabaseClient, userId: string): Promise<boolean> {
+  try {
+    const { data: m } = await sb.schema('core').from('app_memberships').select('role,is_active').eq('app_id', APP_ID).eq('user_id', userId).maybeSingle();
+    return m?.is_active === true && m?.role === 'admin';
+  } catch {
+    return false;
+  }
+}
+
+/** Registra el uso real de OpenAI en el cobro (para costos). NUNCA puede romper una generación: se ignora cualquier error. */
+export async function recordUsage(sb: SupabaseClient, logId: number, token: string | null, usage: Record<string, number | string>): Promise<void> {
+  try {
+    await sb.schema('core').rpc('record_usage', { p_log_id: logId, p_token: token, p_usage: usage });
+  } catch {
+    /* no afecta la entrega */
+  }
+}

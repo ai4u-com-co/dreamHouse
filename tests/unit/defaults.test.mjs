@@ -23,7 +23,7 @@ test('la calidad predeterminada es la más baja', () => {
 test('el formato predeterminado es 16:9 y la resolución la mínima (1K)', () => {
   assert.equal(DEFAULT_PARAMS.renderAspectRatio, '16:9');
   assert.ok(SC.ASPECT_RATIOS.includes('16:9'));
-  assert.equal(DEFAULT_PARAMS.renderOutputResolution, '', 'vacío = 1K, la resolución más barata');
+  assert.equal(DEFAULT_PARAMS.renderOutputResolution, '1K', '1K es la resolución más barata');
 });
 
 test('el servidor sin calidad indicada usa la más baja (llamadas directas y registros antiguos)', () => {
@@ -36,7 +36,8 @@ test('el servidor sin calidad indicada usa la más baja (llamadas directas y reg
 test('las demás calidades siguen disponibles y el modelo se elige por nombre', () => {
   assert.equal(getOpenAIImageSettings('GPT Image 2.5 Sunburst (OpenAI)', 'Estándar').quality, 'medium');
   assert.equal(getOpenAIImageSettings('GPT Image 2.5 Sunburst (OpenAI)', 'Alta').quality, 'high');
-  assert.equal(getOpenAIImageSettings('GPT Image 2.5 Sunburst (OpenAI)', 'Máxima').quality, 'xhigh');
+  assert.equal(getOpenAIImageSettings('GPT Image 2.5 Sunburst (OpenAI)', 'Muy alta').quality, 'xhigh');
+  assert.equal(getOpenAIImageSettings('GPT Image 2.5 Sunburst (OpenAI)', 'Máxima').quality, 'max');
   assert.equal(getOpenAIImageSettings('GPT Image 2.5 Flare · borrador rápido (OpenAI)').model, 'gpt-image-2.5-flare');
   assert.equal(getOpenAIImageSettings('GPT Image 2.5 Sunburst (OpenAI)').model, 'gpt-image-2.5-sunburst');
   assert.equal(getOpenAIImageSettings('GPT Image 2 (OpenAI)').model, 'gpt-image-2.5-sunburst', 'registros antiguos caen en Sunburst');

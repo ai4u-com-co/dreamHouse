@@ -11,8 +11,10 @@ export interface SourceRender {
   params: Partial<DreamHouseParams>;
 }
 
-/** Calidad de render que elige el usuario (OpenAI): se traduce a low / medium / high / xhigh */
-export type RenderQuality = "Borrador" | "Estándar" | "Alta" | "Máxima";
+/** Calidad de render que elige el usuario (OpenAI): se traduce a low / medium / high / xhigh / max */
+export type RenderQuality = "Borrador" | "Estándar" | "Alta" | "Muy alta" | "Máxima";
+export type RenderFormat = "jpeg" | "webp" | "png";
+export type RenderBackground = "auto" | "opaque" | "transparent";
 
 export interface SharedParams {
   mode: GenerationMode;
@@ -41,7 +43,17 @@ export interface SharedParams {
   // Output (Shared)
   renderStyle: string;
   renderAspectRatio: string;
+  /** "1K" | "2K" | "Personalizado" (los valores antiguos "", "512" y "4K" se normalizan al cargar) */
   renderOutputResolution: string;
+  /** "ANCHOxALTO" cuando la resolución es "Personalizado" (múltiplos de 16, hasta 2560x1440) */
+  renderCustomSize: string;
+  /** Formato de archivo del render (con fondo transparente se fuerza webp) */
+  renderFormat: RenderFormat;
+  renderBackground: RenderBackground;
+  /** Variantes por solicitud (1–4); en edición siempre 1 */
+  renderVariants: number;
+  /** "low" solo la puede usar un administrador; el servidor lo verifica */
+  renderModeration: "auto" | "low";
   thinkingLevel: "Minimal" | "High";
   renderQuality: RenderQuality;
   /** Incrustar los parámetros dentro del archivo de imagen generado (XMP/iTXt) */
@@ -121,7 +133,12 @@ export const DEFAULT_PARAMS: DreamHouseParams = {
   depthOfField: "Total (f/8–f/11, todo nítido)",
   renderStyle: "",
   renderAspectRatio: "16:9",
-  renderOutputResolution: "",
+  renderOutputResolution: "1K",
+  renderCustomSize: "1280x720",
+  renderFormat: "jpeg",
+  renderBackground: "auto",
+  renderVariants: 1,
+  renderModeration: "auto",
   thinkingLevel: "Minimal",
   renderQuality: "Borrador",
   embedMetadata: true,

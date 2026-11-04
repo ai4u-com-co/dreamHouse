@@ -6,7 +6,9 @@ import assert from 'node:assert/strict';
 import sharp from 'sharp';
 import { NextRequest } from 'next/server';
 import { DEFAULT_PARAMS } from '@/types';
-import { renderCredits, ASSISTANT_CREDITS } from '@/lib/billing';
+import { ASSISTANT_CREDITS } from '@/lib/billing';
+import { creditsFor } from '@/lib/openai-image-core.ts';
+import { pickOpenAIInputs } from '@/lib/render-options';
 
 process.env.OPENAI_API_KEY = 'sk-servidor-de-prueba';
 const generate = await import('../../src/app/api/generate/route.ts');
@@ -23,6 +25,9 @@ const reset = (over = {}) => {
     consume: { ok: true, remaining: 9, log_id: 42, refund_token: TOKEN },
     consumeError: null,
     refund: { ok: true, remaining: 10 },
+    role: 'user',
+    active: true,
+    recordUsageStatus: 200,
     openai: { status: 200, body: { data: [{ b64_json: JPEG_B64 }] } },
     chat: { status: 200, body: { id: 'x', object: 'chat.completion', choices: [{ index: 0, message: { role: 'assistant', content: '{"mood":"Cálido"}' }, finish_reason: 'stop' }] } },
     ...over,
@@ -36,6 +41,8 @@ globalThis.fetch = async (input, init = {}) => {
   if (url.includes('/auth/v1/user')) return world.userOk ? j(200, { id: 'u1', aud: 'authenticated', role: 'authenticated', email: 'a@b.co' }) : j(401, { msg: 'bad jwt' });
   if (url.includes('/rest/v1/rpc/consume_credits')) return world.consumeError ? j(world.consumeError.http, world.consumeError.body) : j(200, world.consume);
   if (url.includes('/rest/v1/rpc/refund_credits')) return j(200, world.refund);
+  if (url.includes('/rest/v1/rpc/record_usage')) return world.recordUsageStatus === 200 ? j(200, { ok: true }) : j(500, { message: 'boom' });
+  if (url.includes('/rest/v1/app_memberships')) return j(200, { role: world.role, is_active: world.active });
   if (url.includes('api.openai.com/v1/images')) return j(world.openai.status, world.openai.body);
   if (url.includes('api.openai.com/v1/chat/completions')) return j(world.chat.status, world.chat.body);
   throw new Error(`fetch no simulado: ${url}`);
@@ -53,15 +60,8 @@ const parseReq = (body, headers = { authorization: 'Bearer jwt-ok' }) =>
   new NextRequest('http://localhost/api/parse-prompt', { method: 'POST', headers: { 'content-type': 'application/json', ...headers }, body: JSON.stringify(body) });
 
 // ---------------------------------------------------------------- precios
-test('precios: calidad × (2 en 2K/4K y en edición)', () => {
-  assert.equal(renderCredits('low', '', 'exterior'), 1);
-  assert.equal(renderCredits('medium', '1K', 'exterior'), 4);
-  assert.equal(renderCredits('high', '', 'exterior'), 15);
-  assert.equal(renderCredits('high', '2K', 'exterior'), 30);
-  assert.equal(renderCredits('low', '4K', 'exterior'), 2);
-  assert.equal(renderCredits('low', '', 'edit'), 2);
-  assert.equal(renderCredits('xhigh', '2K', 'exterior'), 60);
-  assert.equal(renderCredits('constructor', '', 'exterior'), 1, 'una clave heredada no es una calidad: cae en la más barata, nunca en NaN');
+test('precios: el costo sale del núcleo (tokens de salida × variantes + imágenes de entrada)', () => {
+  assert.equal(creditsFor('low', 1024 * 1024, 1, []), 1);
   assert.equal(ASSISTANT_CREDITS, 1);
 });
 
@@ -126,19 +126,177 @@ test('generate: usa SOLO la clave del servidor; ignora cualquier clave que mande
   assert.ok(!JSON.stringify(world.calls).includes('sk-del-navegador'));
 });
 
-test('generate: calidad Alta en 2K cuesta 30; Máxima en 4K se acota a 2K (60); Borrador en 4K cuesta 2', async () => {
+test('generate: el cobro es EXACTAMENTE v.credits del núcleo (calidad, tamaño, variantes)', async () => {
+  for (const [over, quality, size, n] of [
+    [{ renderQuality: 'Alta', renderOutputResolution: '2K', renderAspectRatio: '1:1' }, 'high', 1920 * 1920, 1],
+    [{ renderQuality: 'Muy alta' }, 'xhigh', 1376 * 768, 1],
+    [{ renderQuality: 'Máxima', renderAspectRatio: '1:1' }, 'max', 1024 * 1024, 1],
+    [{ renderQuality: 'Estándar', renderAspectRatio: '1:1', renderVariants: 3 }, 'medium', 1024 * 1024, 3],
+  ]) {
+    reset();
+    const res = await generate.POST(genReq(over));
+    assert.equal(res.status, 200, JSON.stringify(over));
+    const px = JSON.parse(called('api.openai.com/v1/images')[0].init.body).size.split('x').map(Number).reduce((a, b) => a * b);
+    assert.equal(rpcBody('consume_credits').p_amount, creditsFor(quality, px, n, []), JSON.stringify(over));
+  }
+  // el valor antiguo «4K» se acota a 2K (no 4K) y «512» a 1K
   reset();
-  await generate.POST(genReq({ renderQuality: 'Alta', renderOutputResolution: '2K' }));
-  assert.equal(rpcBody('consume_credits').p_amount, 30);
+  await generate.POST(genReq({ renderOutputResolution: '4K', renderAspectRatio: '1:1' }));
+  assert.equal(JSON.parse(called('api.openai.com/v1/images')[0].init.body).size, '1920x1920');
   reset();
-  await generate.POST(genReq({ renderQuality: 'Máxima', renderOutputResolution: '4K' }));
-  assert.equal(rpcBody('consume_credits').p_amount, 60);
+  await generate.POST(genReq({ renderOutputResolution: '512', renderAspectRatio: '1:1' }));
+  assert.equal(JSON.parse(called('api.openai.com/v1/images')[0].init.body).size, '1024x1024');
+});
+
+test('generate: los valores por defecto son los más baratos y el cuerpo a OpenAI lleva exactamente lo verificado', async () => {
   reset();
-  await generate.POST(genReq({ renderQuality: 'Borrador', renderOutputResolution: '4K' }));
-  assert.equal(rpcBody('consume_credits').p_amount, 2);
-  const size = JSON.parse(called('api.openai.com/v1/images')[0].init.body).size;
-  const [w, h] = size.split('x').map(Number);
-  assert.ok(w * h <= 2560 * 1440 + 16 * 16 * 100, `4K debe acotarse a 2K, llegó ${size}`);
+  const res = await generate.POST(genReq());
+  assert.equal(res.status, 200);
+  const body = JSON.parse(called('api.openai.com/v1/images')[0].init.body);
+  assert.equal(body.model, 'gpt-image-2.5-sunburst');
+  assert.equal(body.quality, 'low');
+  assert.equal(body.n, 1);
+  assert.equal(body.output_format, 'jpeg');
+  assert.equal(body.output_compression, 90);
+  assert.match(body.safety_identifier, /^[0-9a-f]{64}$/);
+  assert.ok(!('input_fidelity' in body) && !('background' in body) && !('moderation' in body) && !('response_format' in body));
+  const meta = rpcBody('consume_credits').p_meta;
+  assert.deepEqual([meta.model, meta.quality, meta.n, meta.format, meta.background, meta.inputs], ['gpt-image-2.5-sunburst', 'low', 1, 'jpeg', 'auto', 0]);
+});
+
+test('generate: cada opción nueva llega a OpenAI con su nombre; transparente fuerza webp; n>1 devuelve images', async () => {
+  reset({ openai: { status: 200, body: { data: [{ b64_json: JPEG_B64 }, { b64_json: JPEG_B64 }], usage: { input_tokens: 5, output_tokens: 214, input_tokens_details: { text_tokens: 5, image_tokens: 0 } } } } });
+  const res = await generate.POST(genReq({ aiModel: 'GPT Image 2.5 Flare · borrador rápido (OpenAI)', renderQuality: 'Muy alta', renderBackground: 'transparent', renderVariants: 2, renderFormat: 'jpeg', embedMetadata: false }));
+  assert.equal(res.status, 200);
+  const body = JSON.parse(called('api.openai.com/v1/images')[0].init.body);
+  assert.deepEqual([body.model, body.quality, body.n, body.output_format, body.background], ['gpt-image-2.5-flare', 'xhigh', 2, 'webp', 'transparent']);
+  assert.equal(body.output_compression, 85);
+  const out = await res.json();
+  assert.equal(out.images.length, 2);
+  assert.equal(out.image, out.images[0]);
+  assert.equal(out.imageUrl, out.images[0]);
+  assert.match(out.images[0], /^data:image\/webp;base64,/);
+  assert.deepEqual([out.options.n, out.options.format, out.options.quality], [2, 'webp', 'xhigh']);
+  assert.equal(out.usage.out, 214);
+});
+
+test('generate: record_usage recibe el log, el token (solo servidor) y claves permitidas; si falla, la generación NO se rompe', async () => {
+  reset();
+  const ok = await generate.POST(genReq());
+  assert.equal(ok.status, 200);
+  const u = rpcBody('record_usage');
+  assert.equal(u.p_log_id, 42);
+  assert.equal(u.p_token, TOKEN);
+  for (const k of Object.keys(u.p_usage)) assert.ok(['in', 'in_img', 'in_txt', 'out', 'n', 'model', 'quality', 'size'].includes(k), `clave no permitida: ${k}`);
+  assert.ok(!(await ok.text()).includes(TOKEN));
+  reset({ recordUsageStatus: 500 });
+  const res = await generate.POST(genReq());
+  assert.equal(res.status, 200, 'un fallo de record_usage no debe romper la entrega');
+  assert.equal(called('refund_credits').length, 0, 'ni devolver el cobro');
+});
+
+test('generate: opciones inválidas responden 400 SIN cobrar ni llamar a OpenAI (incluye claves de prototipo)', async () => {
+  const bad = [
+    { renderQuality: 'constructor' }, { renderQuality: '__proto__' }, { renderQuality: 'toString' }, { renderQuality: 'inventada' },
+    { renderAspectRatio: '1:8' }, { renderAspectRatio: 'constructor' }, { renderOutputResolution: '8K' }, { renderOutputResolution: 'constructor' },
+    { renderOutputResolution: 'Personalizado', renderCustomSize: '1000x700' }, { renderOutputResolution: 'Personalizado', renderCustomSize: '3200x640' },
+    { renderFormat: 'gif' }, { renderFormat: '__proto__' }, { renderBackground: 'toString' }, { renderVariants: 5 }, { renderVariants: 0 }, { renderVariants: '2' },
+    { renderModeration: 'constructor' }, { renderOutputResolution: '2K', renderFormat: 'png', renderVariants: 4, renderAspectRatio: '1:1' },
+  ];
+  for (const over of bad) {
+    reset();
+    const res = await generate.POST(genReq(over));
+    assert.equal(res.status, 400, JSON.stringify(over));
+    assert.equal((await res.json()).code, 'BAD_OPTIONS');
+    assert.equal(called('rpc').length, 0, `cobró con ${JSON.stringify(over)}`);
+    assert.equal(called('api.openai.com').length, 0);
+  }
+});
+
+test('generate: moderación baja solo para admin (403 sin cobrar si no lo es; con rol admin pasa y lleva moderation)', async () => {
+  reset({ role: 'user' });
+  const res = await generate.POST(genReq({ renderModeration: 'low' }));
+  assert.equal(res.status, 403);
+  assert.equal((await res.json()).code, 'ADMIN_ONLY');
+  assert.equal(called('consume_credits').length, 0);
+  assert.equal(called('api.openai.com').length, 0);
+  reset({ role: 'admin' });
+  const ok = await generate.POST(genReq({ renderModeration: 'low' }));
+  assert.equal(ok.status, 200);
+  assert.equal(JSON.parse(called('api.openai.com/v1/images')[0].init.body).moderation, 'low');
+  // membresía INACTIVA con rol admin: tampoco
+  reset({ role: 'admin', active: false });
+  const inactive = await generate.POST(genReq({ renderModeration: 'low' }));
+  assert.equal(inactive.status, 403);
+  assert.equal(called('consume_credits').length, 0);
+  assert.equal(called('api.openai.com').length, 0);
+  // la consulta filtra por app y por el id verificado del usuario
+  const q = called('app_memberships')[0].url;
+  assert.match(q, /app_id=eq\.dreamhouse/);
+  assert.match(q, /user_id=eq\.u1/);
+  // sin pedir moderación baja ni siquiera se consulta el rol
+  reset();
+  await generate.POST(genReq());
+  assert.equal(called('app_memberships').length, 0);
+});
+
+test('generate: una imagen de entrada enorme (> 2048x2048) responde 400 sin cobrar; el costo de entrada es por píxeles reales', async () => {
+  const big = await sharp({ create: { width: 2400, height: 2400, channels: 3, background: '#888' } }).jpeg().toBuffer();
+  reset();
+  const form = new FormData();
+  form.append('params', JSON.stringify({ ...DEFAULT_PARAMS, mode: 'exterior' }));
+  form.append('lotImage', new File([big], 'lote.jpg', { type: 'image/jpeg' }));
+  const res = await generate.POST(new NextRequest('http://localhost/api/generate', { method: 'POST', headers: { authorization: 'Bearer jwt-ok' }, body: form }));
+  assert.equal(res.status, 400);
+  assert.equal(called('consume_credits').length, 0);
+
+  const small = await sharp({ create: { width: 1024, height: 640, channels: 3, background: '#888' } }).jpeg().toBuffer();
+  reset();
+  const form2 = new FormData();
+  form2.append('params', JSON.stringify({ ...DEFAULT_PARAMS, mode: 'exterior', renderAspectRatio: '1:1' }));
+  form2.append('lotImage', new File([small], 'lote.jpg', { type: 'image/jpeg' }));
+  const ok = await generate.POST(new NextRequest('http://localhost/api/generate', { method: 'POST', headers: { authorization: 'Bearer jwt-ok' }, body: form2 }));
+  assert.equal(ok.status, 200);
+  assert.equal(rpcBody('consume_credits').p_amount, creditsFor('low', 1024 * 1024, 1, [1024 * 640]));
+  assert.equal(called('api.openai.com/v1/images/edits').length, 1, 'con una imagen de entrada se usa /images/edits');
+});
+
+test('generate: el espejo del cliente (pickOpenAIInputs) elige las mismas imágenes que el servidor', async () => {
+  const img = (n) => sharp({ create: { width: 640, height: 640, channels: 3, background: '#888' } }).jpeg().toBuffer().then((b) => new File([b], `${n}.jpg`, { type: 'image/jpeg' }));
+  const [lot, ref, plan, r1, r2, o1] = await Promise.all(['lot', 'ref', 'plan', 'r1', 'r2', 'o1'].map(img));
+  for (const mode of ['exterior', 'interior', 'vistas']) {
+    reset();
+    const form = new FormData();
+    form.append('params', JSON.stringify({ ...DEFAULT_PARAMS, mode, selectedVistas: ['x'], renderAspectRatio: '1:1' }));
+    form.append('lotImage', lot);
+    form.append('exteriorReferenceImage', ref);
+    form.append('floorPlanImage', plan);
+    form.append('files', r1);
+    form.append('files', r2);
+    form.append('objectImages', o1);
+    const res = await generate.POST(new NextRequest('http://localhost/api/generate', { method: 'POST', headers: { authorization: 'Bearer jwt-ok' }, body: form }));
+    assert.equal(res.status, 200, mode);
+    const n = pickOpenAIInputs(mode, { lot, exteriorRef: ref, floorPlan: plan, references: [r1, r2], objects: [o1] }).length;
+    assert.equal(rpcBody('consume_credits').p_amount, creditsFor('low', 1024 * 1024, 1, Array(n).fill(640 * 640)), mode);
+    assert.equal(rpcBody('consume_credits').p_meta.inputs, n, mode);
+  }
+});
+
+test('generate: edición cobra por los píxeles reales de la base (acotados) y manda size auto; n y formato quedan fijos', async () => {
+  const base = await sharp({ create: { width: 1600, height: 1200, channels: 3, background: '#888' } }).png().toBuffer();
+  reset();
+  const form = new FormData();
+  form.append('params', JSON.stringify({ ...DEFAULT_PARAMS, mode: 'edit', editPrompt: 'cambiar el piso', renderVariants: 3, renderFormat: 'png', renderBackground: 'transparent' }));
+  form.append('editCompositeFile', new File([base], 'c.png', { type: 'image/png' }));
+  const res = await generate.POST(new NextRequest('http://localhost/api/generate', { method: 'POST', headers: { authorization: 'Bearer jwt-ok' }, body: form }));
+  assert.equal(res.status, 200);
+  const sent = called('api.openai.com/v1/images/edits')[0].init.body;
+  assert.equal(sent.get('size'), 'auto');
+  assert.equal(sent.get('n'), '1');
+  assert.equal(sent.get('output_format'), 'jpeg');
+  assert.equal(sent.get('background'), null);
+  assert.equal(rpcBody('consume_credits').p_amount, creditsFor('low', 1600 * 1200, 1, [1600 * 1200]));
+  assert.match(sent.get('prompt'), /change ONLY what is described here/);
 });
 
 test('generate: un modelo Gemini (cliente viejo) se atiende con GPT Image 2.5, nunca con otro proveedor', async () => {

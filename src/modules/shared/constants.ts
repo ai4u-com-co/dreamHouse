@@ -225,30 +225,30 @@ export const HUMAN_CONTEXT = [
   "Una persona (escala)"
 ];
 
-export const OUTPUT_RESOLUTIONS = ["1K", "2K", "4K", "512"];
+/** 1K ≈ 1 megapíxel; 2K = lado largo 2048 (tope 2560x1440); «Personalizado» pide ancho y alto */
+export const OUTPUT_RESOLUTIONS = ["1K", "2K", "Personalizado"];
 
-export const ASPECT_RATIOS = [
-  "16:9",
-  "1:1",
-  "1:4",
-  "1:8",
-  "3:4",
-  "4:1",
-  "4:3",
-  "8:1",
-  "9:16"
-];
+/** Formatos que admite GPT Image 2.5 (relación máxima 3:1) */
+export const ASPECT_RATIOS = ["16:9", "1:1", "4:3", "3:2", "4:5", "5:4", "3:4", "2:3", "9:16", "21:9"];
 
 export const THINKING_LEVELS = ["High", "Minimal"];
 
 /** Calidad de render (OpenAI): etiqueta de la UI → valor de la API (ver generate/route.ts) */
-export const RENDER_QUALITIES = ["Borrador", "Estándar", "Alta", "Máxima"] as const;
+export const RENDER_QUALITIES = ["Borrador", "Estándar", "Alta", "Muy alta", "Máxima"] as const;
 export const RENDER_QUALITY_HINTS: Record<string, string> = {
   "Borrador": "Rápido y barato, para explorar ideas (predeterminada)",
   "Estándar": "Equilibrio entre detalle, costo y velocidad",
-  "Alta": "Más detalle y fidelidad; recomendado para vistas y entregas",
-  "Máxima": "El mayor detalle; lento y el más costoso",
+  "Alta": "Más detalle y fidelidad; recomendado para vistas y entregas (~20 s)",
+  "Muy alta": "Texturas y detalle fino para entrega final (~30 s)",
+  "Máxima": "El mayor detalle posible; puede tardar más de un minuto y es el más costoso",
 };
+/** Las calidades que tardan lo suficiente como para avisar antes de generar */
+export const SLOW_QUALITIES: readonly string[] = ["Muy alta", "Máxima"];
+
+export const RENDER_FORMATS = ["jpeg", "webp", "png"] as const;
+export const RENDER_FORMAT_LABELS: Record<string, string> = { jpeg: "JPEG (liviano)", webp: "WebP (liviano, admite transparencia)", png: "PNG (sin pérdida, pesado)" };
+export const RENDER_BACKGROUNDS = ["auto", "opaque", "transparent"] as const;
+export const RENDER_BACKGROUND_LABELS: Record<string, string> = { auto: "Automático", opaque: "Opaco", transparent: "Transparente" };
 
 export const RENDER_STYLES = [
   "3D técnico / Clean render",

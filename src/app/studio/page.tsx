@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import Header from '@/components/Header';
 import ReferenceUploader from '@/components/ReferenceUploader';
 import LotUploader from '@/components/LotUploader';
@@ -31,10 +31,16 @@ import type { DreamHouseImageMetadata } from '@/lib/image-metadata';
 import { useAuth } from '@/context/AuthContext';
 import { ApiError, callApi } from '@/lib/api-client';
 import AuthGate from '@/components/AuthGate';
+import ModelOptionsPanel, { durationNote, type QuoteState } from '@/components/ModelOptionsPanel';
+import { pickOpenAIInputs, quoteRender } from '@/lib/render-options';
+import { useFilePixels } from '@/lib/hooks/useFilePixels';
+import { normalizeRenderSettings } from '@/lib/render-settings';
 
 /** Respuesta de /api/generate (el saldo `remaining` lo publica callApi en el encabezado). */
 interface GenerateResponse {
   imageUrl: string;
+  /** Todas las variantes (la primera es `imageUrl`) */
+  images?: string[];
   houseName: string;
 }
 
@@ -66,11 +72,28 @@ function StudioContent() {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
-  const [vistasResults, setVistasResults] = useState<{ type: string, url: string | null, loading: boolean }[]>([]);
+  const [vistasResults, setVistasResults] = useState<{ type: string, url: string | null, loading: boolean, variants?: string[] }[]>([]);
+  // Variantes del render actual (módulos que no son vistas); en vistas viven dentro de cada vista
+  const [variants, setVariants] = useState<string[]>([]);
   const [activeVistaIndex, setActiveVistaIndex] = useState(0);
 
   // El historial es de CADA cuenta: se ata al usuario activo
-  const { userId } = useAuth();
+  const { userId, credits, isAdmin } = useAuth();
+
+  // Costo ANTES de generar: mismo núcleo que el servidor, con los píxeles reales de las imágenes que se enviarán
+  const inputFiles = useMemo(() => pickOpenAIInputs<File>(params.mode, {
+    lot: lotFile, exteriorRef: exteriorReferenceFile, floorPlan: floorPlanFile, references: files, objects: objectFiles,
+    editImage: editMask?.base ?? editCompositeFile ?? lotFile,
+  }).concat(params.mode === 'edit' && editMask ? [editMask.mask] : []),
+  [params.mode, lotFile, exteriorReferenceFile, floorPlanFile, files, objectFiles, editMask, editCompositeFile]);
+  const inputPixels = useFilePixels(inputFiles);
+  const quote: QuoteState = useMemo(() => {
+    const q = quoteRender(params as unknown as Record<string, unknown>, { inputImagePixels: inputPixels, isAdmin });
+    return q.ok ? q : { ok: false, message: q.message };
+  }, [params, inputPixels, isAdmin]);
+  const viewsCount = params.mode === 'vistas' ? Math.max(1, params.selectedVistas.length) : 1;
+  const totalCost = quote.ok ? quote.value.options.credits * viewsCount : 0;
+  const setParam = <K extends keyof DreamHouseParams>(key: K, value: DreamHouseParams[K]) => setParams(prev => ({ ...prev, [key]: value }));
   const { history, saveToHistory, deleteFromHistory, clearHistory, isLoading: isHistoryLoading } = useHistory(userId);
 
 
@@ -287,6 +310,7 @@ function StudioContent() {
     setIsLoading(true);
     setError(null);
     setImageUrl(null);
+    setVariants([]);
     setHouseName(null);
 
     const isVistasMode = params.mode === 'vistas';
@@ -334,7 +358,7 @@ function StudioContent() {
             
             // Update individual result
             setVistasResults(prev => prev.map((v, idx) => 
-              idx === i ? { ...v, url: data.imageUrl, loading: false } : v
+              idx === i ? { ...v, url: data.images?.[0] ?? data.imageUrl, loading: false, variants: data.images?.length ? data.images : [data.imageUrl] } : v
             ));
             
             // Also set as main image for the preview
@@ -342,12 +366,14 @@ function StudioContent() {
             setHouseName(data.houseName);
 
             // Save to history
-            await saveToHistory({
-              mode: 'vistas',
-              params: currentParams,
-              imageUrl: data.imageUrl,
-              houseName: data.houseName
-            }, ownerId);
+            for (const url of (data.images?.length ? data.images : [data.imageUrl])) {
+              await saveToHistory({
+                mode: 'vistas',
+                params: currentParams,
+                imageUrl: url,
+                houseName: data.houseName
+              }, ownerId);
+            }
 
           } catch (err) {
             console.error(`Error generating vista ${viewType}:`, err);
@@ -401,17 +427,21 @@ function StudioContent() {
 
         // Con la sesión de Google (el servidor cobra los créditos); `ownerId` = la cuenta que pidió este render
         const { data, ownerId } = await callApi<GenerateResponse>('/api/generate', formData);
-        setImageUrl(data.imageUrl);
+        const all = data.images?.length ? data.images : [data.imageUrl];
+        setImageUrl(all[0]);
+        setVariants(all);
         setHouseName(data.houseName);
         
         // Save to local history
         try {
-          await saveToHistory({
-            mode: params.mode as 'exterior' | 'interior' | 'edit' | 'vistas',
-            params: params,
-            imageUrl: data.imageUrl,
-            houseName: data.houseName
-          }, ownerId);
+          for (const url of all) {
+            await saveToHistory({
+              mode: params.mode as 'exterior' | 'interior' | 'edit' | 'vistas',
+              params: params,
+              imageUrl: url,
+              houseName: data.houseName
+            }, ownerId);
+          }
         } catch (historyErr) {
           console.error("Failed to save to history:", historyErr);
         }
@@ -437,7 +467,9 @@ function StudioContent() {
 
   const handleLoadHistory = (record: GenerationRecord) => {
     // Se mezcla con los valores por defecto: un registro anterior a un campo nuevo no deja undefined
-    setParams({ ...DEFAULT_PARAMS, ...record.params });
+    // Registros anteriores a las opciones nuevas (o con valores que ya no existen): se normalizan a lo válido y barato
+    setParams(normalizeRenderSettings({ ...DEFAULT_PARAMS, ...record.params }));
+    setVariants([]);
     setActiveSection(FIRST_SECTION[record.mode] ?? 'mode');
     setVistasResults([]);
     setImageUrl(record.imageUrl);
@@ -712,6 +744,17 @@ function StudioContent() {
             />
           )}
 
+          {/* Opciones avanzadas del modelo + costo (siempre visible) */}
+          <ModelOptionsPanel
+            params={params}
+            onChange={setParam}
+            disabled={isLoading}
+            isAdmin={isAdmin}
+            quote={quote}
+            credits={credits}
+            multiplier={viewsCount}
+          />
+
           {/* Error Message */}
           {error && (
             <div className="p-6 bg-destructive text-destructive-foreground flex items-center gap-4">
@@ -728,11 +771,19 @@ function StudioContent() {
             <Button
               onClick={handleGenerate}
               isLoading={isLoading}
+              disabled={!quote.ok}
               size="lg"
               className="rounded-full shadow-2xl hover:shadow-primary/40 active:scale-95 transition-all text-base font-bold uppercase tracking-widest px-10 py-8 bg-primary text-primary-foreground border-4 border-background focus:ring-4 focus:ring-primary/30 outline-none"
               aria-label={`Generate ${params.mode} render`}
             >
-              {isLoading ? 'Generating...' : `Generate ${params.mode}`}
+              <span className="flex flex-col items-center leading-tight">
+                <span>{isLoading ? (durationNote(params.renderQuality) ? 'Generando… puede tardar' : 'Generating...') : `Generate ${params.mode}`}</span>
+                {quote.ok && (
+                  <span className="text-xs font-mono normal-case tracking-normal opacity-90" data-testid="generate-cost">
+                    {isAdmin ? `Admin · ${totalCost} ${totalCost === 1 ? 'crédito' : 'créditos'} de referencia` : `${totalCost} ${totalCost === 1 ? 'crédito' : 'créditos'}`}
+                  </span>
+                )}
+              </span>
               {!isLoading && <Wand2 className="ml-3 w-5 h-5" />}
             </Button>
           </div>
@@ -760,6 +811,35 @@ function StudioContent() {
                   houseName={houseName}
                   onUseAsBase={handleUseResultAsBase}
                 />
+                {(() => {
+                  const strip = params.mode === 'vistas' ? (vistasResults[activeVistaIndex]?.variants ?? []) : variants;
+                  if (strip.length < 2) return null;
+                  const current = params.mode === 'vistas' ? vistasResults[activeVistaIndex]?.url : imageUrl;
+                  const pick = (url: string) => {
+                    if (params.mode === 'vistas') setVistasResults(prev => prev.map((v, idx) => idx === activeVistaIndex ? { ...v, url } : v));
+                    else setImageUrl(url);
+                  };
+                  return (
+                    <div className="mt-4" data-testid="variants-strip">
+                      <p className="text-xs font-bold uppercase tracking-widest text-muted-foreground mb-2">Variantes ({strip.length})</p>
+                      <div className="flex gap-3 overflow-x-auto pb-2">
+                        {strip.map((url, i) => (
+                          <button
+                            key={i}
+                            type="button"
+                            onClick={() => pick(url)}
+                            aria-label={`Ver variante ${i + 1}`}
+                            aria-pressed={url === current}
+                            className={clsx('shrink-0 w-24 h-24 min-w-[44px] border-2 overflow-hidden', url === current ? 'border-primary' : 'border-border')}
+                          >
+                            {/* eslint-disable-next-line @next/next/no-img-element */}
+                            <img src={url} alt={`Variante ${i + 1}`} className="w-full h-full object-cover" />
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  );
+                })()}
               </div>
             </div>
           </div>

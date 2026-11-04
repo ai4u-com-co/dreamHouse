@@ -51,7 +51,7 @@ test('frontera de la API: ajustes de tipo incorrecto o fuera de catálogo se ree
   assert.equal(bad.aiModel, DEFAULT_PARAMS.aiModel);
   assert.equal(bad.renderQuality, 'Borrador');
   assert.equal(bad.renderAspectRatio, '16:9');
-  assert.equal(bad.renderOutputResolution, '');
+  assert.equal(bad.renderOutputResolution, '1K');
   assert.equal(bad.mode, 'exterior');
 });
 
