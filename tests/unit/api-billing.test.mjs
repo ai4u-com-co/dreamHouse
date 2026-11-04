@@ -61,7 +61,7 @@ const parseReq = (body, headers = { authorization: 'Bearer jwt-ok' }) =>
 
 // ---------------------------------------------------------------- precios
 test('precios: el costo sale del núcleo (tokens de salida × variantes + imágenes de entrada)', () => {
-  assert.equal(creditsFor('low', 1024 * 1024, 1, []), 1);
+  assert.equal(creditsFor({ quality: 'low', width: 1024, height: 1024, n: 1, promptChars: 0 }), 2); // 196 tokens de salida = US$0,0059 ≈ 1,3 créditos
   assert.equal(ASSISTANT_CREDITS, 1);
 });
 
@@ -110,7 +110,7 @@ test('generate: éxito cobra ANTES de OpenAI, entrega la imagen y NUNCA el token
   assert.ok(!/refund/i.test(text), 'la respuesta no debe mencionar la devolución');
   const cobro = rpcBody('consume_credits');
   assert.equal(cobro.p_app, 'dreamhouse');
-  assert.equal(cobro.p_amount, 1);
+  assert.equal(cobro.p_amount, creditsFor({ quality: 'low', width: 1360, height: 768, n: 1, inputPixels: [], promptChars: cobro.p_meta.chars }));
   assert.equal(cobro.p_action, 'render');
   const orden = world.calls.map((c) => c.url);
   assert.ok(orden.findIndex((u) => u.includes('consume_credits')) < orden.findIndex((u) => u.includes('api.openai.com')), 'el cobro debe ir antes de llamar a OpenAI');
@@ -136,8 +136,10 @@ test('generate: el cobro es EXACTAMENTE v.credits del núcleo (calidad, tamaño,
     reset();
     const res = await generate.POST(genReq(over));
     assert.equal(res.status, 200, JSON.stringify(over));
-    const px = JSON.parse(called('api.openai.com/v1/images')[0].init.body).size.split('x').map(Number).reduce((a, b) => a * b);
-    assert.equal(rpcBody('consume_credits').p_amount, creditsFor(quality, px, n, []), JSON.stringify(over));
+    const [width, height] = JSON.parse(called('api.openai.com/v1/images')[0].init.body).size.split('x').map(Number);
+    const promptChars = rpcBody('consume_credits').p_meta.chars; // el cobro registra el largo del prompt que viajó a OpenAI
+    assert.ok(promptChars > 100, 'el cobro debe registrar el largo del prompt');
+    assert.equal(rpcBody('consume_credits').p_amount, creditsFor({ quality, width, height, n, inputPixels: [], promptChars }), JSON.stringify(over));
   }
   // el valor antiguo «4K» se acota a 2K (no 4K) y «512» a 1K
   reset();
@@ -257,7 +259,7 @@ test('generate: una imagen de entrada enorme (> 2048x2048) responde 400 sin cobr
   form2.append('lotImage', new File([small], 'lote.jpg', { type: 'image/jpeg' }));
   const ok = await generate.POST(new NextRequest('http://localhost/api/generate', { method: 'POST', headers: { authorization: 'Bearer jwt-ok' }, body: form2 }));
   assert.equal(ok.status, 200);
-  assert.equal(rpcBody('consume_credits').p_amount, creditsFor('low', 1024 * 1024, 1, [1024 * 640]));
+  assert.equal(rpcBody('consume_credits').p_amount, creditsFor({ quality: 'low', width: 1024, height: 1024, n: 1, inputPixels: [1024 * 640], promptChars: rpcBody('consume_credits').p_meta.chars }));
   assert.equal(called('api.openai.com/v1/images/edits').length, 1, 'con una imagen de entrada se usa /images/edits');
 });
 
@@ -277,7 +279,7 @@ test('generate: el espejo del cliente (pickOpenAIInputs) elige las mismas imáge
     const res = await generate.POST(new NextRequest('http://localhost/api/generate', { method: 'POST', headers: { authorization: 'Bearer jwt-ok' }, body: form }));
     assert.equal(res.status, 200, mode);
     const n = pickOpenAIInputs(mode, { lot, exteriorRef: ref, floorPlan: plan, references: [r1, r2], objects: [o1] }).length;
-    assert.equal(rpcBody('consume_credits').p_amount, creditsFor('low', 1024 * 1024, 1, Array(n).fill(640 * 640)), mode);
+    assert.equal(rpcBody('consume_credits').p_amount, creditsFor({ quality: 'low', width: 1024, height: 1024, n: 1, inputPixels: Array(n).fill(640 * 640), promptChars: rpcBody('consume_credits').p_meta.chars }), mode);
     assert.equal(rpcBody('consume_credits').p_meta.inputs, n, mode);
   }
 });
@@ -295,7 +297,8 @@ test('generate: edición cobra por los píxeles reales de la base (acotados) y m
   assert.equal(sent.get('n'), '1');
   assert.equal(sent.get('output_format'), 'jpeg');
   assert.equal(sent.get('background'), null);
-  assert.equal(rpcBody('consume_credits').p_amount, creditsFor('low', 1600 * 1200, 1, [1600 * 1200]));
+  const side = Math.round(Math.sqrt(1600 * 1200)); // en edición se cotiza como cuadrada (se desconoce la forma de la base)
+  assert.equal(rpcBody('consume_credits').p_amount, creditsFor({ quality: 'low', width: side, height: side, n: 1, inputPixels: [1600 * 1200], promptChars: rpcBody('consume_credits').p_meta.chars }));
   assert.match(sent.get('prompt'), /change ONLY what is described here/);
 });
 

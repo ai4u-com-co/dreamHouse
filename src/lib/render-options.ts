@@ -52,24 +52,26 @@ export interface Quote {
  */
 export function quoteRender(
   params: Loose,
-  ctx: { inputImagePixels: number[]; isAdmin?: boolean },
+  ctx: { inputImagePixels: number[]; isAdmin?: boolean; promptChars?: number },
 ): { ok: true; value: Quote } | Extract<Resolved, { ok: false }> {
   const input = imageOptionsInput(params);
   const edit = params.mode === 'edit';
   // En edición el tamaño del formulario no aplica: se valida con uno neutro y luego se sustituye por el de la base
   const r: Resolved = resolveImageOptions(
     edit ? { ...input, imageSize: '1K', aspectRatio: '1:1', size: undefined } : input,
-    { inputImagePixels: ctx.inputImagePixels, isAdmin: ctx.isAdmin },
+    { inputImagePixels: ctx.inputImagePixels, isAdmin: ctx.isAdmin, promptChars: ctx.promptChars },
   );
   if (!r.ok) return r;
   const v = r.value;
   if (!edit) return { ok: true, value: { apiSize: v.size, options: v } };
   const pixels = clampEditPixels(ctx.inputImagePixels[0] ?? 1_048_576);
+  // Se desconoce la forma de la base (solo sus píxeles): se cotiza como cuadrada, que es la curva más cara (conservador)
+  const side = Math.round(Math.sqrt(pixels));
   const options: ResolvedImageOptions = {
     ...v,
     pixels,
-    credits: creditsFor(v.quality, pixels, 1, ctx.inputImagePixels),
-    estimatedOutputTokens: estimateOutputTokens(v.quality, pixels),
+    credits: creditsFor({ quality: v.quality, width: side, height: side, n: 1, inputPixels: ctx.inputImagePixels, promptChars: ctx.promptChars }),
+    estimatedOutputTokens: estimateOutputTokens(v.quality, side, side),
   };
   return { ok: true, value: { apiSize: 'auto', options } };
 }

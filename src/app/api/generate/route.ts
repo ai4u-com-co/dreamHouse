@@ -469,7 +469,7 @@ ${mandate}${userExclusions}
     // El rol se consulta (con el JWT de la persona) solo cuando la solicitud pide algo reservado a admin
     const wantsAdminOption = (rawParams as Record<string, unknown>).renderModeration === 'low';
     const callerIsAdmin = wantsAdminOption ? await isAdmin(auth.sb, auth.userId) : false;
-    const quote = quoteRender(rawParams as Record<string, unknown>, { inputImagePixels, isAdmin: callerIsAdmin });
+    const quote = quoteRender(rawParams as Record<string, unknown>, { inputImagePixels, isAdmin: callerIsAdmin, promptChars: fullPrompt.length });
     if (!quote.ok) {
       // Moderación baja sin ser admin: 403; cualquier otra opción inválida: 400. En ambos casos, ANTES de cobrar.
       if (quote.code === 'forbidden_moderation') {
@@ -482,7 +482,7 @@ ${mandate}${userExclusions}
 
     // COBRO antes de llamar a OpenAI (atómico; los admin no pagan). Si OpenAI falla, el catch devuelve el cobro.
     const c = await charge(auth.sb, v.credits, 'render', {
-      mode: params.mode, model: v.modelId, quality: v.quality, size: apiSize, n: v.n, format: v.format, background: v.background, inputs: imageFiles.length,
+      mode: params.mode, model: v.modelId, quality: v.quality, size: apiSize, n: v.n, format: v.format, background: v.background, inputs: imageFiles.length, chars: fullPrompt.length,
     });
     if (!c.ok) {
       const failure = chargeFailure(c);
