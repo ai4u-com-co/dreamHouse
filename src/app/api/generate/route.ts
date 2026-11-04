@@ -4,17 +4,18 @@ import sharp from 'sharp';
 import { prepareEditMask, blendEditedOntoBase, type PreparedEditMask } from '@/lib/edit-mask';
 import { embedImageMetadata, pickEmbeddableParams, METADATA_APP, METADATA_VERSION, type DreamHouseImageMetadata } from '@/lib/image-metadata';
 import { DreamHouseParams } from '@/types';
-import { getOpenAIImageSettings, type OpenAIImageQuality } from '@/lib/openai-image-settings';
+import { quoteRender } from '@/lib/render-options';
+import { FALLBACK_MODEL, mimeFor, usageForLog } from '@/lib/openai-image-core.ts';
+import { openaiImageFields } from '@/lib/openai-image-server.ts';
 import { lookup } from '@/lib/safe-lookup';
 import { normalizeRenderSettings } from '@/lib/render-settings';
 import { buildExteriorPrompt } from '@/modules/exterior/lib/prompt-builder';
 import { buildInteriorPrompt } from '@/modules/interior/lib/prompt-builder';
 import { buildVistasPrompt } from '@/modules/vistas/lib/prompt-builder';
-import { authenticate, charge, chargeFailure, noChargeNote, refund, renderCredits, type Charge } from '@/lib/billing';
+import { APP_ID, authenticate, charge, chargeFailure, isAdmin, noChargeNote, recordUsage, refund, type Charge } from '@/lib/billing';
 
-// Vercel configuration: maxDuration only works on Pro plan, but it's the correct way to declare it
-// Hobby plan has 10s limit, Pro plan allows up to 300s
-export const maxDuration = 120; // Increased to 120s to allow for image generation and thinking time
+// Vercel: «Muy alta» tarda ~30 s y «Máxima» ~60 s o más (medido); con varias variantes y entradas, más. 300 s es el tope del plan Pro.
+export const maxDuration = 300;
 
 // Constants for validation
 const MAX_IMAGE_SIZE = 100 * 1024 * 1024; // 100MB per image
@@ -95,9 +96,7 @@ function validateImageSize(file: File, fieldName: string, skipSizeLimit: boolean
   return { valid: true };
 }
 
-// Formato de salida de OpenAI: JPEG es más rápido que PNG y mantiene la respuesta
-// por debajo del límite de 4,5 MB del cuerpo de respuesta de una función de Vercel.
-const OPENAI_OUTPUT_FORMAT = 'jpeg' as const;
+// Calidad JPEG con la que se compone una edición con máscara sobre el original (el resultado final de esa ruta siempre es JPEG)
 const OPENAI_OUTPUT_COMPRESSION = 95;
 
 // La máscara de OpenAI es una guía, no una garantía: el modelo puede tocar fuera de la zona.
@@ -146,58 +145,14 @@ async function compositeMaskedEdit(baseFile: File, prepared: PreparedEditMask, r
   }
 }
 
-// Helper function to calculate a valid size parameter for GPT Image (2 / 2.5)
-function getGptImage2Size(aspectRatio: string, resolutionPreset: string): string {
-  let widthRatio = 16;
-  let heightRatio = 9;
-
-  if (aspectRatio && aspectRatio.includes(':')) {
-    const parts = aspectRatio.split(':');
-    widthRatio = parseInt(parts[0], 10) || 16;
-    heightRatio = parseInt(parts[1], 10) || 9;
+// Píxeles reales de una imagen (solo cabecera, no se decodifica): el costo de una edición depende de la imagen base.
+async function imagePixels(file: File): Promise<number | undefined> {
+  try {
+    const meta = await sharp(Buffer.from(await file.arrayBuffer()), { limitInputPixels: false }).metadata();
+    return meta.width && meta.height ? meta.width * meta.height : undefined;
+  } catch {
+    return undefined;
   }
-
-  // La API exige una relación de aspecto entre 1:3 y 3:1
-  const clampedRatio = Math.min(3, Math.max(1 / 3, widthRatio / heightRatio));
-  widthRatio = clampedRatio;
-  heightRatio = 1;
-
-  // Target total pixels based on preset
-  let targetPixels = 1024 * 1024; // Default "1K" (~1MP)
-  if (resolutionPreset === "2K") {
-    targetPixels = 2560 * 1440; // ~3.7MP
-  } else if (resolutionPreset === "4K") {
-    targetPixels = 3824 * 2144; // ~8.2MP (safe limit below 3840 edge size)
-  } else if (resolutionPreset === "512") {
-    targetPixels = 655360; // Minimum limit for gpt-image-2
-  }
-
-  const ratio = widthRatio / heightRatio;
-  let h = Math.sqrt(targetPixels / ratio);
-  let w = h * ratio;
-
-  // Round dimensions to nearest multiple of 16
-  w = Math.round(w / 16) * 16;
-  h = Math.round(h / 16) * 16;
-
-  // Enforce constraints:
-  // 1. Max edge length must be less than 3840px (3824 is the highest multiple of 16 below 3840)
-  if (w >= 3840) w = 3824;
-  if (h >= 3840) h = 3824;
-
-  // 2. Total pixels must not be less than 655,360
-  while (w * h < 655360) {
-    w += 16;
-    h = Math.round((w / ratio) / 16) * 16;
-  }
-
-  // 3. Total pixels must not exceed 8,294,400
-  while (w * h > 8294400) {
-    w -= 16;
-    h = Math.round((w / ratio) / 16) * 16;
-  }
-
-  return `${w}x${h}`;
 }
 
 // Helper function to calculate total payload size
@@ -342,7 +297,8 @@ export async function POST(req: NextRequest) {
     } else if (params.mode === 'vistas') {
       narrativePrompt = buildVistasPrompt(params, params.viewType || 'Perspectiva Principal (Hero Shot)', params.aiModel);
     } else {
-      narrativePrompt = `USER EDIT PROMPT: ${params.editPrompt}`;
+      // Una sola instrucción, acotada: «replace ONLY X» (Cookbook). Lo que se conserva va en el mandato de abajo.
+      narrativePrompt = `[INTENDED USE: Photorealistic architectural image edit]\n\nEDIT INSTRUCTION — change ONLY what is described here, nothing else:\n${params.editPrompt}`;
     }
 
     // --- OpenAI: imágenes de entrada con su rol ---
@@ -379,7 +335,7 @@ export async function POST(req: NextRequest) {
           openaiInputs.push({ file: lotImage, role: lotRole });
         }
         if (floorPlanImage) {
-          openaiInputs.push({ file: floorPlanImage, role: "the floor plan (geometric reference for layout and proportions)" });
+          openaiInputs.push({ file: floorPlanImage, role: "the floor plan or sketch (geometry only): preserve its exact layout, proportions and perspective; do not add new elements; do not copy its linework, labels, dimensions or any text into the image" });
         }
         if (params.mode === 'exterior' && lotImage) {
           openaiInputs.push({ file: lotImage, role: lotRole });
@@ -417,27 +373,30 @@ export async function POST(req: NextRequest) {
             ? `- ${[params.flooringMaterial && `Flooring: ${params.flooringMaterial}`, params.ceilingDetail && `Ceiling: ${params.ceilingDetail}`].filter(Boolean).join(', ')}.`
             : '',
           lotImage ? '- Redesign the existing space from the reference photo; keep its architectural shell and viewpoint.' : '',
+          floorPlanImage ? '- Preserve the exact layout, proportions and perspective of the floor plan or sketch; do not add new elements or text.' : '',
         ].filter(Boolean).join('\n');
       } else if (params.mode === "exterior") {
         const structureMandate = exteriorReferenceImage 
           ? "PRESERVE general architectural volumes and facade structure from reference image."
-          : "Adhere to the provided layout/floor plan geometry.";
+          : floorPlanImage
+            ? "Preserve the exact layout, proportions and perspective of the floor plan or sketch; do not add new elements or text."
+            : "Compose the building from the written specification only.";
         mandate = `ARCHITECTURAL EXTERIOR MANDATE:
 - ${structureMandate}${params.levels > 0 ? `\n- Show exactly ${params.levels} floors.` : ''}`;
       } else if (params.mode === "vistas") {
         mandate = `ARCHITECTURAL PORTFOLIO MANDATE:
-- Maintain design style, materials, and geometry identical to the reference image (Image 1 is the house).
+- House anchor: Image 1 is the house. In every view repeat its massing, number of floors, roof, window and door rhythm, materials and colors exactly; only the camera changes.
 - Do not restyle, redesign or add elements that are not implied by the reference.`;
       } else if (openaiMaskFile) {
         mandate = `IMAGE EDITING MANDATE (MASKED EDIT):
-- Change only the masked area, following the edit instruction above.
+- Replace ONLY the masked area, following the edit instruction above.
 - The mask was painted by hand, so its outline is APPROXIMATE: it marks where the change is wanted, not an exact cut line. Never reproduce the brush outline as a visible edge, halo, seam or tone shift.
 - Let the change follow the architecture and logic of the space. Carry the new surface, material, color or object up to the natural boundaries nearby (wall corners, ceiling and floor lines, baseboards, window and door frames, joints between planes, furniture edges) and stop there, never in the middle of a continuous plane.
 - Respect the original perspective and vanishing lines, the light direction and color temperature, the shadows and reflections, and the scale of the surroundings, so the edited area reads as part of the same space.
 - Inside the thin band around the mask you may adjust slightly where it is needed to make the junction coherent. Everything beyond that band stays identical: camera angle, framing, perspective, lighting, materials, proportions, surrounding objects and resolution.`;
       } else {
         mandate = `IMAGE EDITING MANDATE (SURGICAL EDIT):
-- Change only the areas marked or described in the user's sketch and notes.
+- Replace ONLY the areas marked or described in the user's sketch and notes.
 - Keep everything else identical: camera angle, framing, perspective, lighting direction and color temperature, materials, proportions, surrounding objects, saturation, contrast and resolution.
 - The sketch lines, arrows and notes drawn on the image are instructions only; they must not appear in the output.`;
       }
@@ -486,88 +445,114 @@ export async function POST(req: NextRequest) {
 
 [MANDATES & CONSTRAINTS]
 ${mandate}${userExclusions}
-- No watermarks, logos or text inside the image.`.trim();
+- No extra text, no watermarks, no unrelated logos.`.trim();
     }
 
     console.log("Generated Narrative Prompt:", fullPrompt);
 
-    let imageUrl = "";
-    let usedModel: string = 'gpt-image-2.5-sunburst';
-    let usedQuality: string | undefined;
-    let usedSize: string | undefined;
-    const groundingMetadata = null; // se conserva en la respuesta por compatibilidad (antes venía de Gemini)
-
-    if (useOpenAI && openaiClient) {
-      const imageFiles = openaiInputs.map(input => input.file);
-      // En edición el tamaño lo decide la imagen de entrada ("auto"): forzar 16:9 deformaría lo editado
-      // Resolución máxima 2K: la respuesta de una función de Vercel no puede pasar de 4,5 MB
-      const effectiveResolution = params.renderOutputResolution === '4K' ? '2K' : params.renderOutputResolution;
-      const sizeStr = params.mode === 'edit' ? 'auto' : getGptImage2Size(params.renderAspectRatio, effectiveResolution);
-      const requested = getOpenAIImageSettings(params.aiModel, params.renderQuality);
-      const openaiModel = requested.model;
-      const qualityVal: OpenAIImageQuality = requested.quality;
-
-      // COBRO antes de llamar a OpenAI (atómico; los admin no pagan). Si OpenAI falla, el catch devuelve el cobro.
-      const amount = renderCredits(qualityVal, effectiveResolution, params.mode);
-      const c = await charge(auth.sb, amount, 'render', { mode: params.mode, quality: qualityVal, resolution: effectiveResolution || '1K', model: openaiModel });
-      if (!c.ok) {
-        const failure = chargeFailure(c);
-        return NextResponse.json(failure.body, { status: failure.status });
+    // --- Opciones de salida: validación ESTRICTA con el núcleo compartido (400 sin cobrar si algo no es válido) ---
+    const imageFiles = openaiInputs.map(input => input.file);
+    // El costo de cada imagen de entrada sale de sus píxeles REALES (el servidor no confía en que el navegador las redujo);
+    // en edición la primera es la base y el tamaño de salida lo decide ella ("auto").
+    const inputImagePixels: number[] = [];
+    for (const file of imageFiles) {
+      const px = await imagePixels(file);
+      if (!px) return NextResponse.json({ code: 'BAD_OPTIONS', option: 'bad_input_image', message: 'No se pudo leer una de las imágenes. Súbela de nuevo (JPG, PNG o WebP).' }, { status: 400 });
+      inputImagePixels.push(px);
+    }
+    // La máscara también es una imagen de entrada: cuenta (y cuesta) por sus píxeles reales
+    if (maskForModel) {
+      const mpx = await imagePixels(maskForModel);
+      if (!mpx) return NextResponse.json({ code: 'BAD_OPTIONS', option: 'bad_input_image', message: 'No se pudo leer la máscara de edición.' }, { status: 400 });
+      inputImagePixels.push(mpx);
+    }
+    // El rol se consulta (con el JWT de la persona) solo cuando la solicitud pide algo reservado a admin
+    const wantsAdminOption = (rawParams as Record<string, unknown>).renderModeration === 'low';
+    const callerIsAdmin = wantsAdminOption ? await isAdmin(auth.sb, auth.userId) : false;
+    const quote = quoteRender(rawParams as Record<string, unknown>, { inputImagePixels, isAdmin: callerIsAdmin });
+    if (!quote.ok) {
+      // Moderación baja sin ser admin: 403; cualquier otra opción inválida: 400. En ambos casos, ANTES de cobrar.
+      if (quote.code === 'forbidden_moderation') {
+        return NextResponse.json({ code: 'ADMIN_ONLY', message: quote.message }, { status: 403 });
       }
-      charged = c;
+      return NextResponse.json({ code: 'BAD_OPTIONS', option: quote.code, message: quote.message }, { status: 400 });
+    }
+    const v = quote.value.options;
+    const apiSize = quote.value.apiSize;
 
-      usedModel = openaiModel;
-      usedQuality = qualityVal;
-      usedSize = sizeStr;
+    // COBRO antes de llamar a OpenAI (atómico; los admin no pagan). Si OpenAI falla, el catch devuelve el cobro.
+    const c = await charge(auth.sb, v.credits, 'render', {
+      mode: params.mode, model: v.modelId, quality: v.quality, size: apiSize, n: v.n, format: v.format, background: v.background, inputs: imageFiles.length,
+    });
+    if (!c.ok) {
+      const failure = chargeFailure(c);
+      return NextResponse.json(failure.body, { status: failure.status });
+    }
+    charged = c;
 
-      let result;
+    // Los campos extra (safety_identifier, quality 'max', background…) pueden ir por delante de los tipos del SDK:
+    // el cuerpo que viaja es exactamente el verificado contra la API.
+    type ImageResult = { data?: Array<{ b64_json?: string; url?: string }>; usage?: unknown };
+    const callOpenAI = async (modelId: string): Promise<ImageResult> => {
+      const fields = openaiImageFields({ ...v, size: apiSize }, { appId: APP_ID, userId: auth.userId }, modelId);
       if (imageFiles.length > 0) {
-        console.log(`Editing/Compositing with OpenAI (${openaiModel}) using ${imageFiles.length} image files. Size: ${sizeStr}, Quality: ${qualityVal}`);
-        result = await openaiClient.images.edit({
-          model: openaiModel,
+        console.log(`Editing/Compositing with OpenAI (${modelId}) using ${imageFiles.length} input images. Size: ${apiSize}, Quality: ${v.quality}, n: ${v.n}`);
+        return await openaiClient.images.edit({
+          ...fields,
           image: imageFiles,
           ...(maskForModel ? { mask: maskForModel } : {}),
           prompt: fullPrompt,
-          size: sizeStr as `${number}x${number}` | 'auto',
-          quality: qualityVal,
-          output_format: OPENAI_OUTPUT_FORMAT,
-          output_compression: OPENAI_OUTPUT_COMPRESSION,
-        });
-      } else {
-        console.log(`Generating text-to-image with OpenAI (${openaiModel}). Size: ${sizeStr}, Quality: ${qualityVal}`);
-        result = await openaiClient.images.generate({
-          model: openaiModel,
-          prompt: fullPrompt,
-          size: sizeStr as `${number}x${number}` | 'auto',
-          quality: qualityVal,
-          output_format: OPENAI_OUTPUT_FORMAT,
-          output_compression: OPENAI_OUTPUT_COMPRESSION,
-        });
+        } as unknown as Parameters<typeof openaiClient.images.edit>[0]) as unknown as ImageResult;
       }
+      console.log(`Generating text-to-image with OpenAI (${modelId}). Size: ${apiSize}, Quality: ${v.quality}, n: ${v.n}`);
+      return await openaiClient.images.generate({ ...fields, prompt: fullPrompt } as unknown as Parameters<typeof openaiClient.images.generate>[0]) as unknown as ImageResult;
+    };
 
-      const imageBase64 = result?.data?.[0]?.b64_json;
-      const imageUrlResult = result?.data?.[0]?.url;
-      if (imageBase64) {
-        const composited = preparedMask && editBaseFile
-          ? await compositeMaskedEdit(editBaseFile, preparedMask, imageBase64)
-          : null;
-        imageUrl = `data:image/${OPENAI_OUTPUT_FORMAT};base64,${composited ?? imageBase64}`;
-      } else if (imageUrlResult) {
-        imageUrl = imageUrlResult;
+    let usedModel: string = v.modelId;
+    let result: ImageResult;
+    try {
+      result = await callOpenAI(v.modelId);
+    } catch (err) {
+      // Respaldo SOLO si la cuenta aún no tiene GPT Image 2.5 (no se vuelve a cobrar: el cobro ya está hecho)
+      const e = err as { status?: number; code?: string | null };
+      if (e?.status === 404 || e?.code === 'model_not_found') {
+        usedModel = FALLBACK_MODEL;
+        result = await callOpenAI(FALLBACK_MODEL);
       } else {
-         throw new Error("No image data or URL returned from OpenAI");
+        throw err;
       }
-    } else {
-      throw new Error('OpenAI client is not initialized.');
     }
+
+    const mime = mimeFor(v.format);
+    const imageUrls: string[] = [];
+    for (const item of result?.data ?? []) {
+      if (item?.b64_json) {
+        const composited = preparedMask && editBaseFile
+          ? await compositeMaskedEdit(editBaseFile, preparedMask, item.b64_json)
+          : null;
+        // La composición con máscara siempre entrega JPEG
+        imageUrls.push(`data:${composited ? 'image/jpeg' : mime};base64,${composited ?? item.b64_json}`);
+      } else if (item?.url) {
+        imageUrls.push(item.url);
+      }
+    }
+    if (imageUrls.length === 0) throw new Error("No image data or URL returned from OpenAI");
+    const usedQuality = v.quality;
+    const usedSize = apiSize;
+    const groundingMetadata = null; // se conserva en la respuesta por compatibilidad (antes venía de Gemini)
+    // Uso real de OpenAI para el control de costos: jamás puede romper la entrega
+    await recordUsage(auth.sb, c.logId, c.refundToken, usageForLog(result?.usage, { model: usedModel, quality: v.quality, size: apiSize, n: v.n }));
 
     // Nombre del proyecto: lo escribía Gemini (y solo con ese modelo); con GPT Image 2.5 siempre fue el predeterminado.
     const houseName = "DreamHouse Project";
 
-    // --- Metadatos incrustados: los parámetros viajan dentro del archivo ---
-    const metadataId = crypto.randomUUID();
-    if (params.embedMetadata !== false) {
-      imageUrl = embedMetadataInDataUrl(imageUrl, {
+    // --- Metadatos incrustados: los parámetros viajan dentro del archivo (cada variante lleva su propio id; webp no los admite) ---
+    const metadataIds: string[] = [];
+    const images = imageUrls.map((url) => {
+      const metadataId = crypto.randomUUID();
+      metadataIds.push(metadataId);
+      if (params.embedMetadata === false) return url;
+      return embedMetadataInDataUrl(url, {
         app: METADATA_APP,
         version: METADATA_VERSION,
         id: metadataId,
@@ -583,10 +568,23 @@ ${mandate}${userExclusions}
         params: pickEmbeddableParams(params, !!params.embedDetails),
         prompt: params.embedDetails ? fullPrompt : undefined,
       });
-    }
+    });
 
     delivered = true;
-    return NextResponse.json({ imageUrl, groundingMetadata, houseName, metadataId, remaining: charged?.remaining });
+    // `imageUrl`/`image` = la primera (compatibilidad); `images` = todas las variantes. El token de devolución nunca sale.
+    return NextResponse.json({
+      imageUrl: images[0],
+      image: images[0],
+      images,
+      groundingMetadata,
+      houseName,
+      metadataId: metadataIds[0],
+      metadataIds,
+      remaining: charged?.remaining,
+      model: usedModel,
+      options: { size: apiSize, quality: v.quality, format: v.format, n: v.n, background: v.background, model: v.model },
+      usage: usageForLog(result?.usage),
+    });
 
   } catch (error: unknown) {
     console.error("API Error Detailed:", error);

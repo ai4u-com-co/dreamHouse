@@ -1,5 +1,5 @@
 import React from 'react';
-import type { DreamHouseParams, RenderQuality } from '@/types';
+import type { DreamHouseParams } from '@/types';
 import { Select } from '@/components/ui/Select';
 import * as SC from '@/modules/shared/constants';
 
@@ -12,25 +12,13 @@ interface ExtrasProps {
 }
 
 /**
- * Opciones de salida compartidas por los cuatro módulos: calidad del render (solo OpenAI) y
- * si los parámetros se guardan dentro de la imagen. Va dentro de una cuadrícula de 2 columnas.
+ * Opciones de salida compartidas por los cuatro módulos: si los parámetros se guardan dentro de la imagen.
+ * (Modelo, calidad, tamaño, formato, fondo y variantes viven en «Opciones avanzadas del modelo»: ModelOptionsPanel.)
+ * Va dentro de una cuadrícula de 2 columnas.
  */
 export function OutputOptions({ params, onChange, disabled }: ExtrasProps) {
-  const isOpenAI = params.aiModel.includes('OpenAI');
   return (
     <>
-      {isOpenAI && (
-        <div className="flex flex-col gap-2">
-          <Select
-            label="Calidad del render"
-            value={params.renderQuality}
-            onChange={(e) => onChange('renderQuality', e.target.value as RenderQuality)}
-            options={[...SC.RENDER_QUALITIES]}
-            disabled={disabled}
-          />
-          <p className="text-xs text-muted-foreground">{SC.RENDER_QUALITY_HINTS[params.renderQuality]}</p>
-        </div>
-      )}
       <fieldset className="sm:col-span-2 flex flex-col gap-1 border-0 p-0 m-0">
         <legend className="sr-only">Metadatos de la imagen</legend>
         <label className="flex items-start gap-3 min-h-[44px] py-2 cursor-pointer text-sm">
