@@ -5,14 +5,14 @@ import { prepareEditMask, blendEditedOntoBase, type PreparedEditMask } from '@/l
 import { embedImageMetadata, pickEmbeddableParams, METADATA_APP, METADATA_VERSION, type DreamHouseImageMetadata } from '@/lib/image-metadata';
 import { DreamHouseParams } from '@/types';
 import { quoteRender } from '@/lib/render-options';
-import { FALLBACK_MODEL, mimeFor, promptCostUnits, usageForLog } from '@/lib/openai-image-core.ts';
+import { FALLBACK_MODEL, creditsFromUsage, mimeFor, promptCostUnits, usageForLog } from '@/lib/openai-image-core.ts';
 import { openaiImageFields } from '@/lib/openai-image-server.ts';
 import { lookup } from '@/lib/safe-lookup';
 import { normalizeRenderSettings } from '@/lib/render-settings';
 import { buildExteriorPrompt } from '@/modules/exterior/lib/prompt-builder';
 import { buildInteriorPrompt } from '@/modules/interior/lib/prompt-builder';
 import { buildVistasPrompt } from '@/modules/vistas/lib/prompt-builder';
-import { APP_ID, authenticate, charge, chargeFailure, isAdmin, noChargeNote, recordUsage, refund, type Charge } from '@/lib/billing';
+import { APP_ID, authenticate, charge, chargeFailure, isAdmin, noChargeNote, recordUsage, refund, topUp, type Charge } from '@/lib/billing';
 
 // Vercel: «Muy alta» tarda ~30 s y «Máxima» ~60 s o más (medido); con varias variantes y entradas, más. 300 s es el tope del plan Pro.
 export const maxDuration = 300;
@@ -571,6 +571,9 @@ ${mandate}${userExclusions}
     });
 
     delivered = true;
+    // Liquidación con el uso real (los admin no pagan: sin refundToken no hay cobro extra). Va DESPUÉS de marcar la entrega para que un
+    // fallo posterior nunca devuelva el cobro de una imagen ya hecha; y nunca rompe la respuesta (topUp no lanza).
+    const settled = await topUp(auth.sb, c, creditsFromUsage(result?.usage));
     // `imageUrl`/`image` = la primera (compatibilidad); `images` = todas las variantes. El token de devolución nunca sale.
     return NextResponse.json({
       imageUrl: images[0],
@@ -580,7 +583,7 @@ ${mandate}${userExclusions}
       houseName,
       metadataId: metadataIds[0],
       metadataIds,
-      remaining: charged?.remaining,
+      remaining: settled.remaining,
       model: usedModel,
       options: { size: apiSize, quality: v.quality, format: v.format, n: v.n, background: v.background, model: v.model },
       usage: usageForLog(result?.usage),
