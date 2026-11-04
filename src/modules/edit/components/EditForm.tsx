@@ -52,7 +52,7 @@ export default function EditForm({
 
       {/* ── 04 SKETCH CANVAS ─────────────────────────────────────── */}
       <Section title="Modo Sketch / Edición Visual" number="02" icon={<PenLine className="w-5 h-5" />} isOpen={activeSection === 'sketch'} onToggle={() => onSectionChange('sketch')}>
-        <SectionDescription>Dibuja sobre la imagen base para indicar las zonas que deseas modificar y escribe tu instrucción de edición.</SectionDescription>
+        <SectionDescription>Marca las zonas que deseas modificar —pintando con el pincel o con «Zona por puntos», tocando punto por punto como en un mapa— y escribe tu instrucción de edición.</SectionDescription>
         
         <div className="space-y-8">
           <div className="flex flex-col gap-2">
