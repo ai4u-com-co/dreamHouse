@@ -1,6 +1,8 @@
 import React, { useRef, useState, useEffect, useCallback } from 'react';
 import { Button } from './ui/Button';
-import { Undo, Trash2, Pencil, ImagePlus } from 'lucide-react';
+import { Undo, Trash2, Pencil, ImagePlus, Pentagon } from 'lucide-react';
+import PolygonZoneModal from './PolygonZoneModal';
+import { tracePolygon, type Pt } from '@/lib/polygon-zone';
 
 export interface EditMaskPayload {
   /** Imagen original limpia (sin trazos), en PNG, del mismo tamaño que la máscara */
@@ -30,10 +32,11 @@ interface Point {
 }
 
 interface Line {
+  /** 'zona' y 'notas': píxeles del lienzo. 'poligono': coordenadas normalizadas 0..1 (ver lib/polygon-zone) */
   points: Point[];
   color: string;
   size: number;
-  kind: DrawMode;
+  kind: DrawMode | 'poligono';
 }
 
 function zoneLineWidth(size: number): number {
@@ -56,6 +59,7 @@ export default function SketchCanvas({ baseImage, onCompositeImageUpdate, onMask
   const [brushSize, setBrushSize] = useState(3);
   const [mode, setMode] = useState<DrawMode>('notas');
   const [imageObj, setImageObj] = useState<HTMLImageElement | null>(null);
+  const [polygonOpen, setPolygonOpen] = useState(false);
 
   // Load the image object when baseImage changes
   useEffect(() => {
@@ -114,6 +118,16 @@ export default function SketchCanvas({ baseImage, onCompositeImageUpdate, onMask
     // Draw all lines
     lines.forEach((line) => {
       if (line.points.length === 0) return;
+      if (line.kind === 'poligono') {
+        tracePolygon(ctx, line.points, canvas.width, canvas.height);
+        ctx.fillStyle = 'rgba(239, 68, 68, 0.45)';
+        ctx.fill();
+        ctx.lineWidth = 2;
+        ctx.strokeStyle = 'rgba(239, 68, 68, 0.95)';
+        ctx.lineJoin = 'round';
+        ctx.stroke();
+        return;
+      }
       ctx.beginPath();
       ctx.moveTo(line.points[0].x, line.points[0].y);
       for (let i = 1; i < line.points.length; i++) {
@@ -148,7 +162,7 @@ export default function SketchCanvas({ baseImage, onCompositeImageUpdate, onMask
   // Las notas no entran en la máscara: siguen yendo solo en la imagen compuesta.
   const generateMaskFiles = useCallback(async () => {
     const canvas = canvasRef.current;
-    const zoneLines = lines.filter((l) => l.kind === 'zona' && l.points.length > 0);
+    const zoneLines = lines.filter((l) => (l.kind === 'zona' || l.kind === 'poligono') && l.points.length > 0);
     if (!onMaskUpdate) return;
     if (!canvas || !imageObj || zoneLines.length === 0) {
       onMaskUpdate(null);
@@ -179,6 +193,12 @@ export default function SketchCanvas({ baseImage, onCompositeImageUpdate, onMask
     mctx.strokeStyle = '#000000';
     mctx.fillStyle = '#000000';
     zoneLines.forEach((line) => {
+      if (line.kind === 'poligono') {
+        // Figura por puntos: ya viene normalizada, se rellena a la resolución de exportación (destination-out = editable)
+        tracePolygon(mctx, line.points, w, h);
+        mctx.fill();
+        return;
+      }
       const width = zoneLineWidth(line.size) * toExport;
       mctx.lineWidth = width;
       if (line.points.length === 1) {
@@ -264,6 +284,15 @@ export default function SketchCanvas({ baseImage, onCompositeImageUpdate, onMask
     setIsDrawing(false);
   };
 
+  /** Reemplaza todas las figuras por puntos por las que devuelve el modal (las demás marcas no se tocan) */
+  const applyPolygons = (polygons: Pt[][]) => {
+    setLines((prev) => [
+      ...prev.filter((l) => l.kind !== 'poligono'),
+      ...polygons.map((points): Line => ({ points, color: '#EF4444', size: brushSize, kind: 'poligono' })),
+    ]);
+    setPolygonOpen(false);
+  };
+
   const handleUndo = () => {
     setLines((prev) => prev.slice(0, -1));
   };
@@ -307,6 +336,16 @@ export default function SketchCanvas({ baseImage, onCompositeImageUpdate, onMask
             </button>
           ))}
         </div>
+
+        {/* Zona por puntos: abre el modal para trazar un polígono punto a punto */}
+        <button
+          type="button"
+          onClick={() => { setMode('zona'); setPolygonOpen(true); }}
+          className="inline-flex items-center gap-2 min-h-[44px] px-3 text-xs font-semibold rounded-md border border-primary text-foreground hover:bg-primary hover:text-primary-foreground transition-colors cursor-pointer"
+        >
+          <Pentagon className="w-4 h-4" aria-hidden="true" />
+          Zona por puntos
+        </button>
 
         <div className="h-6 w-px bg-border" />
 
@@ -374,9 +413,18 @@ export default function SketchCanvas({ baseImage, onCompositeImageUpdate, onMask
       <p className="text-xs text-muted-foreground text-center flex items-center justify-center gap-2">
         <Pencil className="w-3 h-3" />
         {mode === 'zona'
-          ? 'Pinta la zona que quieres cambiar. Con OpenAI solo se modificará esa zona; el resto de la imagen se conserva.'
+          ? 'Pinta la zona que quieres cambiar o usa «Zona por puntos» para marcarla con puntos, como en un mapa. Con OpenAI solo se modificará esa zona; el resto de la imagen se conserva.'
           : 'Dibuja sobre la imagen para señalar exactamente qué quieres modificar.'}
       </p>
+
+      {polygonOpen && imageObj && (
+        <PolygonZoneModal
+          image={imageObj}
+          initial={lines.filter((l) => l.kind === 'poligono').map((l) => l.points)}
+          onApply={applyPolygons}
+          onClose={() => setPolygonOpen(false)}
+        />
+      )}
     </div>
   );
 }
