@@ -10,7 +10,8 @@ test('el modelo predeterminado es GPT Image 2.5 (Sunburst) y es el primero de la
   assert.equal(DEFAULT_PARAMS.aiModel, 'GPT Image 2.5 Sunburst (OpenAI)');
   assert.equal(SC.AI_MODELS[0], DEFAULT_PARAMS.aiModel);
   assert.ok(SC.AI_MODELS.includes(DEFAULT_PARAMS.aiModel), 'debe existir en el selector (si no, se vería "—")');
-  assert.deepEqual(SC.AI_MODELS.filter((m) => /Gemini/.test(m)).length, 1, 'Gemini sigue disponible como alternativa');
+  assert.equal(SC.AI_MODELS.filter((m) => /Gemini/.test(m)).length, 0, 'Gemini se retiró: solo GPT Image 2.5');
+  assert.ok(SC.AI_MODELS.every((m) => /OpenAI/.test(m)), 'todo modelo ofrecido debe ser de OpenAI (el servidor solo usa esa clave)');
 });
 
 test('la calidad predeterminada es la más baja', () => {

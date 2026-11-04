@@ -1,27 +1,16 @@
 import { test, expect } from '@playwright/test';
+import { initSession, mockGenerate, mockSupabase, newMockState } from './auth-mock';
 
 test.describe('DreamHouse Studio E2E MVP', () => {
-  test.beforeEach(async ({ page }) => {
-    // Mock the API generation response
-    await page.route('**/api/generate', async (route) => {
-      await route.fulfill({
-        status: 200,
-        contentType: 'application/json',
-        body: JSON.stringify({
-          imageUrl: 'https://placehold.co/1280x720?text=Mocked+DreamHouse+Render',
-          houseName: 'Villa Test',
-          groundingMetadata: {}
-        }),
-      });
-    });
+  test.beforeEach(async ({ page, context }) => {
+    // El Studio exige sesión de Google y membresía: Supabase y la generación van simulados (sin red, sin secretos)
+    await mockSupabase(context, newMockState());
+    await mockGenerate(context, { calls: [], remaining: 9, delayMs: 0 });
+    await initSession(page);
 
     // Go to the studio page
     await page.goto('/studio');
-    
-    // Fill the API Key in localStorage (simulating user config)
-    await page.evaluate(() => {
-      localStorage.setItem('GEMINI_API_KEY', 'mock-key');
-    });
+    await expect(page.getByRole('button', { name: 'Generate exterior' })).toBeVisible();
   });
 
   test('Global Actions: Surprise Me and Reset', async ({ page }) => {

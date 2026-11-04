@@ -18,6 +18,8 @@ function withExtension(file) {
 }
 
 export async function resolve(specifier, context, nextResolve) {
+  // Las rutas /api importan 'next/server' (CJS sin mapa de exports): en ESM de Node hay que pedirlo con extensión.
+  if (specifier === 'next/server') return nextResolve('next/server.js', context);
   if (specifier.startsWith('@/')) {
     const found = withExtension(path.join(SRC, specifier.slice(2)));
     if (found) return { url: pathToFileURL(found).href, shortCircuit: true };

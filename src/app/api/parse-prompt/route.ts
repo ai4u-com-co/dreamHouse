@@ -3,24 +3,42 @@ import OpenAI from 'openai';
 import * as EC from '@/modules/exterior/constants';
 import * as IC from '@/modules/interior/constants';
 import * as SC from '@/modules/shared/constants';
+import { ASSISTANT_CREDITS, authenticate, charge, chargeFailure, noChargeNote, refund, type Charge } from '@/lib/billing';
 
 export const maxDuration = 30;
 
+const MAX_TEXT_PROMPT = 2000;
+
 export async function POST(req: NextRequest) {
+  // Sin sesión de Google válida no se procesa nada: la clave de OpenAI es de Mariano.
+  const auth = await authenticate(req.headers.get('authorization'));
+  if (!auth) {
+    return NextResponse.json({ code: 'UNAUTHENTICATED', message: 'Inicia sesión para usar el asistente.' }, { status: 401 });
+  }
+  let charged: Extract<Charge, { ok: true }> | null = null;
   try {
     const { textPrompt, mode } = await req.json();
 
-    if (!textPrompt) {
+    if (typeof textPrompt !== 'string' || !textPrompt.trim()) {
       return NextResponse.json({ message: 'Missing textPrompt' }, { status: 400 });
     }
-
-    const openaiApiKey = req.headers.get('x-openai-api-key') || process.env.OPENAI_API_KEY;
-    if (!openaiApiKey) {
-      return NextResponse.json(
-        { message: 'OpenAI API Key is missing.' },
-        { status: 401 }
-      );
+    if (textPrompt.length > MAX_TEXT_PROMPT) {
+      return NextResponse.json({ message: `El texto es demasiado largo (máximo ${MAX_TEXT_PROMPT} caracteres).` }, { status: 400 });
     }
+
+    // La clave de OpenAI vive SOLO en el servidor (OPENAI_API_KEY en Vercel): el navegador no manda ninguna.
+    const openaiApiKey = process.env.OPENAI_API_KEY;
+    if (!openaiApiKey) {
+      return NextResponse.json({ code: 'SERVER_MISCONFIGURED', message: 'El asistente no está configurado todavía.' }, { status: 500 });
+    }
+
+    // COBRO antes de llamar a OpenAI (1 crédito; los admin no pagan). Si falla, el catch lo devuelve.
+    const c = await charge(auth.sb, ASSISTANT_CREDITS, 'assistant', { mode: String(mode ?? '') });
+    if (!c.ok) {
+      const failure = chargeFailure(c);
+      return NextResponse.json(failure.body, { status: failure.status });
+    }
+    charged = c;
 
     const openai = new OpenAI({ apiKey: openaiApiKey });
 
@@ -118,14 +136,30 @@ Rules:
     }
 
     const parsedParams = JSON.parse(outputText.trim());
-    return NextResponse.json(parsedParams);
+    // `remaining` viaja aparte del resultado (el cliente lo separa antes de aplicar los parámetros)
+    return NextResponse.json({ ...parsedParams, _remaining: charged.remaining });
 
   } catch (error: unknown) {
     console.error("Parse API Error:", error);
-    const message = error instanceof Error ? error.message : "Failed to parse text prompt";
+
+    // Si ya se cobró, se devuelve (el token de devolución jamás sale del servidor).
+    let remaining: number | undefined;
+    let refunded = true;
+    if (charged) {
+      const r = await refund(auth.sb, charged);
+      remaining = r.remaining;
+      refunded = r.refunded;
+    }
+
+    // Nunca se reenvía el texto crudo de OpenAI. Una clave restringida a imágenes (sin permiso de texto) da 401/403/404.
+    const sdkError = error as { status?: number };
+    const unavailable = sdkError?.status === 401 || sdkError?.status === 403 || sdkError?.status === 404;
+    const base = unavailable
+      ? 'El asistente de texto no está habilitado para la clave del servidor todavía.'
+      : 'No se pudo interpretar el texto.';
     return NextResponse.json(
-      { message },
-      { status: 500 }
+      { code: unavailable ? 'ASSISTANT_UNAVAILABLE' : 'PARSE_FAILED', message: `${base}${charged ? noChargeNote(refunded) : ''}`, ...(remaining !== undefined ? { remaining } : {}) },
+      { status: unavailable ? 502 : 500 }
     );
   }
 }

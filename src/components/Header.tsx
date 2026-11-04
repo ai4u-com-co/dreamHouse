@@ -8,8 +8,6 @@ import IconButton from '@mui/material/IconButton';
 import Drawer from '@mui/material/Drawer';
 import Stack from '@mui/material/Stack';
 import Typography from '@mui/material/Typography';
-import InputAdornment from '@mui/material/InputAdornment';
-import OutlinedInput from '@mui/material/OutlinedInput';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 
@@ -17,13 +15,11 @@ import LightModeOutlinedIcon from '@mui/icons-material/LightModeOutlined';
 import DarkModeOutlinedIcon from '@mui/icons-material/DarkModeOutlined';
 import MenuIcon from '@mui/icons-material/Menu';
 import CloseIcon from '@mui/icons-material/Close';
-import KeyIcon from '@mui/icons-material/KeyOutlined';
-import CheckCircleOutlineIcon from '@mui/icons-material/CheckCircleOutlined';
-import ErrorOutlineIcon from '@mui/icons-material/ErrorOutlined';
 import InstallMobileIcon from '@mui/icons-material/InstallMobile';
 import IosShareIcon from '@mui/icons-material/IosShare';
 
 import { DhButton, DhLogo, DhBadge } from '@/components/brand';
+import AccountChip from '@/components/AccountChip';
 import { useTheme } from '@/components/ThemeProvider';
 import { usePwa } from '@/components/PwaProvider';
 import { palette, typography as t } from '@/lib/theme/tokens';
@@ -38,37 +34,15 @@ const NAV_LINKS = [
 export default function Header() {
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [scrolled, setScrolled]     = useState(false);
-  const [geminiApiKey, setGeminiApiKey] = useState('');
-  const [openaiApiKey, setOpenaiApiKey] = useState('');
-  const [keyVisible, setKeyVisible] = useState(false);
   const { theme, toggleTheme }      = useTheme();
   const pathname                    = usePathname();
   const { canInstall, needsIosInstructions, promptInstall } = usePwa();
-
-  useEffect(() => {
-    const savedGemini = localStorage.getItem('GEMINI_API_KEY');
-    if (savedGemini) setGeminiApiKey(savedGemini);
-    const savedOpenai = localStorage.getItem('OPENAI_API_KEY');
-    if (savedOpenai) setOpenaiApiKey(savedOpenai);
-  }, []);
 
   useEffect(() => {
     const onScroll = () => setScrolled(window.scrollY > 20);
     window.addEventListener('scroll', onScroll, { passive: true });
     return () => window.removeEventListener('scroll', onScroll);
   }, []);
-
-  const handleGeminiApiKey = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const v = e.target.value;
-    setGeminiApiKey(v);
-    localStorage.setItem('GEMINI_API_KEY', v);
-  };
-
-  const handleOpenaiApiKey = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const v = e.target.value;
-    setOpenaiApiKey(v);
-    localStorage.setItem('OPENAI_API_KEY', v);
-  };
 
   const handleNavClick = (href: string) => {
     setDrawerOpen(false);
@@ -153,152 +127,8 @@ export default function Header() {
             spacing={1.5}
             sx={{ display: { xs: 'none', lg: 'flex' }, alignItems: 'center' }}
           >
-            {/* API Key */}
-            <Box
-              sx={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: 1.5,
-                px: 2,
-                py: 1,
-                border: `1px solid ${palette.stone800}`,
-                backgroundColor: theme === 'dark' ? palette.stone900 : '#FFFFFF',
-              }}
-            >
-              {geminiApiKey ? (
-                <CheckCircleOutlineIcon sx={{ fontSize: 14, color: palette.success }} />
-              ) : (
-                <ErrorOutlineIcon sx={{ fontSize: 14, color: palette.warning }} />
-              )}
-              <Typography
-                sx={{
-                  fontFamily: t.fontMono,
-                  fontSize: '12px',
-                  fontWeight: t.weight.bold,
-                  letterSpacing: t.tracking.caps,
-                  textTransform: 'uppercase',
-                  color: palette.stone500,
-                  whiteSpace: 'nowrap',
-                }}
-              >
-                {geminiApiKey ? 'Gemini Active' : 'Gemini Optional'}
-              </Typography>
-              <OutlinedInput
-                type={keyVisible ? 'text' : 'password'}
-                value={geminiApiKey}
-                onChange={handleGeminiApiKey}
-                placeholder="Gemini key..."
-                size="small"
-                startAdornment={
-                  <InputAdornment position="start">
-                    <KeyIcon sx={{ fontSize: 12, color: palette.stone500 }} />
-                  </InputAdornment>
-                }
-                sx={{
-                  width: 160,
-                  height: 28,
-                  fontFamily: t.fontMono,
-                  fontSize: t.size.xs,
-                  border: 'none',
-                  outline: 'none',
-                  '& .MuiOutlinedInput-notchedOutline': { border: 'none' },
-                  '& input': { p: '0 4px', color: 'text.primary' },
-                  '& input::placeholder': { color: palette.stone600, opacity: 1 },
-                }}
-              />
-              <Typography
-                component="button"
-                onClick={() => setKeyVisible(!keyVisible)}
-                sx={{
-                  fontFamily: t.fontMono,
-                  fontSize: '12px',
-                  fontWeight: t.weight.bold,
-                  letterSpacing: t.tracking.wide,
-                  textTransform: 'uppercase',
-                  color: palette.stone500,
-                  background: 'none',
-                  border: 'none',
-                  cursor: 'pointer',
-                  p: 0,
-                  '&:hover': { color: 'text.primary' },
-                }}
-              >
-                {keyVisible ? 'Hide' : 'Show'}
-              </Typography>
-            </Box>
-
-            <Box
-              sx={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: 1.5,
-                px: 2,
-                py: 1,
-                border: `1px solid ${palette.stone800}`,
-                backgroundColor: theme === 'dark' ? palette.stone900 : '#FFFFFF',
-              }}
-            >
-              {openaiApiKey ? (
-                <CheckCircleOutlineIcon sx={{ fontSize: 14, color: palette.success }} />
-              ) : (
-                <ErrorOutlineIcon sx={{ fontSize: 14, color: palette.warning }} />
-              )}
-              <Typography
-                sx={{
-                  fontFamily: t.fontMono,
-                  fontSize: '12px',
-                  fontWeight: t.weight.bold,
-                  letterSpacing: t.tracking.caps,
-                  textTransform: 'uppercase',
-                  color: palette.stone500,
-                  whiteSpace: 'nowrap',
-                }}
-              >
-                {openaiApiKey ? 'OpenAI Active' : 'OpenAI Required'}
-              </Typography>
-              <OutlinedInput
-                type={keyVisible ? 'text' : 'password'}
-                value={openaiApiKey}
-                onChange={handleOpenaiApiKey}
-                placeholder="OpenAI key..."
-                size="small"
-                startAdornment={
-                  <InputAdornment position="start">
-                    <KeyIcon sx={{ fontSize: 12, color: palette.stone500 }} />
-                  </InputAdornment>
-                }
-                sx={{
-                  width: 160,
-                  height: 28,
-                  fontFamily: t.fontMono,
-                  fontSize: t.size.xs,
-                  border: 'none',
-                  outline: 'none',
-                  '& .MuiOutlinedInput-notchedOutline': { border: 'none' },
-                  '& input': { p: '0 4px', color: 'text.primary' },
-                  '& input::placeholder': { color: palette.stone600, opacity: 1 },
-                }}
-              />
-              <Typography
-                component="button"
-                onClick={() => setKeyVisible(!keyVisible)}
-                sx={{
-                  fontFamily: t.fontMono,
-                  fontSize: '12px',
-                  fontWeight: t.weight.bold,
-                  letterSpacing: t.tracking.wide,
-                  textTransform: 'uppercase',
-                  color: palette.stone500,
-                  background: 'none',
-                  border: 'none',
-                  cursor: 'pointer',
-                  p: 0,
-                  '&:hover': { color: 'text.primary' },
-                }}
-              >
-                {keyVisible ? 'Hide' : 'Show'}
-              </Typography>
-            </Box>
+            {/* Cuenta: saldo de créditos y salir (Google) */}
+            <AccountChip />
 
             {/* Theme toggle */}
             <IconButton onClick={toggleTheme} size="small" aria-label="Toggle theme">
@@ -392,70 +222,7 @@ export default function Header() {
           </Stack>
 
           <Box sx={{ borderTop: `1px solid ${palette.stone800}`, pt: 4 }}>
-            <Typography
-              sx={{
-                fontFamily: t.fontMono,
-                fontSize: t.size.xs,
-                fontWeight: t.weight.bold,
-                letterSpacing: t.tracking.caps,
-                textTransform: 'uppercase',
-                color: palette.stone500,
-                mb: 2,
-              }}
-            >
-              Gemini API Key (opcional)
-            </Typography>
-            <OutlinedInput
-              type="password"
-              value={geminiApiKey}
-              onChange={handleGeminiApiKey}
-              placeholder="Enter your Gemini key..."
-              fullWidth
-              startAdornment={
-                <InputAdornment position="start">
-                  <KeyIcon sx={{ fontSize: 14 }} />
-                </InputAdornment>
-              }
-              sx={{ fontFamily: t.fontMono, fontSize: t.size.sm }}
-            />
-            
-            <Typography
-              sx={{
-                fontFamily: t.fontMono,
-                fontSize: t.size.xs,
-                fontWeight: t.weight.bold,
-                letterSpacing: t.tracking.caps,
-                textTransform: 'uppercase',
-                color: palette.stone500,
-                mb: 2,
-                mt: 4,
-              }}
-            >
-              OpenAI API Key (predeterminada)
-            </Typography>
-            <OutlinedInput
-              type="password"
-              value={openaiApiKey}
-              onChange={handleOpenaiApiKey}
-              placeholder="Enter your OpenAI key..."
-              fullWidth
-              startAdornment={
-                <InputAdornment position="start">
-                  <KeyIcon sx={{ fontSize: 14 }} />
-                </InputAdornment>
-              }
-              sx={{ fontFamily: t.fontMono, fontSize: t.size.sm }}
-            />
-            <Typography
-              sx={{
-                fontFamily: t.fontMono,
-                fontSize: '12px',
-                color: palette.stone600,
-                mt: 1,
-              }}
-            >
-              Stored locally in your browser.
-            </Typography>
+            <AccountChip stacked />
           </Box>
 
           {(canInstall || needsIosInstructions) && (
