@@ -88,7 +88,7 @@ function StudioContent() {
   [params.mode, lotFile, exteriorReferenceFile, floorPlanFile, files, objectFiles, editMask, editCompositeFile]);
   const inputPixels = useFilePixels(inputFiles);
   const quote: QuoteState = useMemo(() => {
-    const q = quoteRender(params as unknown as Record<string, unknown>, { inputImagePixels: inputPixels, isAdmin });
+    const q = quoteRender(params as unknown as Record<string, unknown>, { inputImagePixels: inputPixels, isAdmin, estimate: true });
     return q.ok ? q : { ok: false, message: q.message };
   }, [params, inputPixels, isAdmin]);
   const viewsCount = params.mode === 'vistas' ? Math.max(1, params.selectedVistas.length) : 1;
