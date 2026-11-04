@@ -52,14 +52,14 @@ export interface Quote {
  */
 export function quoteRender(
   params: Loose,
-  ctx: { inputImagePixels: number[]; isAdmin?: boolean; promptChars?: number },
+  ctx: { inputImagePixels: number[]; isAdmin?: boolean; promptChars?: number; estimate?: boolean },
 ): { ok: true; value: Quote } | Extract<Resolved, { ok: false }> {
   const input = imageOptionsInput(params);
   const edit = params.mode === 'edit';
   // En edición el tamaño del formulario no aplica: se valida con uno neutro y luego se sustituye por el de la base
   const r: Resolved = resolveImageOptions(
     edit ? { ...input, imageSize: '1K', aspectRatio: '1:1', size: undefined } : input,
-    { inputImagePixels: ctx.inputImagePixels, isAdmin: ctx.isAdmin, promptChars: ctx.promptChars },
+    { inputImagePixels: ctx.inputImagePixels, isAdmin: ctx.isAdmin, promptChars: ctx.promptChars, estimate: ctx.estimate },
   );
   if (!r.ok) return r;
   const v = r.value;

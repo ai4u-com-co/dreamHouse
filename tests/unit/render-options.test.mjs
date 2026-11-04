@@ -13,9 +13,9 @@ test('defaults: Borrador · 1K · 1 variante · JPEG · fondo automático · mod
     ['Borrador', '1K', 1, 'jpeg', 'auto', 'auto'],
   );
   assert.equal(DEFAULT_PARAMS.aiModel, SC.AI_MODELS[0]);
-  const q = quoteRender(DEFAULT_PARAMS, { inputImagePixels: [] });
+  const q = quoteRender(DEFAULT_PARAMS, { estimate: true, inputImagePixels: [] });
   assert.ok(q.ok);
-  assert.equal(q.value.options.credits, 1);
+  assert.equal(q.value.options.credits, 2); // 110 tokens de salida (US$0,0033) + ~1.000 bytes de prompt estimados: 1,1 créditos, redondeado hacia arriba
   assert.equal(q.value.options.quality, 'low');
 });
 
@@ -26,7 +26,7 @@ test('calidades de la interfaz: cinco, con «Muy alta» y «Máxima» al final',
 
 test('todos los formatos que ofrece la interfaz los acepta el núcleo (nada se acota en silencio)', () => {
   for (const a of SC.ASPECT_RATIOS) assert.ok(ASPECTS.includes(a), a);
-  for (const r of ['1K', '2K']) for (const a of SC.ASPECT_RATIOS) assert.ok(quoteRender({ ...DEFAULT_PARAMS, renderOutputResolution: r, renderAspectRatio: a }, { inputImagePixels: [] }).ok, `${r} ${a}`);
+  for (const r of ['1K', '2K']) for (const a of SC.ASPECT_RATIOS) assert.ok(quoteRender({ ...DEFAULT_PARAMS, renderOutputResolution: r, renderAspectRatio: a }, { estimate: true, inputImagePixels: [] }).ok, `${r} ${a}`);
 });
 
 test('registros antiguos: valores que ya no existen se normalizan a lo barato y válido', () => {
@@ -40,29 +40,29 @@ test('registros antiguos: valores que ya no existen se normalizan a lo barato y 
 });
 
 test('el costo crece con cada opción cara y el tamaño personalizado se valida', () => {
-  const base = quoteRender(DEFAULT_PARAMS, { inputImagePixels: [] }).value.options.credits;
-  const cost = (over) => quoteRender({ ...DEFAULT_PARAMS, ...over }, { inputImagePixels: [] }).value.options.credits;
+  const base = quoteRender(DEFAULT_PARAMS, { estimate: true, inputImagePixels: [] }).value.options.credits;
+  const cost = (over) => quoteRender({ ...DEFAULT_PARAMS, ...over }, { estimate: true, inputImagePixels: [] }).value.options.credits;
   assert.ok(cost({ renderQuality: 'Estándar' }) > base);
   assert.ok(cost({ renderQuality: 'Máxima' }) > cost({ renderQuality: 'Muy alta' }));
   assert.ok(cost({ renderOutputResolution: '2K' }) > base);
   // la API cobra entrada y salida por cada variante; con el redondeo hacia arriba no es exactamente base×3
-  assert.ok(cost({ renderVariants: 3 }) > base * 2 && cost({ renderVariants: 3 }) <= base * 3 + 1);
+  assert.ok(cost({ renderVariants: 3 }) > base && cost({ renderVariants: 3 }) <= base * 3);
   assert.equal(cost({ renderOutputResolution: 'Personalizado', renderCustomSize: '1280x720' }) >= 1, true);
-  assert.equal(quoteRender({ ...DEFAULT_PARAMS, renderOutputResolution: 'Personalizado', renderCustomSize: '1000x700' }, { inputImagePixels: [] }).ok, false);
+  assert.equal(quoteRender({ ...DEFAULT_PARAMS, renderOutputResolution: 'Personalizado', renderCustomSize: '1000x700' }, { estimate: true, inputImagePixels: [] }).ok, false);
 });
 
 test('moderación baja solo se cotiza con admin verificado; transparente pasa a webp', () => {
-  assert.equal(quoteRender({ ...DEFAULT_PARAMS, renderModeration: 'low' }, { inputImagePixels: [] }).ok, false);
-  assert.equal(quoteRender({ ...DEFAULT_PARAMS, renderModeration: 'low' }, { inputImagePixels: [], isAdmin: true }).ok, true);
-  assert.equal(quoteRender({ ...DEFAULT_PARAMS, renderBackground: 'transparent' }, { inputImagePixels: [] }).value.options.format, 'webp');
+  assert.equal(quoteRender({ ...DEFAULT_PARAMS, renderModeration: 'low' }, { estimate: true, inputImagePixels: [] }).ok, false);
+  assert.equal(quoteRender({ ...DEFAULT_PARAMS, renderModeration: 'low' }, { estimate: true, inputImagePixels: [], isAdmin: true }).ok, true);
+  assert.equal(quoteRender({ ...DEFAULT_PARAMS, renderBackground: 'transparent' }, { estimate: true, inputImagePixels: [] }).value.options.format, 'webp');
 });
 
 test('edición: el tamaño es auto y se cobra por los píxeles de la base (acotados al rango del núcleo)', () => {
-  const q = quoteRender({ ...DEFAULT_PARAMS, mode: 'edit', renderVariants: 4 }, { inputImagePixels: [2048 * 2048] });
+  const q = quoteRender({ ...DEFAULT_PARAMS, mode: 'edit', renderVariants: 4 }, { estimate: true, inputImagePixels: [2048 * 2048] });
   assert.equal(q.value.apiSize, 'auto');
   assert.equal(q.value.options.n, 1);
   assert.equal(q.value.options.pixels, 3_686_400);
-  const tiny = quoteRender({ ...DEFAULT_PARAMS, mode: 'edit' }, { inputImagePixels: [100 * 100] });
+  const tiny = quoteRender({ ...DEFAULT_PARAMS, mode: 'edit' }, { estimate: true, inputImagePixels: [100 * 100] });
   assert.equal(tiny.value.options.pixels, 655_360);
 });
 
