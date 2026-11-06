@@ -21,7 +21,9 @@ import * as IC from '@/modules/interior/constants';
 import clsx from 'clsx';
 import { useHistory } from '@/lib/hooks/useHistory';
 import HistoryGallery from '@/components/HistoryGallery';
-import { GenerationRecord } from '@/lib/db';
+import { GenerationRecord, MAX_HISTORY } from '@/lib/db';
+import RestoreParamsButton from '@/components/RestoreParamsButton';
+import type { RestoreResult } from '@/lib/restore-params';
 import { LightboxProvider } from '@/context/LightboxContext';
 import MemoryGuard from '@/components/MemoryGuard';
 import type { EditMaskPayload } from '@/components/SketchCanvas';
@@ -41,6 +43,8 @@ interface GenerateResponse {
   imageUrl: string;
   /** Todas las variantes (la primera es `imageUrl`) */
   images?: string[];
+  /** Id de cada variante (el de sus metadatos incrustados), en el mismo orden que `images` */
+  metadataIds?: string[];
   houseName: string;
 }
 
@@ -365,13 +369,16 @@ function StudioContent() {
             setHouseName(data.houseName);
 
             // Save to history
-            for (const url of (data.images?.length ? data.images : [data.imageUrl])) {
-              await saveToHistory({
+            const vistaImages = data.images?.length ? data.images : [data.imageUrl];
+            for (const [k, url] of vistaImages.entries()) {
+              const { pruned } = await saveToHistory({
                 mode: 'vistas',
                 params: currentParams,
                 imageUrl: url,
-                houseName: data.houseName
+                houseName: data.houseName,
+                imageId: data.metadataIds?.[k],
               }, ownerId);
+              if (pruned > 0) warnPruned(pruned);
             }
 
           } catch (err) {
@@ -433,13 +440,15 @@ function StudioContent() {
         
         // Save to local history
         try {
-          for (const url of all) {
-            await saveToHistory({
+          for (const [k, url] of all.entries()) {
+            const { pruned } = await saveToHistory({
               mode: params.mode as 'exterior' | 'interior' | 'edit' | 'vistas',
-              params: params,
+              params: finalParams, // los parámetros que de verdad se enviaron (incluye si había casa de referencia)
               imageUrl: url,
-              houseName: data.houseName
+              houseName: data.houseName,
+              imageId: data.metadataIds?.[k],
             }, ownerId);
+            if (pruned > 0) warnPruned(pruned);
           }
         } catch (historyErr) {
           console.error("Failed to save to history:", historyErr);
@@ -462,6 +471,23 @@ function StudioContent() {
     } finally {
       setIsLoading(false);
     }
+  };
+
+  /** El historial tiene tope: se avisa cuando para guardar un render nuevo hubo que borrar uno antiguo */
+  const warnPruned = (n: number) => {
+    showToast(`Historial lleno (máximo ${MAX_HISTORY}): se borró${n > 1 ? 'ron' : ''} ${n} render${n > 1 ? 's' : ''} antiguo${n > 1 ? 's' : ''}. Descarga los que quieras conservar: cada imagen guarda sus parámetros.`);
+  };
+
+  /** Vuelca al formulario los parámetros recuperados de una imagen o de un archivo de parámetros */
+  const handleRestoreParams = (result: RestoreResult) => {
+    setParams((prev) => normalizeRenderSettings({ ...prev, ...result.params, mode: prev.mode, sourceRender: prev.sourceRender } as DreamHouseParams));
+    const from = result.houseName ? `«${result.houseName}»` : result.source === 'imagen' ? 'la imagen' : 'el archivo';
+    const notes = [
+      result.hasTexts ? '' : result.source === 'imagen' ? ' La imagen no incluye ciudad ni textos libres (se guardó sin «incluir detalles»).' : '',
+      result.dropped.length ? ` ${result.dropped.length} valor${result.dropped.length > 1 ? 'es' : ''} ya no existe${result.dropped.length > 1 ? 'n' : ''} y se omitió.` : '',
+      result.mode && result.mode !== params.mode ? ` Se hizo en el módulo ${result.mode}; los campos compartidos se aplicaron aquí.` : '',
+    ].join('');
+    showToast(`Recuperados ${result.count} parámetros de ${from}.${notes}`);
   };
 
   const handleLoadHistory = (record: GenerationRecord) => {
@@ -616,6 +642,7 @@ function StudioContent() {
                 <span className="text-xs font-bold uppercase tracking-widest">Portafolio de Vistas</span>
               </button>
             </div>
+            <RestoreParamsButton onRestore={handleRestoreParams} disabled={isLoading} />
           </Section>
 
           {/* 02: Referencias Visuales (Shared) */}

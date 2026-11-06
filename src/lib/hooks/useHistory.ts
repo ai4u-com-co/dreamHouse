@@ -54,7 +54,7 @@ export function useHistory(ownerId: string | null) {
   }, [refreshFor]);
 
   /** `forOwner` = la cuenta que pidió la imagen (por defecto, la activa). */
-  const saveToHistory = async (record: Omit<GenerationRecord, 'id' | 'timestamp'>, forOwner: string | null = ownerId) => {
+  const saveToHistory = async (record: Omit<GenerationRecord, 'id' | 'timestamp'>, forOwner: string | null = ownerId): Promise<{ pruned: number }> => {
     if (!forOwner) throw new Error('Sin sesión: no hay historial activo.');
     try {
       // La grilla del historial usa un thumbnail de 320px (ligero, evita memory crashes
@@ -66,8 +66,9 @@ export function useHistory(ownerId: string | null) {
       } catch (e) {
         console.warn('No se pudo convertir el render a Blob; se guardará solo el thumbnail.', e);
       }
-      await dbFor(forOwner).saveGeneration({ ...record, imageUrl: thumbnailUrl }, fullImage);
+      const { pruned } = await dbFor(forOwner).saveGeneration({ ...record, imageUrl: thumbnailUrl }, fullImage);
       await refreshFor(forOwner); // solo repinta si `forOwner` sigue siendo la cuenta activa
+      return { pruned };
     } catch (err) {
       console.error('Failed to save to history:', err);
       throw err;

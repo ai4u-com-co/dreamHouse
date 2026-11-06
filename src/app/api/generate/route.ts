@@ -72,7 +72,7 @@ const INPUTS_BY_MODE: Record<string, { lot: boolean; exteriorRef: boolean; floor
   edit: { lot: false, exteriorRef: false, floorPlan: false, files: false, objects: false },
 };
 
-// Incrusta los metadatos en una imagen en data URL (JPEG/PNG). Si no es data URL o falla, la devuelve igual.
+// Incrusta los metadatos en una imagen en data URL (JPEG, PNG o WebP). Si no es data URL o falla, la devuelve igual.
 function embedMetadataInDataUrl(dataUrl: string, meta: DreamHouseImageMetadata): string {
   const match = /^data:(image\/[a-z]+);base64,([\s\S]+)$/.exec(dataUrl);
   if (!match) return dataUrl;
@@ -550,7 +550,7 @@ ${mandate}${userExclusions}${creativePriority}
     // Nombre del proyecto: lo escribía Gemini (y solo con ese modelo); con GPT Image 2.5 siempre fue el predeterminado.
     const houseName = "DreamHouse Project";
 
-    // --- Metadatos incrustados: los parámetros viajan dentro del archivo (cada variante lleva su propio id; webp no los admite) ---
+    // --- Metadatos incrustados: los parámetros viajan dentro del archivo (cada variante lleva su propio id) ---
     const metadataIds: string[] = [];
     const images = imageUrls.map((url) => {
       const metadataId = crypto.randomUUID();

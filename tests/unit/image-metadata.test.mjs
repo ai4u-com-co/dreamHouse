@@ -74,8 +74,11 @@ test('PNG: un paquete grande cabe sin recortar', async () => {
 
 test('formatos no soportados y bytes basura no se rompen', async () => {
   const webp = new Uint8Array(await sharp({ create: { width: 8, height: 8, channels: 3, background: '#fff' } }).webp().toBuffer());
-  assert.deepEqual(embedImageMetadata(webp, meta()), webp); // WebP: se devuelve igual
-  assert.equal(readImageMetadata(webp), null);
+  assert.equal(readImageMetadata(webp), null); // un WebP sin metadatos no se lee como si los tuviera
+  assert.equal(readImageMetadata(embedImageMetadata(webp, meta())).id, meta().id); // y con ellos, sí
+  const gif = new Uint8Array(await sharp({ create: { width: 8, height: 8, channels: 3, background: '#fff' } }).gif().toBuffer());
+  assert.deepEqual(embedImageMetadata(gif, meta()), gif); // GIF y otros: se devuelve igual
+  assert.deepEqual(embedImageMetadata(new Uint8Array([1, 2, 3]), meta()), new Uint8Array([1, 2, 3]));
   assert.equal(readImageMetadata(new Uint8Array([1, 2, 3])), null);
   assert.equal(readImageMetadata(new Uint8Array(0)), null);
 });
