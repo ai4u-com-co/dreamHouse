@@ -442,10 +442,13 @@ export async function POST(req: NextRequest) {
       const userExclusions = params.negativePrompt?.trim()
         ? `\n- Also avoid: ${params.negativePrompt.trim()}`
         : "";
+      const creativePriority = params.artDirection?.trim()
+        ? "\n- The CREATIVE DIRECTION in the brief above has the highest priority: where it conflicts with a default rule here, it wins (except the structural integrity of the base image)."
+        : "";
       fullPrompt = `${openaiImageGuide ? `${openaiImageGuide}\n\n` : ""}${narrativePrompt}
 
 [MANDATES & CONSTRAINTS]
-${mandate}${userExclusions}
+${mandate}${userExclusions}${creativePriority}
 - No extra text, no watermarks, no unrelated logos.`.trim();
     }
 

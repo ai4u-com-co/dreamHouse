@@ -5,6 +5,8 @@ import { PROJECT_TYPE_MAP } from '@/modules/exterior/lib/prompt-builder';
 import { sanitizeSourceParams } from '@/lib/assistant-params';
 import {
   cameraSentence,
+  creativeDirectionBlock,
+  creativeDirectionLead,
   joinList,
   present,
   resolveRenderStyle,
@@ -124,7 +126,7 @@ export function buildVistasPrompt(rawParams: DreamHouseParams, viewType: string,
   if (isOpenAI) {
     const prompt = `
 [INTENDED USE: Professional Architectural Portfolio Image]
-
+${creativeDirectionLead(params) ? `\n${creativeDirectionLead(params)}\n` : ""}
 TASK:
 - Action: Generate a new ${viewType} of the SAME house shown in the reference image. Same house, different camera.
 - Camera Perspective: ${vistaDescription}
@@ -146,7 +148,7 @@ ${camera ? `- Camera Setting: ${camera}\n` : ""}- Lighting: ${lightingCtx}
 - Mood/Atmosphere: ${moodLine}
 - Materials: ${materialList}, with honest texture, grain and natural color variation.
 - Look: ${style.photographic ? "Photorealistic. Real textures, pores, material thickness, glass reflections, and soft shadows. No digital smoothness." : style.look}
-`.trim();
+${creativeDirectionBlock(params, true) ? `\n${creativeDirectionBlock(params, true)}\n` : ""}`.trim();
     return prompt;
   }
 
@@ -172,5 +174,7 @@ Every material — ${materialList} — must be rendered with honest texture and 
 ${style.photographic ? "" : style.look}
 `.trim();
 
-  return basicPrompt;
+  const creative = creativeDirectionBlock(params, true);
+  const lead = creativeDirectionLead(params);
+  return `${lead ? `${lead}\n\n` : ''}${basicPrompt}${creative ? `\n\n${creative}` : ''}`;
 }
