@@ -2,6 +2,7 @@ import { DEFAULT_PARAMS, type DreamHouseParams } from '@/types';
 import * as SC from '@/modules/shared/constants';
 import * as EC from '@/modules/exterior/constants';
 import * as IC from '@/modules/interior/constants';
+import * as EDC from '@/modules/edit/constants';
 import { DESIGN_PARAM_KEYS } from '@/lib/image-metadata';
 
 // ============================================
@@ -39,6 +40,7 @@ const OPTIONS: Partial<Record<keyof DreamHouseParams, readonly string[]>> = {
   roomType: IC.ROOM_TYPES, furnitureStyle: IC.FURNITURE_STYLES, interiorLighting: IC.INTERIOR_LIGHTING_TYPES,
   flooringMaterial: IC.FLOORING_MATERIALS, ceilingDetail: IC.CEILING_DETAILS,
   kitchenType: IC.KITCHEN_TYPES, livingAreaType: IC.LIVING_AREA_TYPES,
+  editChangeType: EDC.EDIT_CHANGE_TYPES, editIntensity: EDC.EDIT_INTENSITIES, editPreserve: EDC.EDIT_PRESERVE_OPTIONS,
 };
 
 /** Máximo de elementos por lista (lo que el propio prompt del asistente le pide) */

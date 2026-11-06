@@ -109,7 +109,16 @@ export interface VistasSpecificParams {
   viewType?: string; // Current view being generated in the batch
 }
 
-export type DreamHouseParams = SharedParams & ExteriorSpecificParams & InteriorSpecificParams & VistasSpecificParams;
+export interface EditSpecificParams {
+  /** Qué clase de cambio se pide (vacío = lo que diga la instrucción) */
+  editChangeType: string;
+  /** Cuánto se permite transformar la zona marcada */
+  editIntensity: string;
+  /** Qué debe permanecer idéntico fuera de lo que se edita */
+  editPreserve: string[];
+}
+
+export type DreamHouseParams = SharedParams & ExteriorSpecificParams & InteriorSpecificParams & VistasSpecificParams & EditSpecificParams;
 
 export const DEFAULT_PARAMS: DreamHouseParams = {
   // Shared
@@ -182,4 +191,9 @@ export const DEFAULT_PARAMS: DreamHouseParams = {
 
   // Vistas
   selectedVistas: [],
+
+  // Edición
+  editChangeType: "",
+  editIntensity: "",
+  editPreserve: [],
 };

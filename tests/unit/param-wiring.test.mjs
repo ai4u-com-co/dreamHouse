@@ -10,6 +10,7 @@ import { DEFAULT_PARAMS } from '@/types';
 import { PARAM_MODES, editableParams, modesFor } from '@/modules/shared/param-modes';
 import { buildExteriorPrompt } from '@/modules/exterior/lib/prompt-builder';
 import { buildInteriorPrompt } from '@/modules/interior/lib/prompt-builder';
+import { buildEditPrompt } from '@/modules/edit/lib/prompt-builder';
 
 const OPENAI = 'GPT Image 2.5 Sunburst (OpenAI)';
 const GEMINI = 'Gemini 3.1 Flash Image Preview';
@@ -28,6 +29,7 @@ const SAMPLE = {
   socialAreas: ['Piscina'],
   roomType: 'Cocina gourmet', roomSizeM2: 28, furnitureStyle: ['Escandinavo'], interiorLighting: ['Iluminación indirecta (Cove lighting)'],
   flooringMaterial: 'Roble', ceilingDetail: 'Vigas de madera', kitchenType: 'Isla central', livingAreaType: 'Doble altura',
+  editChangeType: 'Cambiar el color', editIntensity: 'Radical (transformación total)', editPreserve: ['Perspectiva y encuadre'],
 };
 
 // Algunos campos solo se expresan junto a otro (p. ej. las plazas, si hay estacionamiento)
@@ -36,6 +38,7 @@ const NEEDS = { parkingSpots: { parkingType: 'Garaje cerrado (2+ autos)' } };
 const BUILDERS = {
   exterior: (params, model) => buildExteriorPrompt(params, false, model),
   interior: (params, model) => buildInteriorPrompt(params, model),
+  edit: (params) => buildEditPrompt(params),
 };
 
 test('el registro y la prueba están al día: todo parámetro registrado tiene valor de muestra', () => {
@@ -45,7 +48,7 @@ test('el registro y la prueba están al día: todo parámetro registrado tiene v
   }
 });
 
-for (const mode of ['exterior', 'interior']) {
+for (const mode of ['exterior', 'interior', 'edit']) {
   for (const key of editableParams(mode)) {
     test(`${mode}: "${key}" llega al prompt (OpenAI y Gemini)`, () => {
       // Línea base con materiales para que `finishLevel` también se exprese en exterior
@@ -63,6 +66,7 @@ for (const mode of ['exterior', 'interior']) {
 const FORMS = {
   exterior: 'src/modules/exterior/components/ExteriorForm.tsx',
   interior: 'src/modules/interior/components/InteriorForm.tsx',
+  edit: 'src/modules/edit/components/EditForm.tsx',
 };
 const SHARED_FILES = ['src/components/FormFields.tsx', 'src/components/FormExtras.tsx'];
 const SHARED_COMPONENTS = ['ChipsField', 'EssenceFields', 'SiteFields', 'HomeProgramFields', 'AmbienceSelects', 'OutputOptions'];
@@ -93,7 +97,7 @@ function controlSource(mode) {
   return source;
 }
 
-for (const mode of ['exterior', 'interior']) {
+for (const mode of ['exterior', 'interior', 'edit']) {
   test(`${mode}: todo parámetro que aplica tiene un control en el formulario`, () => {
     const source = controlSource(mode);
     const missing = editableParams(mode).filter((key) => !new RegExp(`['"]${key}['"]`).test(source));
@@ -131,3 +135,24 @@ for (const model of [OPENAI, GEMINI]) {
     assert.match(text, /apply[^.]*Japandi[^.]*Tadao Ando|Japandi[^.]*Tadao Ando[^.]*redesign/is, 'la instrucción de remodelación debe vincular estilo y maestro');
   });
 }
+
+// ── Edición: los parámetros son opcionales y solo orientan la zona editada ──
+test('edición sin parámetros: el prompt es exactamente la instrucción histórica', () => {
+  const params = { ...DEFAULT_PARAMS, mode: 'edit', editPrompt: 'Make the tree smaller' };
+  assert.equal(
+    buildEditPrompt(params),
+    '[INTENDED USE: Photorealistic architectural image edit]\n\nEDIT INSTRUCTION — change ONLY what is described here, nothing else:\nMake the tree smaller',
+  );
+});
+
+test('edición: el tipo de espacio, el maestro y lo que se conserva llegan al prompt y se acotan a la zona editada', () => {
+  const params = {
+    ...DEFAULT_PARAMS, mode: 'edit', editPrompt: 'Replace the sofa',
+    roomType: 'Sala de estar/Living room', architect: ['Tadao Ando'], editPreserve: ['Perspectiva y encuadre', 'Aberturas (puertas y ventanas)'],
+  };
+  const text = buildEditPrompt(params);
+  assert.match(text, /living room/i);
+  assert.match(text, /Tadao Ando/);
+  assert.match(text, /EDITED AREA ONLY/);
+  assert.match(text, /perspective, framing and camera viewpoint and the doors and windows/);
+});

@@ -64,7 +64,7 @@ function isFactoryDefault(item: ParamItem): boolean {
   return JSON.stringify(DEFAULT_PARAMS[item.key]) === JSON.stringify(item.value);
 }
 
-const INT: GenerationMode[] = ['interior'];
+const INT_EDIT: GenerationMode[] = ['interior', 'edit'];
 const EXT_VISTAS: GenerationMode[] = ['exterior', 'vistas'];
 const NOT_EDIT: GenerationMode[] = ['exterior', 'interior', 'vistas'];
 
@@ -82,10 +82,20 @@ export default function PromptPreview({ params, loadedFiles = [] }: PromptPrevie
       ],
     },
     {
+      number: '03b',
+      title: 'Tipo de Cambio',
+      icon: <PenLine className="w-3.5 h-3.5" />,
+      modes: ['edit'],
+      items: [
+        { label: 'CAMBIO', value: params.editChangeType, key: 'editChangeType' },
+        { label: 'INTENSIDAD', value: params.editIntensity, key: 'editIntensity' },
+        { label: 'CONSERVAR', value: params.editPreserve, key: 'editPreserve' },
+      ],
+    },
+    {
       number: '04',
       title: 'Esencia del Proyecto',
       icon: <Sparkles className="w-3.5 h-3.5" />,
-      modes: NOT_EDIT,
       items: [
         { label: 'TIPO', value: params.projectType, key: 'projectType' },
         { label: 'ESPACIO', value: params.roomType, key: 'roomType' },
@@ -123,7 +133,7 @@ export default function PromptPreview({ params, loadedFiles = [] }: PromptPrevie
       number: '07',
       title: 'Diseño Interior',
       icon: <Armchair className="w-3.5 h-3.5" />,
-      modes: INT,
+      modes: INT_EDIT,
       items: [
         { label: 'M²', value: params.roomSizeM2, key: 'roomSizeM2' },
         { label: 'MUEBLES', value: params.furnitureStyle, key: 'furnitureStyle' },
@@ -151,7 +161,6 @@ export default function PromptPreview({ params, loadedFiles = [] }: PromptPrevie
       number: '09',
       title: 'Materialidad y Acabados',
       icon: <Hammer className="w-3.5 h-3.5" />,
-      modes: NOT_EDIT,
       items: [
         { label: 'REVESTIM.', value: params.materials, key: 'materials' },
         { label: 'CALIDAD', value: params.finishLevel, key: 'finishLevel' },
@@ -162,7 +171,6 @@ export default function PromptPreview({ params, loadedFiles = [] }: PromptPrevie
       number: '10',
       title: 'Estética y Paisaje',
       icon: <Palette className="w-3.5 h-3.5" />,
-      modes: NOT_EDIT,
       items: [
         { label: 'PALETA', value: params.colorPalette, key: 'colorPalette' },
         { label: 'ELEMENTOS', value: params.exteriorElements, key: 'exteriorElements' },

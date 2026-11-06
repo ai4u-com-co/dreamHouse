@@ -52,6 +52,7 @@ export const DESIGN_PARAM_KEYS = [
   'vegetation', 'architecturalDetails',
   'roomType', 'roomSizeM2', 'furnitureStyle', 'interiorLighting', 'flooringMaterial', 'ceilingDetail',
   'bedrooms', 'bathrooms', 'kitchenType', 'livingAreaType',
+  'editChangeType', 'editIntensity', 'editPreserve',
 ] as const satisfies ReadonlyArray<keyof DreamHouseParams>;
 
 /** Solo con permiso expreso del usuario: ubicación y textos libres */

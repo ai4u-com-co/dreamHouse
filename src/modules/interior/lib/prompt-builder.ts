@@ -12,7 +12,7 @@ import {
   when,
 } from '@/modules/shared/lib/prompt-helpers';
 
-const ROOM_MAP: Record<string, string> = {
+export const ROOM_MAP: Record<string, string> = {
   "Baño principal": "a luxurious master bathroom sanctuary",
   "Biblioteca/Estudio": "a sophisticated private library and study",
   "Cocina gourmet": "a state-of-the-art gourmet kitchen",
@@ -28,7 +28,7 @@ const ROOM_MAP: Record<string, string> = {
   "Vestidor/Walk-in closet": "a bespoke luxury walk-in closet"
 };
 
-const FURNITURE_MAP: Record<string, string> = {
+export const FURNITURE_MAP: Record<string, string> = {
   "Bespoke / Hecho a medida": "bespoke custom-crafted furniture",
   "Bohemio": "eclectic bohemian furnishings",
   "Clásico/Tradicional": "timeless classical furniture pieces",
@@ -41,7 +41,7 @@ const FURNITURE_MAP: Record<string, string> = {
   "Rústico moderno": "warm modern rustic furnishings"
 };
 
-const INTERIOR_LIGHTING_MAP: Record<string, string> = {
+export const INTERIOR_LIGHTING_MAP: Record<string, string> = {
   "Candelabro/Lámpara colgante": "a dramatic statement chandelier",
   "Iluminación de riel (Track lighting)": "discreet architectural track lighting",
   "Iluminación indirecta (Cove lighting)": "soft atmospheric cove lighting",
