@@ -30,6 +30,7 @@ export const STYLES = [
   "Coastal Modern",
   "Colonial",
   "Contemporáneo",
+  "Contenedor / Industrial modular",
   "Craftsman/Bungalow",
   "De Stijl",
   "Deconstructivista",
