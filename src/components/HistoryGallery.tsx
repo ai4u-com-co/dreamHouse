@@ -1,8 +1,9 @@
 import React from 'react';
 import Image from 'next/image';
-import { Trash2, Download, RotateCcw, Clock, Layout, Home, Armchair, Wand, ZoomIn } from 'lucide-react';
+import { Trash2, Download, RotateCcw, Clock, Layout, Home, Armchair, Wand, ZoomIn, FileJson } from 'lucide-react';
 import { Button } from './ui/Button';
-import { GenerationRecord, dbFor } from '../lib/db';
+import { GenerationRecord, dbFor, MAX_HISTORY } from '../lib/db';
+import { buildParamsFile } from '../lib/restore-params';
 import { useLightbox } from '../context/LightboxContext';
 import { useAuth } from '../context/AuthContext';
 
@@ -11,7 +12,7 @@ import { useAuth } from '../context/AuthContext';
 async function downloadGeneration(item: GenerationRecord, ownerId: string | null) {
   try {
     const blob = ownerId ? await dbFor(ownerId).getFullImage(item.id) : null;
-    const ext = blob?.type === 'image/jpeg' ? 'jpg' : 'png';
+    const ext = blob?.type === 'image/jpeg' ? 'jpg' : blob?.type === 'image/webp' ? 'webp' : 'png';
     const url = blob ? URL.createObjectURL(blob) : item.imageUrl;
     const a = document.createElement('a');
     a.href = url;
@@ -25,6 +26,18 @@ async function downloadGeneration(item: GenerationRecord, ownerId: string | null
   }
 }
 
+/** Descarga un archivo de parámetros (.json) de la generación: se puede volver a subir con «Recuperar parámetros» */
+function downloadParams(item: GenerationRecord) {
+  const file = buildParamsFile({ mode: item.mode, params: item.params, houseName: item.houseName, timestamp: item.timestamp });
+  const url = URL.createObjectURL(new Blob([JSON.stringify(file, null, 2)], { type: 'application/json' }));
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `dreamhouse-parametros-${item.mode}-${item.id.slice(0, 8)}.json`;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
 
 interface HistoryGalleryProps {
   history: GenerationRecord[];
@@ -89,7 +102,12 @@ export default function HistoryGallery({
   return (
     <div className="space-y-8">
       <div className="flex justify-between items-center">
-        <h3 className="text-sm font-mono text-primary uppercase tracking-[0.3em] font-bold">Historial de Generaciones</h3>
+        <div className="flex flex-col gap-1">
+          <h3 className="text-sm font-mono text-primary uppercase tracking-[0.3em] font-bold">Historial de Generaciones</h3>
+          <p className="text-xs text-muted-foreground">
+            {history.length} de {MAX_HISTORY}: al llenarse, los más antiguos se borran. Se guarda solo en este navegador; cada imagen descargada conserva sus parámetros.
+          </p>
+        </div>
         {history.length > 0 && (
           <Button 
             variant="outline" 
@@ -187,6 +205,14 @@ export default function HistoryGallery({
                 <RotateCcw className="w-3 h-3 mr-2" />
                 Cargar Parámetros
               </Button>
+              <button
+                type="button"
+                onClick={() => downloadParams(item)}
+                className="inline-flex items-center justify-center gap-2 min-h-[44px] w-full border border-border text-xs font-bold uppercase tracking-widest text-muted-foreground hover:border-primary/60 hover:text-foreground transition-colors"
+              >
+                <FileJson className="w-3.5 h-3.5" />
+                Descargar parámetros (.json)
+              </button>
             </div>
           </div>
         ))}

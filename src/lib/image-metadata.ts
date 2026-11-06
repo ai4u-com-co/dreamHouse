@@ -126,6 +126,8 @@ function crc32(bytes: Uint8Array): number {
 
 const isJpeg = (b: Uint8Array) => b.length > 3 && b[0] === 0xff && b[1] === 0xd8;
 const isPng = (b: Uint8Array) => b.length > 8 && PNG_SIGNATURE.every((v, i) => b[i] === v);
+const isWebp = (b: Uint8Array) =>
+  b.length > 16 && decoder.decode(b.subarray(0, 4)) === 'RIFF' && decoder.decode(b.subarray(8, 12)) === 'WEBP';
 
 function buildXmpPacket(meta: DreamHouseImageMetadata): string {
   const payload = toBase64(encoder.encode(JSON.stringify(meta)));
@@ -202,14 +204,97 @@ function removePngXmp(bytes: Uint8Array): Uint8Array {
   return concat(bytes.subarray(0, found.start), bytes.subarray(found.end));
 }
 
+// ---------- WebP (contenedor RIFF: el XMP viaja en un chunk «XMP » dentro de un VP8X) ----------
+
+interface WebpChunk { type: string; start: number; data: number; size: number; end: number }
+
+function webpChunks(bytes: Uint8Array): WebpChunk[] {
+  const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
+  const chunks: WebpChunk[] = [];
+  let pos = 12;
+  while (pos + 8 <= bytes.length) {
+    const size = view.getUint32(pos + 4, true);
+    const end = Math.min(bytes.length, pos + 8 + size + (size & 1)); // los chunks se rellenan a longitud par
+    chunks.push({ type: decoder.decode(bytes.subarray(pos, pos + 4)), start: pos, data: pos + 8, size, end });
+    pos = end;
+  }
+  return chunks;
+}
+
+/** Cabecera VP8X para un WebP simple (VP8 con pérdida o VP8L sin pérdida), que no la trae */
+function webpExtendedHeader(bytes: Uint8Array, first: WebpChunk): Uint8Array | null {
+  const d = bytes.subarray(first.data, first.data + first.size);
+  let width = 0;
+  let height = 0;
+  let alpha = false;
+  if (first.type === 'VP8 ' && d.length >= 10 && d[3] === 0x9d && d[4] === 0x01 && d[5] === 0x2a) {
+    width = (d[6] | (d[7] << 8)) & 0x3fff;
+    height = (d[8] | (d[9] << 8)) & 0x3fff;
+  } else if (first.type === 'VP8L' && d.length >= 5 && d[0] === 0x2f) {
+    const bits = (d[1] | (d[2] << 8) | (d[3] << 16) | (d[4] << 24)) >>> 0;
+    width = (bits & 0x3fff) + 1;
+    height = ((bits >>> 14) & 0x3fff) + 1;
+    alpha = ((bits >>> 28) & 1) === 1;
+  } else {
+    return null;
+  }
+  if (!width || !height) return null;
+  const out = new Uint8Array(18);
+  out.set(encoder.encode('VP8X'), 0);
+  out[4] = 10; // tamaño del chunk (LE)
+  out[8] = 0x04 | (alpha ? 0x10 : 0); // XMP (+ alfa)
+  const w = width - 1;
+  const h = height - 1;
+  out[12] = w & 0xff; out[13] = (w >> 8) & 0xff; out[14] = (w >> 16) & 0xff;
+  out[15] = h & 0xff; out[16] = (h >> 8) & 0xff; out[17] = (h >> 16) & 0xff;
+  return out;
+}
+
+function embedInWebp(bytes: Uint8Array, meta: DreamHouseImageMetadata): Uint8Array {
+  const packet = fitMetadata(meta, 5 * 1024 * 1024);
+  if (!packet) return bytes;
+  const chunks = webpChunks(bytes).filter((c) => c.type !== 'XMP ');
+  if (!chunks.length) return bytes;
+  if (chunks.some((c) => c.type === 'ANIM')) return bytes; // animación: no se toca
+
+  const parts: Uint8Array[] = [];
+  let header: Uint8Array | null = null;
+  if (chunks[0].type === 'VP8X') {
+    header = bytes.slice(chunks[0].start, chunks[0].end);
+    header[8] |= 0x04; // activa el indicador de XMP
+  } else {
+    header = webpExtendedHeader(bytes, chunks[0]);
+    if (!header) return bytes;
+  }
+  const rest = chunks[0].type === 'VP8X' ? chunks.slice(1) : chunks;
+  parts.push(header);
+  for (const c of rest) parts.push(bytes.subarray(c.start, c.end));
+
+  const text = encoder.encode(packet);
+  const xmp = new Uint8Array(8 + text.length + (text.length & 1));
+  xmp.set(encoder.encode('XMP '), 0);
+  new DataView(xmp.buffer).setUint32(4, text.length, true);
+  xmp.set(text, 8);
+  parts.push(xmp);
+
+  const body = concat(...parts);
+  const out = new Uint8Array(12 + body.length);
+  out.set(encoder.encode('RIFF'), 0);
+  new DataView(out.buffer).setUint32(4, 4 + body.length, true);
+  out.set(encoder.encode('WEBP'), 8);
+  out.set(body, 12);
+  return out;
+}
+
 /**
- * Devuelve la imagen con los metadatos incrustados. Si el formato no es JPEG ni PNG
+ * Devuelve la imagen con los metadatos incrustados. Si el formato no es JPEG, PNG ni WebP
  * (o algo falla) devuelve los bytes originales sin tocar: nunca rompe la imagen.
  */
 export function embedImageMetadata(bytes: Uint8Array, meta: DreamHouseImageMetadata): Uint8Array {
   try {
     if (isJpeg(bytes)) return embedInJpeg(bytes, meta);
     if (isPng(bytes)) return embedInPng(bytes, meta);
+    if (isWebp(bytes)) return embedInWebp(bytes, meta);
   } catch (error) {
     console.error('No se pudieron incrustar los metadatos:', error);
   }
@@ -271,10 +356,17 @@ function findPngXmp(bytes: Uint8Array): Located | null {
   return null;
 }
 
+function findWebpXmp(bytes: Uint8Array): Located | null {
+  if (!isWebp(bytes)) return null;
+  const xmp = webpChunks(bytes).find((c) => c.type === 'XMP ');
+  if (!xmp) return null;
+  return { start: xmp.start, end: xmp.end, text: decoder.decode(bytes.subarray(xmp.data, xmp.data + xmp.size)) };
+}
+
 /** Lee los metadatos de DreamHouse de una imagen. Devuelve null si no los tiene o no son válidos. */
 export function readImageMetadata(bytes: Uint8Array): DreamHouseImageMetadata | null {
   try {
-    const located = findJpegXmp(bytes) ?? findPngXmp(bytes);
+    const located = findJpegXmp(bytes) ?? findPngXmp(bytes) ?? findWebpXmp(bytes);
     if (!located) return null;
     const match = /dreamhouse:payload="([A-Za-z0-9+/=]+)"/.exec(located.text);
     if (!match) return null;
@@ -288,6 +380,6 @@ export function readImageMetadata(bytes: Uint8Array): DreamHouseImageMetadata | 
 
 /** Atajo para el navegador: lee los metadatos de un File subido por el usuario */
 export async function readImageMetadataFromFile(file: File): Promise<DreamHouseImageMetadata | null> {
-  if (!/^image\/(jpeg|png)$/.test(file.type)) return null;
+  if (!/^image\/(jpeg|png|webp)$/.test(file.type)) return null;
   return readImageMetadata(new Uint8Array(await file.arrayBuffer()));
 }

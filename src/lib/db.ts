@@ -9,6 +9,8 @@ export interface GenerationRecord {
   prompt?: string;
   houseName?: string;
   hasFullImage?: boolean; // true si existe el render full-res en el store `fullImages`
+  /** Id de la imagen (el de sus metadatos incrustados): enlaza un render con las vistas y ediciones que salieron de él */
+  imageId?: string;
 }
 
 // El historial vive en el navegador. Cada persona tiene su PROPIA base (`DreamHouseDB-<user_id>`): en un navegador compartido,
@@ -21,7 +23,9 @@ export const LEGACY_DB_NAME = 'DreamHouseDB';
 const DB_VERSION = 2;
 const STORE_NAME = 'generations';
 const IMAGES_STORE = 'fullImages'; // blobs full-res, keyed por el id de la generación
-const MAX_HISTORY = 20;
+// Tope de renders guardados por cuenta. Antes eran 20: una sola tanda de vistas (hasta 20) o 5 renders con 4 variantes vaciaba
+// todo lo anterior sin avisar. Cada render full-res pesa ~1-3 MB; 60 caben de sobra en IndexedDB.
+export const MAX_HISTORY = 60;
 
 export class DreamHouseDB {
   private db: IDBDatabase | null = null;
@@ -65,7 +69,7 @@ export class DreamHouseDB {
   async saveGeneration(
     record: Omit<GenerationRecord, 'id' | 'timestamp'>,
     fullImage?: Blob
-  ): Promise<string> {
+  ): Promise<{ id: string; pruned: number }> {
     await this.init();
     const id = crypto.randomUUID();
     const timestamp = Date.now();
@@ -75,9 +79,10 @@ export class DreamHouseDB {
       const transaction = this.db!.transaction([STORE_NAME, IMAGES_STORE], 'readwrite');
       const store = transaction.objectStore(STORE_NAME);
       const imagesStore = transaction.objectStore(IMAGES_STORE);
+      let pruned = 0;
 
       transaction.onerror = () => reject(transaction.error);
-      transaction.oncomplete = () => resolve(id);
+      transaction.oncomplete = () => resolve({ id, pruned });
 
       // Add the new record + its full-res blob
       store.add(fullRecord);
@@ -91,6 +96,7 @@ export class DreamHouseDB {
           (a, b) => a.timestamp - b.timestamp
         );
         const toDelete = all.slice(0, Math.max(0, all.length - MAX_HISTORY));
+        pruned = toDelete.length;
         toDelete.forEach(r => {
           store.delete(r.id);
           imagesStore.delete(r.id);

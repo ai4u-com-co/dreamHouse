@@ -137,3 +137,39 @@ export function sanitizeSourceParams(raw: unknown): Partial<DreamHouseParams> {
 export function cleanLabel(value: unknown, max = 80): string | undefined {
   return typeof value === 'string' && value.trim() ? cleanFreeText(value).slice(0, max) : undefined;
 }
+
+// ---------- recuperar parámetros de una generación (acción explícita del usuario) ----------
+
+/** Textos libres que se pueden recuperar de una imagen propia y su tope de longitud */
+const RESTORABLE_TEXT: Record<string, number> = { city: 200, artDirection: 4000, negativePrompt: 2000, editPrompt: 2000 };
+
+/** Texto libre largo: conserva saltos de línea, quita caracteres de control y acota la longitud */
+function cleanLongText(text: string, max: number): string {
+  return text.replace(/[\u0000-\u0008\u000b\u000c\u000e-\u001f\u007f]+/g, ' ').replace(/[ \t]+/g, ' ').trim().slice(0, max);
+}
+
+/**
+ * Parámetros que se vuelcan al FORMULARIO al recuperar una generación (imagen con metadatos o archivo de parámetros).
+ * A diferencia de `sanitizeSourceParams` (que alimenta el prompt de las vistas sin que nadie lo revise), aquí también se
+ * aceptan los textos libres: ciudad, dirección creativa, exclusiones, instrucción de edición. La persona los ve en
+ * el formulario y puede editarlos antes de generar. Los campos de diseño siguen validados contra los catálogos.
+ */
+export function sanitizeRestoredParams(raw: unknown): SanitizedParams {
+  const design = sanitizeCore(raw, { allowedKeys: DESIGN_KEYS, allowFreeText: false });
+  const params: Record<string, unknown> = { ...design.params };
+  const dropped = [...design.dropped];
+  if (raw && typeof raw === 'object' && !Array.isArray(raw)) {
+    // Modelo y calidad: el asistente nunca los toca (cuestan créditos), pero al recuperar una generación propia se recuperan
+    // (solo si son valores del catálogo) y quedan visibles en «Opciones avanzadas del modelo» antes de generar
+    const { aiModel, renderQuality } = raw as Record<string, unknown>;
+    if (typeof aiModel === 'string' && SC.AI_MODELS.includes(aiModel)) params.aiModel = aiModel;
+    if (typeof renderQuality === 'string' && (SC.RENDER_QUALITIES as readonly string[]).includes(renderQuality)) params.renderQuality = renderQuality;
+    for (const [key, max] of Object.entries(RESTORABLE_TEXT)) {
+      const value = (raw as Record<string, unknown>)[key];
+      if (typeof value !== 'string') continue;
+      const clean = cleanLongText(value, max);
+      if (clean) params[key] = clean;
+    }
+  }
+  return { params: params as Partial<DreamHouseParams>, dropped };
+}
