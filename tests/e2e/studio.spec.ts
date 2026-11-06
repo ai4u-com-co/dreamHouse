@@ -194,7 +194,7 @@ test.describe('DreamHouse Studio E2E MVP', () => {
     await liftBtn.click();
 
     await expect(page.getByText('Planta cargada como Plano Residencial en Arquitectura Exterior con todo tu programa espacial.')).toBeVisible();
-    await expect(page.getByText('Slot de Planta activo: límites geométricos fijados')).toBeVisible();
+    await expect(page.getByText('Slot de Planta activo: forma y geometría ancladas (1:1)')).toBeVisible();
     await expect(page.getByRole('button', { name: 'Generate exterior render' })).toBeVisible();
     // Design Spec shows the loaded PLANO file and preserved size/bedrooms
     await expect(page.locator('span:text-is("PLANO")')).toBeVisible();

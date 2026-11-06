@@ -129,19 +129,19 @@ export default function ExteriorForm({
         <SectionDescription>Sube las fotos y planos que guiarán la estructura de la generación.</SectionDescription>
         <div className="space-y-8">
           <div>
-            <Subtitle>Slot de Planta Arquitectónica (Límite Geométrico 1:1)</Subtitle>
+            <Subtitle>Slot de Planta Arquitectónica (Geometría y Forma de la Casa)</Subtitle>
             <FloorPlanUploader 
               file={floorPlanFile} 
               onFileChange={onFloorPlanFileChange} 
               title="Plano Residencial / Planta Guía"
-              description="Si cargas una planta aquí, su huella, perímetro y vanos actúan como límite geométrico duro (1:1), mientras la IA construye el exterior aplicando todos los demás parámetros que pidas (estilo, materiales, cubierta, pisos, paisaje y dirección creativa)."
+              description="La planta sirve únicamente como referencia de la forma y geometría de la casa (huella 1:1, alas, patios y vanos). La foto exterior debe cumplir con todos los demás parámetros que configures en el formulario y en el prompt."
             />
             {floorPlanFile && (
               <div className="mt-3 p-4 border border-primary/40 bg-primary/5 text-xs text-muted-foreground leading-relaxed" role="status">
                 <span className="font-bold uppercase tracking-wider text-primary block mb-1">
-                  Slot de Planta activo: límites geométricos fijados
+                  Slot de Planta activo: forma y geometría ancladas (1:1)
                 </span>
-                El exterior respetará estrictamente los límites espaciales, huella y distribución de la planta cargada, pero aplicará todos los parámetros de estilo, materiales, cubierta, niveles, clima y dirección creativa que configures en este módulo.
+                La planta solo define la forma y geometría de la casa. La fachada exterior, materiales, estilo arquitectónico, cubierta, niveles, paisaje, iluminación y dirección creativa se generan cumpliendo fielmente con los parámetros del prompt.
               </div>
             )}
           </div>

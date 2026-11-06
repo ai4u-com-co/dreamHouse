@@ -54,6 +54,7 @@ test('exterior: cuando se adjunta foto de la planta (hasFloorPlanReference), el 
     const out = buildExteriorPrompt(p({ mode: 'exterior', aiModel: model }), false, model, true);
     assert.match(out, /HARD GEOMETRIC CONSTRAINT/);
     assert.match(out, /1:1/);
+    assert.match(out, /PROMPT/i);
   }
 });
 

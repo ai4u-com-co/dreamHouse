@@ -343,7 +343,7 @@ export async function POST(req: NextRequest) {
         }
         if (floorPlanImage) {
           const floorPlanRole = params.mode === 'exterior'
-            ? "HARD GEOMETRIC SLOT (floor plan): this floor plan sets the strict geometric boundaries (exact footprint, perimeter shape, wings, setbacks, courtyard/terrace zones and window/door bays 1:1); stay strictly within these spatial limits while fully executing all requested exterior parameters (architectural style, facade materials, roof type, levels, landscaping, lighting and Creative Direction), and do not copy flat 2D drafting lines or text labels into the photo"
+            ? "GEOMETRIC SHAPE REFERENCE ONLY (floor plan): this image defines SOLELY the 3D footprint, perimeter boundaries and volumetric shape of the house (1:1). It does NOT dictate style, materials, colors or lighting. The exterior photo MUST strictly comply with all prompt parameters (materials, architectural style, roof type, levels, landscaping, lighting and Creative Direction) onto this geometric shape, without copying 2D drafting lines or text labels into the photo"
             : "HARD GEOMETRIC ANCHOR (floor plan or sketch): preserve its exact layout, spatial division, proportions and perimeter footprint while applying the requested parameters; do not copy raw 2D labels or dimension text into the image";
           openaiInputs.push({ file: floorPlanImage, role: floorPlanRole });
         }
@@ -404,7 +404,7 @@ export async function POST(req: NextRequest) {
             ? "PRESERVE general architectural volumes and facade structure from the house reference image."
             : "",
           floorPlanImage
-            ? "HARD CONSTRAINT (FLOOR PLAN SLOT): The provided floor plan image defines the strict 1:1 geometric boundaries (footprint, perimeter shape, wings, recesses, courtyard/patio voids, terraces, entry and window/door bays). Respect these spatial limits strictly while still executing ALL requested exterior parameters (style, facade materials, roof, levels, environment, landscaping, lighting and Creative Direction); do not draw flat 2D plan lines or text labels."
+            ? "HARD CONSTRAINT (FLOOR PLAN = SHAPE ONLY, PROMPT = FULL EXTERIOR SPECIFICATION): The provided floor plan image defines ONLY the 1:1 geometric boundaries and footprint shape (wings, recesses, courtyards, terraces, entry and window/door bays). It is strictly a geometry reference, NOT an aesthetic one. The exterior render MUST fulfill ALL parameters specified in the prompt (architectural style, facade materials, textures, roof design, levels, landscaping, environment, lighting and Creative Direction); do not draw flat 2D plan lines or text labels."
             : "",
           !exteriorReferenceImage && !floorPlanImage
             ? "Compose the building from the written specification only."

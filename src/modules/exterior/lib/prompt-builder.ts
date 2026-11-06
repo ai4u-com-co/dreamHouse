@@ -138,10 +138,10 @@ export function buildExteriorPrompt(
     : `Rooted in a ${params.environment || 'carefully considered'} environment`;
 
   const floorPlanHardBlock = hasFloorPlanReference
-    ? `\nHARD GEOMETRIC CONSTRAINT — FLOOR PLAN SLOT (BOUNDARIES + FULL PARAMETER EXECUTION):
-- Hard Spatial Limits (1:1 Footprint): The provided floor plan image defines the strict geometric boundaries of the building — exact footprint, perimeter shape (L-shape, U-shape, courtyard, wings, setbacks, projections), entry position, outdoor terraces/pool/deck zones, and window/door bays along the facades. Do NOT exceed, distort or replace these spatial boundaries.
-- Full Parameter Execution Within Those Limits: While strictly obeying the floor plan's footprint and spatial limits, you MUST actively build and dress the 3D exterior applying ALL requested parameters in this brief (architectural style, facade materials, finish standard, color palette, roof type and covering, number of levels, window design, landscaping, site environment, lighting, camera angle and any Creative Direction).
-- 2D-to-3D Translation: Extrude the 2D plan into a real three-dimensional built exterior volume (never render flat 2D plan lines, dimension arrows or text labels on the ground).\n`
+    ? `\nHARD GEOMETRIC CONSTRAINT — FLOOR PLAN SLOT (SHAPE & GEOMETRY ONLY vs PROMPT SPECIFICATION):
+- FLOOR PLAN IS GEOMETRIC BLUEPRINT ONLY: The provided floor plan image is SOLELY and EXCLUSIVELY a reference for the 3D footprint, perimeter boundaries, wings, recesses, courtyards, setbacks and spatial geometry (1:1 shape of the house). It does NOT define or restrict the exterior aesthetic, colors, materials, style or lighting.
+- PROMPT GOVERNS ALL EXTERIOR APPEARANCE & PARAMETERS: The generated exterior photo MUST fully and faithfully execute every single parameter from the prompt (architectural style, facade materials, textures, color palette, roof type and covering, number of levels, window design, landscaping, site environment, lighting, camera and Creative Direction).
+- 2D-to-3D Extrusion: Extrude the 3D volume directly from the floor plan's footprint shape, dressing that geometry completely according to the prompt parameters (never render flat 2D drafting lines, dimension text or annotations on the ground).\n`
     : "";
 
   if (isOpenAI) {
@@ -185,7 +185,7 @@ ${creativeDirectionBlock(params) ? `\n${creativeDirectionBlock(params)}\n` : ""}
     prompt = `${article} ${style.medium} — ${params.cameraAngle || 'eye-level'} view — of a ${scaleDesc} ${projectType}. `;
   }
   if (hasFloorPlanReference) {
-    prompt += `HARD GEOMETRIC CONSTRAINT (FLOOR PLAN SLOT): The provided floor plan image defines the strict 1:1 geometric boundaries (footprint, perimeter wings, recesses, courtyards, terraces and window/door positions) — stay strictly within those spatial limits while fully applying all requested exterior parameters (style, facade materials, roof type, levels, landscaping, lighting and Creative Direction), without copying flat 2D drafting lines or text. `;
+    prompt += `HARD GEOMETRIC CONSTRAINT (FLOOR PLAN SLOT): The provided floor plan image is strictly a 1:1 reference for the house's 3D footprint and geometry (perimeter, wings, recesses, courtyards, terraces and openings) — it is NOT an aesthetic reference. The exterior photo must fully fulfill ALL prompt parameters (style, facade materials, roof, levels, landscaping, lighting and Creative Direction) onto that shape, without copying flat 2D drafting lines or text. `;
   }
 
   if (present(params.city)) {
