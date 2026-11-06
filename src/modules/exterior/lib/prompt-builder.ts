@@ -138,10 +138,12 @@ export function buildExteriorPrompt(
     : `Rooted in a ${params.environment || 'carefully considered'} environment`;
 
   const floorPlanHardBlock = hasFloorPlanReference
-    ? `\nHARD GEOMETRIC CONSTRAINT — FLOOR PLAN SLOT (SHAPE & GEOMETRY ONLY vs PROMPT SPECIFICATION):
-- FLOOR PLAN IS GEOMETRIC BLUEPRINT ONLY: The provided floor plan image is SOLELY and EXCLUSIVELY a reference for the 3D footprint, perimeter boundaries, wings, recesses, courtyards, setbacks and spatial geometry (1:1 shape of the house). It does NOT define or restrict the exterior aesthetic, colors, materials, style or lighting.
-- PROMPT GOVERNS ALL EXTERIOR APPEARANCE & PARAMETERS: The generated exterior photo MUST fully and faithfully execute every single parameter from the prompt (architectural style, facade materials, textures, color palette, roof type and covering, number of levels, window design, landscaping, site environment, lighting, camera and Creative Direction).
-- 2D-to-3D Extrusion: Extrude the 3D volume directly from the floor plan's footprint shape, dressing that geometry completely according to the prompt parameters (never render flat 2D drafting lines, dimension text or annotations on the ground).\n`
+    ? `\nHARD CONSTRAINT — EXTERIOR RENDERING ONLY (FLOOR PLAN = EXTERIOR SHAPE REFERENCE ONLY):
+- PURE EXTERIOR ARCHITECTURAL RENDERING: The final image MUST strictly be an exterior architectural rendering or photograph of the complete finished building seen from the outside, with complete solid exterior facades, opaque weather-tight roof, and realistic exterior window glass.
+- FORBIDDEN (NO INTERNAL DETAILS OR CUTAWAYS): Do NOT show internal floor plan details, internal room layouts, floor divisions seen from above, furniture (beds, sofas, tables, sanitary fixtures) or dollhouse/cutaway/open-roof views. The interior must NOT be visible except through natural exterior window panes.
+- GENERAL EXTERIOR SHAPE REFERENCE ONLY (1:1): The provided floor plan image is strictly a general geometric reference for the house's exterior footprint shape, perimeter boundaries, wings, recesses, courtyards and overall massing (1:1 footprint). Nothing more.
+- PROMPT GOVERNS ALL EXTERIOR APPEARANCE & PARAMETERS: The facade materials, textures, architectural style, color palette, roof type and covering, number of levels, landscaping, site environment, lighting, camera and Creative Direction are 100% governed by the prompt parameters.
+- 2D-to-3D Extrusion: Extrude the exterior massing directly from the floor plan's footprint shape, dressing that geometry completely according to the prompt parameters (never render flat 2D drafting lines, dimension text or annotations on the ground).\n`
     : "";
 
   if (isOpenAI) {
@@ -185,7 +187,7 @@ ${creativeDirectionBlock(params) ? `\n${creativeDirectionBlock(params)}\n` : ""}
     prompt = `${article} ${style.medium} — ${params.cameraAngle || 'eye-level'} view — of a ${scaleDesc} ${projectType}. `;
   }
   if (hasFloorPlanReference) {
-    prompt += `HARD GEOMETRIC CONSTRAINT (FLOOR PLAN SLOT): The provided floor plan image is strictly a 1:1 reference for the house's 3D footprint and geometry (perimeter, wings, recesses, courtyards, terraces and openings) — it is NOT an aesthetic reference. The exterior photo must fully fulfill ALL prompt parameters (style, facade materials, roof, levels, landscaping, lighting and Creative Direction) onto that shape, without copying flat 2D drafting lines or text. `;
+    prompt += `HARD CONSTRAINT (PURE EXTERIOR RENDERING): The final image must strictly be a finished exterior architectural rendering/photograph of the complete building from the outside, with full facades, solid exterior walls and complete opaque roof. Do NOT include internal floor plan details, interior furniture, room layouts, cutaways or see-through roofs. The floor plan is strictly a general 1:1 reference for the house's exterior footprint and volume shape, while all exterior materials, style, roof, lighting, landscaping and parameters are governed by the prompt. `;
   }
 
   if (present(params.city)) {

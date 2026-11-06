@@ -343,7 +343,7 @@ export async function POST(req: NextRequest) {
         }
         if (floorPlanImage) {
           const floorPlanRole = params.mode === 'exterior'
-            ? "GEOMETRIC SHAPE REFERENCE ONLY (floor plan): this image defines SOLELY the 3D footprint, perimeter boundaries and volumetric shape of the house (1:1). It does NOT dictate style, materials, colors or lighting. The exterior photo MUST strictly comply with all prompt parameters (materials, architectural style, roof type, levels, landscaping, lighting and Creative Direction) onto this geometric shape, without copying 2D drafting lines or text labels into the photo"
+            ? "GENERAL EXTERIOR SHAPE REFERENCE ONLY (floor plan): this image is SOLELY a general reference for the exterior footprint shape and massing silhouette of the house (1:1). It is NOT an aesthetic reference and must NEVER cause interior details to appear. The final output must be a pure exterior architectural rendering/photograph of the complete building from the outside (solid exterior walls, complete opaque roof, full facades). Do NOT render interior room layouts, interior furniture, cutaway views, or see-through rooms. The exterior render must strictly execute all prompt parameters (materials, architectural style, roof type, levels, landscaping, lighting and Creative Direction) onto this exterior shape, with zero 2D drafting lines or text labels."
             : "HARD GEOMETRIC ANCHOR (floor plan or sketch): preserve its exact layout, spatial division, proportions and perimeter footprint while applying the requested parameters; do not copy raw 2D labels or dimension text into the image";
           openaiInputs.push({ file: floorPlanImage, role: floorPlanRole });
         }
@@ -404,7 +404,7 @@ export async function POST(req: NextRequest) {
             ? "PRESERVE general architectural volumes and facade structure from the house reference image."
             : "",
           floorPlanImage
-            ? "HARD CONSTRAINT (FLOOR PLAN = SHAPE ONLY, PROMPT = FULL EXTERIOR SPECIFICATION): The provided floor plan image defines ONLY the 1:1 geometric boundaries and footprint shape (wings, recesses, courtyards, terraces, entry and window/door bays). It is strictly a geometry reference, NOT an aesthetic one. The exterior render MUST fulfill ALL parameters specified in the prompt (architectural style, facade materials, textures, roof design, levels, landscaping, environment, lighting and Creative Direction); do not draw flat 2D plan lines or text labels."
+            ? "HARD CONSTRAINT — PURE EXTERIOR RENDERING (FLOOR PLAN = EXTERIOR SHAPE REFERENCE ONLY): The final output MUST strictly be an exterior architectural rendering or photograph of the complete building seen from the outside (solid exterior facades, weather-tight opaque roof, realistic exterior window glass). Do NOT render internal room layouts, floor divisions seen from above, furniture (beds, sofas, tables, sanitary fixtures) or cutaway/dollhouse views. The floor plan is strictly a general 1:1 reference for the house's exterior footprint shape and volumetric massing, while the prompt governs ALL exterior parameters (materials, architectural style, roof, levels, landscaping, lighting and Creative Direction); do not draw flat 2D plan lines or text labels."
             : "",
           !exteriorReferenceImage && !floorPlanImage
             ? "Compose the building from the written specification only."
