@@ -5,7 +5,7 @@ export interface GenerationRecord {
   timestamp: number;
   mode: GenerationMode;
   params: DreamHouseParams;
-  imageUrl: string; // thumbnail (320px JPEG) — usado solo para la grilla del historial
+  imageUrl: string; // miniatura (720 px JPEG; las anteriores, 320 px): SOLO para la grilla. El render completo vive en `fullImages`
   prompt?: string;
   houseName?: string;
   hasFullImage?: boolean; // true si existe el render full-res en el store `fullImages`

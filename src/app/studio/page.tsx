@@ -98,7 +98,7 @@ function StudioContent() {
   const viewsCount = params.mode === 'vistas' ? Math.max(1, params.selectedVistas.length) : 1;
   const totalCost = quote.ok ? quote.value.options.credits * viewsCount : 0;
   const setParam = <K extends keyof DreamHouseParams>(key: K, value: DreamHouseParams[K]) => setParams(prev => ({ ...prev, [key]: value }));
-  const { history, saveToHistory, deleteFromHistory, clearHistory, isLoading: isHistoryLoading } = useHistory(userId);
+  const { history, saveToHistory, deleteFromHistory, clearHistory, getFullImageDataUrl, isLoading: isHistoryLoading } = useHistory(userId);
 
 
 
@@ -371,14 +371,20 @@ function StudioContent() {
             // Save to history
             const vistaImages = data.images?.length ? data.images : [data.imageUrl];
             for (const [k, url] of vistaImages.entries()) {
-              const { pruned } = await saveToHistory({
-                mode: 'vistas',
-                params: currentParams,
-                imageUrl: url,
-                houseName: data.houseName,
-                imageId: data.metadataIds?.[k],
-              }, ownerId);
-              if (pruned > 0) warnPruned(pruned);
+              try {
+                const { pruned } = await saveToHistory({
+                  mode: 'vistas',
+                  params: currentParams,
+                  imageUrl: url,
+                  houseName: data.houseName,
+                  imageId: data.metadataIds?.[k],
+                }, ownerId);
+                if (pruned > 0) warnPruned(pruned);
+              } catch (historyErr) {
+                // La vista SÍ se generó: un fallo del historial no debe contarse como vista fallida
+                console.error('Failed to save vista to history:', historyErr);
+                showToast('La vista se generó, pero no se pudo guardar en el historial. Descárgala para no perderla.');
+              }
             }
 
           } catch (err) {
@@ -452,6 +458,7 @@ function StudioContent() {
           }
         } catch (historyErr) {
           console.error("Failed to save to history:", historyErr);
+          showToast('El render se generó, pero no se pudo guardar en el historial (¿poco espacio en el navegador?). Descárgalo ahora para no perderlo.');
         }
 
         showToast("Render generated successfully!");
@@ -490,14 +497,17 @@ function StudioContent() {
     showToast(`Recuperados ${result.count} parámetros de ${from}.${notes}`);
   };
 
-  const handleLoadHistory = (record: GenerationRecord) => {
+  const handleLoadHistory = async (record: GenerationRecord) => {
     // Se mezcla con los valores por defecto: un registro anterior a un campo nuevo no deja undefined
     // Registros anteriores a las opciones nuevas (o con valores que ya no existen): se normalizan a lo válido y barato
     setParams(normalizeRenderSettings({ ...DEFAULT_PARAMS, ...record.params }));
     setVariants([]);
     setActiveSection(FIRST_SECTION[record.mode] ?? 'mode');
     setVistasResults([]);
-    setImageUrl(record.imageUrl);
+    // El panel de resultado (vista, descarga y «usar como base») debe tener el render COMPLETO: `record.imageUrl` es solo la
+    // miniatura de la grilla. Los registros muy antiguos no guardaron el original: ahí solo queda la miniatura y se avisa.
+    const fullImage = record.hasFullImage ? await getFullImageDataUrl(record.id) : null;
+    setImageUrl(fullImage ?? record.imageUrl);
     setHouseName(record.houseName || null);
     // Reset files since we don't store them in history (only the params)
     setFiles([]);
@@ -508,7 +518,7 @@ function StudioContent() {
     setEditMask(null);
     setObjectFiles([]);
     
-    showToast(`Cargado diseño ${record.mode} de ${new Date(record.timestamp).toLocaleDateString()}. Los archivos subidos no se guardan en el historial: vuelve a cargarlos si quieres regenerar.`);
+    showToast(`Cargado diseño ${record.mode} de ${new Date(record.timestamp).toLocaleDateString()}. Los archivos subidos no se guardan en el historial: vuelve a cargarlos si quieres regenerar.${fullImage ? '' : ' Este registro es anterior y solo conserva una miniatura de baja resolución.'}`);
     
     setTimeout(() => {
       document.getElementById('studio')?.scrollIntoView({ behavior: 'smooth', block: 'start' });

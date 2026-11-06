@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { dbFor, GenerationRecord } from '../db';
-import { createThumbnail } from '../image-thumbnail';
+import { createThumbnail, THUMBNAIL_MAX_SIDE, THUMBNAIL_QUALITY } from '../image-thumbnail';
 
 /** Aviso de que el historial de una cuenta cambió por fuera del hook (p. ej. se importó el historial anterior). */
 export const HISTORY_CHANGED_EVENT = 'dh-history-changed';
@@ -57,9 +57,9 @@ export function useHistory(ownerId: string | null) {
   const saveToHistory = async (record: Omit<GenerationRecord, 'id' | 'timestamp'>, forOwner: string | null = ownerId): Promise<{ pruned: number }> => {
     if (!forOwner) throw new Error('Sin sesión: no hay historial activo.');
     try {
-      // La grilla del historial usa un thumbnail de 320px (ligero, evita memory crashes
+      // La grilla del historial usa una miniatura (ligera, evita memory crashes
       // al listar). El render full-res se persiste aparte como Blob para el lightbox y la descarga.
-      const thumbnailUrl = await createThumbnail(record.imageUrl, 320, 0.6);
+      const thumbnailUrl = await createThumbnail(record.imageUrl, THUMBNAIL_MAX_SIDE, THUMBNAIL_QUALITY);
       let fullImage: Blob | undefined;
       try {
         fullImage = await (await fetch(record.imageUrl)).blob();
@@ -81,6 +81,27 @@ export function useHistory(ownerId: string | null) {
     try {
       const blob = await dbFor(ownerId).getFullImage(id);
       return blob ? URL.createObjectURL(blob) : null;
+    } catch (err) {
+      console.error('Failed to load full image:', err);
+      return null;
+    }
+  };
+
+  /**
+   * Render completo como data URL (mismo formato que una generación recién hecha: así el panel de resultado, la descarga
+   * —con su extensión correcta— y «usar como base» funcionan igual). null si no existe (registros muy antiguos).
+   */
+  const getFullImageDataUrl = async (id: string): Promise<string | null> => {
+    if (!ownerId) return null;
+    try {
+      const blob = await dbFor(ownerId).getFullImage(id);
+      if (!blob) return null;
+      return await new Promise<string>((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(String(reader.result));
+        reader.onerror = () => reject(reader.error);
+        reader.readAsDataURL(blob);
+      });
     } catch (err) {
       console.error('Failed to load full image:', err);
       return null;
@@ -117,6 +138,7 @@ export function useHistory(ownerId: string | null) {
     deleteFromHistory,
     clearHistory,
     refreshHistory,
-    getFullImageUrl
+    getFullImageUrl,
+    getFullImageDataUrl
   };
 }
