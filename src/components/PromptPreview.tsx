@@ -64,7 +64,7 @@ function isFactoryDefault(item: ParamItem): boolean {
   return JSON.stringify(DEFAULT_PARAMS[item.key]) === JSON.stringify(item.value);
 }
 
-const INT: GenerationMode[] = ['interior'];
+const INT_EDIT: GenerationMode[] = ['interior', 'edit'];
 const EXT_VISTAS: GenerationMode[] = ['exterior', 'vistas'];
 const NOT_EDIT: GenerationMode[] = ['exterior', 'interior', 'vistas'];
 
@@ -82,10 +82,20 @@ export default function PromptPreview({ params, loadedFiles = [] }: PromptPrevie
       ],
     },
     {
+      number: '03b',
+      title: 'Tipo de Cambio',
+      icon: <PenLine className="w-3.5 h-3.5" />,
+      modes: ['edit'],
+      items: [
+        { label: 'CAMBIO', value: params.editChangeType, key: 'editChangeType' },
+        { label: 'INTENSIDAD', value: params.editIntensity, key: 'editIntensity' },
+        { label: 'CONSERVAR', value: params.editPreserve, key: 'editPreserve' },
+      ],
+    },
+    {
       number: '04',
       title: 'Esencia del Proyecto',
       icon: <Sparkles className="w-3.5 h-3.5" />,
-      modes: NOT_EDIT,
       items: [
         { label: 'TIPO', value: params.projectType, key: 'projectType' },
         { label: 'ESPACIO', value: params.roomType, key: 'roomType' },
@@ -105,6 +115,8 @@ export default function PromptPreview({ params, loadedFiles = [] }: PromptPrevie
         { label: 'ENTORNO', value: params.environment, key: 'environment' },
         { label: 'AGUA', value: params.waterBody, key: 'waterBody' },
         { label: 'TIEMPO', value: params.weatherCondition, key: 'weatherCondition' },
+        { label: 'TERRENO', value: params.siteTopography, key: 'siteTopography' },
+        { label: 'ORIENTAC.', value: params.solarOrientation, key: 'solarOrientation' },
       ],
     },
     {
@@ -117,13 +129,16 @@ export default function PromptPreview({ params, loadedFiles = [] }: PromptPrevie
         { label: 'NIVELES', value: params.levels, key: 'levels' },
         { label: 'CUBIERTA', value: params.roofType, key: 'roofType' },
         { label: 'PLANTA', value: params.layoutType, key: 'layoutType' },
+        { label: 'SISTEMA', value: params.constructionSystem, key: 'constructionSystem' },
+        { label: 'MAT. CUBIERTA', value: params.roofMaterial, key: 'roofMaterial' },
+        { label: 'BIOCLIMA', value: params.passiveStrategies, key: 'passiveStrategies' },
       ],
     },
     {
       number: '07',
       title: 'Diseño Interior',
       icon: <Armchair className="w-3.5 h-3.5" />,
-      modes: INT,
+      modes: INT_EDIT,
       items: [
         { label: 'M²', value: params.roomSizeM2, key: 'roomSizeM2' },
         { label: 'MUEBLES', value: params.furnitureStyle, key: 'furnitureStyle' },
@@ -151,10 +166,11 @@ export default function PromptPreview({ params, loadedFiles = [] }: PromptPrevie
       number: '09',
       title: 'Materialidad y Acabados',
       icon: <Hammer className="w-3.5 h-3.5" />,
-      modes: NOT_EDIT,
       items: [
         { label: 'REVESTIM.', value: params.materials, key: 'materials' },
         { label: 'CALIDAD', value: params.finishLevel, key: 'finishLevel' },
+        { label: 'MUROS', value: params.wallFinish, key: 'wallFinish' },
+        { label: 'ABERTURAS', value: params.windowType, key: 'windowType' },
         { label: 'DETALLES', value: params.architecturalDetails, key: 'architecturalDetails' },
       ],
     },
@@ -162,7 +178,6 @@ export default function PromptPreview({ params, loadedFiles = [] }: PromptPrevie
       number: '10',
       title: 'Estética y Paisaje',
       icon: <Palette className="w-3.5 h-3.5" />,
-      modes: NOT_EDIT,
       items: [
         { label: 'PALETA', value: params.colorPalette, key: 'colorPalette' },
         { label: 'ELEMENTOS', value: params.exteriorElements, key: 'exteriorElements' },
@@ -197,7 +212,6 @@ export default function PromptPreview({ params, loadedFiles = [] }: PromptPrevie
         { label: 'CALIDAD', value: params.aiModel.includes('OpenAI') ? params.renderQuality : '', key: 'renderQuality' },
         { label: 'RATIO', value: params.renderAspectRatio, key: 'renderAspectRatio', modes: NOT_EDIT },
         { label: 'RESOLUCIÓN', value: params.renderOutputResolution, key: 'renderOutputResolution', modes: NOT_EDIT },
-        { label: 'THINKING', value: params.thinkingLevel !== 'Minimal' ? params.thinkingLevel : '', modes: NOT_EDIT },
       ],
     },
     {
@@ -206,7 +220,6 @@ export default function PromptPreview({ params, loadedFiles = [] }: PromptPrevie
       icon: <PenLine className="w-3.5 h-3.5" />,
       items: [
         { label: 'EDITAR', value: params.editPrompt, key: 'editPrompt', modes: ['edit'] },
-        { label: 'TÉCNICAS', value: params.technicalNotes, key: 'technicalNotes', modes: NOT_EDIT },
         { label: 'ART DIR.', value: params.artDirection, key: 'artDirection', modes: NOT_EDIT },
         { label: 'EXCLUIR', value: params.negativePrompt, key: 'negativePrompt' },
       ],

@@ -12,7 +12,7 @@ import {
   when,
 } from '@/modules/shared/lib/prompt-helpers';
 
-const ROOM_MAP: Record<string, string> = {
+export const ROOM_MAP: Record<string, string> = {
   "Baño principal": "a luxurious master bathroom sanctuary",
   "Biblioteca/Estudio": "a sophisticated private library and study",
   "Cocina gourmet": "a state-of-the-art gourmet kitchen",
@@ -25,10 +25,22 @@ const ROOM_MAP: Record<string, string> = {
   "Recibidor/Entryway": "a grand and welcoming entryway",
   "Sala de estar/Living room": "a breathtaking expansive living room",
   "Terraza/Deck interior": "a seamless indoor-outdoor terrace",
-  "Vestidor/Walk-in closet": "a bespoke luxury walk-in closet"
+  "Vestidor/Walk-in closet": "a bespoke luxury walk-in closet",
+  "Balcón / Terraza privada": "a private balcony or terrace with a strong connection to the outdoors",
+  "Baño social / Medio baño": "a compact, carefully designed guest powder room",
+  "Cocina sencilla / Cocineta": "a practical everyday kitchen, well organized and lived-in",
+  "Comedor informal / Diario": "a relaxed everyday dining area",
+  "Despensa": "an organized walk-in pantry with shelving and storage",
+  "Dormitorio secundario": "a comfortable secondary bedroom",
+  "Dormitorio infantil / Juvenil": "a bright, playful children's or teenager's bedroom",
+  "Escalera / Hall de escaleras": "a sculptural staircase hall",
+  "Garaje / Taller": "a tidy garage and workshop space",
+  "Lavandería / Cuarto de servicio": "a functional laundry and utility room",
+  "Oficina / Home office": "a focused home office",
+  "Lobby / Vestíbulo de edificio": "a refined building lobby and entrance hall"
 };
 
-const FURNITURE_MAP: Record<string, string> = {
+export const FURNITURE_MAP: Record<string, string> = {
   "Bespoke / Hecho a medida": "bespoke custom-crafted furniture",
   "Bohemio": "eclectic bohemian furnishings",
   "Clásico/Tradicional": "timeless classical furniture pieces",
@@ -41,7 +53,7 @@ const FURNITURE_MAP: Record<string, string> = {
   "Rústico moderno": "warm modern rustic furnishings"
 };
 
-const INTERIOR_LIGHTING_MAP: Record<string, string> = {
+export const INTERIOR_LIGHTING_MAP: Record<string, string> = {
   "Candelabro/Lámpara colgante": "a dramatic statement chandelier",
   "Iluminación de riel (Track lighting)": "discreet architectural track lighting",
   "Iluminación indirecta (Cove lighting)": "soft atmospheric cove lighting",

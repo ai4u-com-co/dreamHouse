@@ -30,6 +30,7 @@ const INHERITED_KEYS = [
   'roofType', 'layoutType', 'colorPalette', 'environment', 'city', 'climate', 'vegetation',
   'waterBody', 'weatherCondition', 'timeOfDay', 'season', 'lighting', 'mood', 'renderStyle',
   'exteriorElements', 'architecturalDetails', 'size',
+  'siteTopography', 'solarOrientation', 'constructionSystem', 'roofMaterial', 'passiveStrategies', 'windowType',
 ] as const;
 
 /**
@@ -60,6 +61,12 @@ function designFactLines(p: DreamHouseParams): string[] {
     when(p.architecturalStyles, (v) => `Architectural style: ${joinList(v)}${present(p.architect) ? `, in the language of ${joinList(p.architect, '&')}` : ''}`),
     when(p.materials, (v) => `Materials: ${joinList(v)}${present(p.finishLevel) ? `, finished to a ${p.finishLevel} standard` : ''}`),
     when(p.roofType, (v) => `Roof: ${v}`),
+    when(p.roofMaterial, (v) => `Roof covering: ${v}`),
+    when(p.constructionSystem, (v) => `Construction system: ${v}`),
+    when(p.windowType, (v) => `Openings: ${v}`),
+    when(p.siteTopography, (v) => `Terrain: ${v}`),
+    when(p.solarOrientation, (v) => `Orientation: ${v}`),
+    when(p.passiveStrategies, (v) => `Passive strategies visible in the design: ${joinList(v)}`),
     when(p.layoutType, (v) => `Spatial layout: ${v}`),
     when(p.colorPalette, (v) => `Color palette: ${joinList(v)}`),
     when(site, (v) => `Site: ${v}`),

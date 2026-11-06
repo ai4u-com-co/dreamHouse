@@ -1,5 +1,6 @@
 import type { DreamHouseParams } from '@/types';
 import { lookup } from '@/lib/safe-lookup';
+import { filmLooksFor } from '@/modules/shared/constants';
 
 // ============================================
 // Ayudas compartidas por los constructores de prompt
@@ -61,7 +62,8 @@ export function cameraSentence(params: DreamHouseParams): string {
     when(params.cameraPreset, (v) => `shot on ${v}`),
     when(params.focalLength, (v) => `${v} lens`),
     when(params.aperture, (v) => `at ${v}`),
-    when(params.filmSimulation, (v) => `${v} color rendering`),
+    // Un look que no pertenece a la cámara elegida (p. ej. una simulación Fujifilm con una Canon) no se aplica
+    when(filmLooksFor(params.cameraPreset).includes(params.filmSimulation) ? params.filmSimulation : '', (v) => `${v} color rendering`),
   ].filter(Boolean);
   return parts.length ? `${parts.join(', ')}` : '';
 }
@@ -86,6 +88,12 @@ export function exteriorDetailLines(params: DreamHouseParams): string[] {
     when(params.waterBody, (v) => `Water on site: ${v}`),
     when(params.weatherCondition, (v) => `Weather: ${v}`),
     when(params.roofType, (v) => `Roof: ${v}`),
+    when(params.roofMaterial, (v) => `Roof covering: ${v}`),
+    when(params.constructionSystem, (v) => `Construction system (visible in the structure, proportions and joints): ${v}`),
+    when(params.windowType, (v) => `Openings: ${v}`),
+    when(params.siteTopography, (v) => `Terrain: ${v}; the building must sit on it with believable foundations, retaining walls and levels`),
+    when(params.solarOrientation, (v) => `Orientation: ${v}; sun direction and shadows must be consistent with it`),
+    when(params.passiveStrategies, (v) => `Passive and bioclimatic strategies expressed in the architecture: ${joinList(v)}`),
     when(parking, (v) => `Parking: ${v}`),
     when(params.socialAreas, (v) => `Social areas expressed in the design: ${joinList(v)}`),
     when(params.exteriorElements, (v) => `Exterior elements present: ${joinList(v)}`),
@@ -123,6 +131,8 @@ export function interiorContextLines(params: DreamHouseParams, buildingType: str
 export function interiorDetailLines(params: DreamHouseParams, buildingType = ''): string[] {
   return [
     ...interiorContextLines(params, buildingType),
+    when(params.wallFinish, (v) => `Wall finish: ${v}`),
+    when(params.windowType, (v) => `Openings: ${v}`),
     when(params.kitchenType, (v) => `Kitchen type: ${v}`),
     when(params.livingAreaType, (v) => `Living area type: ${v}`),
     when(homeProgram(params), (v) => `Home program (context for the space): ${joinList(v)}`),

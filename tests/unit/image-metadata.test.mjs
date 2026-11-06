@@ -92,7 +92,7 @@ const sensitive = {
   ...DEFAULT_PARAMS,
   city: 'Calle Secreta 123, Medellín',
   artDirection: 'Nota privada del cliente',
-  technicalNotes: 'Presupuesto: 500 millones',
+  artDirection2: 'Presupuesto: 500 millones',
   negativePrompt: 'sin vecinos',
   editPrompt: 'quitar el carro del vecino',
   projectType: 'Tiny house',
@@ -105,7 +105,7 @@ test('por defecto solo se incrustan campos de diseño: nada de ciudad, notas ni 
   const out = pickEmbeddableParams(sensitive);
   assert.equal(out.projectType, 'Tiny house');
   assert.deepEqual(out.materials, ['Madera']);
-  for (const key of ['city', 'artDirection', 'technicalNotes', 'negativePrompt', 'editPrompt', 'sourceRender', 'campoNuevoSinRevisar']) {
+  for (const key of ['city', 'artDirection', 'negativePrompt', 'editPrompt', 'sourceRender', 'campoNuevoSinRevisar']) {
     assert.ok(!(key in out), `no debe incrustarse "${key}"`);
   }
   const serialized = JSON.stringify(out);

@@ -11,6 +11,7 @@ import { lookup } from '@/lib/safe-lookup';
 import { normalizeRenderSettings } from '@/lib/render-settings';
 import { buildExteriorPrompt } from '@/modules/exterior/lib/prompt-builder';
 import { buildInteriorPrompt } from '@/modules/interior/lib/prompt-builder';
+import { buildEditPrompt } from '@/modules/edit/lib/prompt-builder';
 import { buildVistasPrompt } from '@/modules/vistas/lib/prompt-builder';
 import { APP_ID, authenticate, charge, chargeFailure, isAdmin, noChargeNote, recordUsage, refund, topUp, type Charge } from '@/lib/billing';
 
@@ -297,8 +298,8 @@ export async function POST(req: NextRequest) {
     } else if (params.mode === 'vistas') {
       narrativePrompt = buildVistasPrompt(params, params.viewType || 'Perspectiva Principal (Hero Shot)', params.aiModel);
     } else {
-      // Una sola instrucción, acotada: «replace ONLY X» (Cookbook). Lo que se conserva va en el mandato de abajo.
-      narrativePrompt = `[INTENDED USE: Photorealistic architectural image edit]\n\nEDIT INSTRUCTION — change ONLY what is described here, nothing else:\n${params.editPrompt}`;
+      // Instrucción acotada + dirección de diseño opcional (ver modules/edit/lib/prompt-builder.ts)
+      narrativePrompt = buildEditPrompt(params);
     }
 
     // --- OpenAI: imágenes de entrada con su rol ---

@@ -13,6 +13,7 @@ import type { DreamHouseParams, GenerationMode } from '@/types';
 // (2) usarlo en su prompt. `tests/unit/param-wiring.test.mjs` lo verifica; añadir un campo aquí sin
 // cablearlo rompe la prueba.
 //
+// 'edit' usa un subconjunto opcional: la dirección de diseño de la zona que se cambia.
 // 'vistas' hereda su diseño del render original (`sourceRender`): consume los parámetros pero no los
 // edita, por eso aparece aquí solo para el panel y el prompt, no para la prueba de controles.
 
@@ -20,16 +21,21 @@ type Modes = readonly GenerationMode[];
 
 const EXT: Modes = ['exterior'];
 const INT: Modes = ['interior'];
+const EDIT: Modes = ['edit'];
 const EXT_INT: Modes = ['exterior', 'interior'];
 const EXT_VISTAS: Modes = ['exterior', 'vistas'];
 const ALL_DESIGN: Modes = ['exterior', 'interior', 'vistas'];
+// Edición: la dirección de diseño de la zona que se cambia (opcional). La luz, el sitio y la cámara NO
+// aplican: la edición conserva los de la imagen original.
+const DESIGN_EDIT: Modes = ['exterior', 'interior', 'vistas', 'edit'];
+const INT_EDIT: Modes = ['interior', 'edit'];
 
 export const PARAM_MODES = {
   // ── Esencia del proyecto (compartida: se edita en un módulo y se ve en el otro) ──
-  projectType: ALL_DESIGN,
-  architecturalStyles: ALL_DESIGN,
-  architect: ALL_DESIGN,
-  mood: ALL_DESIGN,
+  projectType: DESIGN_EDIT,
+  architecturalStyles: DESIGN_EDIT,
+  architect: DESIGN_EDIT,
+  mood: DESIGN_EDIT,
 
   // ── Sitio y luz natural (en interior definen lo que entra por las ventanas) ──
   city: ALL_DESIGN,
@@ -42,9 +48,9 @@ export const PARAM_MODES = {
   lighting: ALL_DESIGN,
 
   // ── Materialidad y estética ──
-  materials: ALL_DESIGN,
-  finishLevel: ALL_DESIGN,
-  colorPalette: ALL_DESIGN,
+  materials: DESIGN_EDIT,
+  finishLevel: DESIGN_EDIT,
+  colorPalette: DESIGN_EDIT,
 
   // ── Cámara y escena ──
   cameraAngle: EXT_INT,
@@ -67,15 +73,29 @@ export const PARAM_MODES = {
   parkingSpots: EXT,
   socialAreas: EXT,
 
+  // ── Emplazamiento y construcción (la vista lo hereda del render original) ──
+  siteTopography: EXT_VISTAS,
+  solarOrientation: EXT_VISTAS,
+  constructionSystem: EXT_VISTAS,
+  roofMaterial: EXT_VISTAS,
+  passiveStrategies: EXT_VISTAS,
+  windowType: DESIGN_EDIT,
+
   // ── Solo interior ──
-  roomType: INT,
+  roomType: INT_EDIT,
   roomSizeM2: INT,
-  furnitureStyle: INT,
-  interiorLighting: INT,
-  flooringMaterial: INT,
-  ceilingDetail: INT,
+  furnitureStyle: INT_EDIT,
+  interiorLighting: INT_EDIT,
+  flooringMaterial: INT_EDIT,
+  ceilingDetail: INT_EDIT,
   kitchenType: INT,
   livingAreaType: INT,
+  wallFinish: INT_EDIT,
+
+  // ── Solo edición ──
+  editChangeType: EDIT,
+  editIntensity: EDIT,
+  editPreserve: EDIT,
 } as const satisfies Partial<Record<keyof DreamHouseParams, Modes>>;
 
 export type RegisteredParam = keyof typeof PARAM_MODES;
@@ -91,6 +111,6 @@ export function appliesTo(key: keyof DreamHouseParams, mode: GenerationMode): bo
 }
 
 /** Parámetros que el módulo debe poder editar (excluye 'vistas', que hereda y no edita) */
-export function editableParams(mode: 'exterior' | 'interior'): RegisteredParam[] {
+export function editableParams(mode: 'exterior' | 'interior' | 'edit'): RegisteredParam[] {
   return (Object.keys(PARAM_MODES) as RegisteredParam[]).filter((k) => appliesTo(k, mode));
 }

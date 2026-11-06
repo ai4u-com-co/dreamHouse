@@ -1,7 +1,7 @@
 import React from 'react';
 import { DreamHouseParams } from '@/types';
 import * as EC from '../constants';
-import { OutputOptions, AmbienceSelects } from '@/components/FormExtras';
+import { OutputOptions, AmbienceSelects, CameraFields, CreativeFields } from '@/components/FormExtras';
 import * as SC from '../../shared/constants';
 import { Sparkles, MapPin, Box, Camera, ImageIcon, Home } from 'lucide-react';
 import { Section } from '@/components/ui/Section';
@@ -177,7 +177,13 @@ export default function ExteriorForm({
         summary={siteSummary}
       >
         <SectionDescription>El emplazamiento físico y las condiciones climáticas del sitio.</SectionDescription>
-        <SiteFields params={params} onChange={handleChange} disabled={disabled} />
+        <div className="space-y-6">
+          <SiteFields params={params} onChange={handleChange} disabled={disabled} />
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
+            <Select label="Topografía del Terreno" value={params.siteTopography} onChange={(e) => handleChange("siteTopography", e.target.value)} options={EC.SITE_TOPOGRAPHIES} disabled={disabled} />
+            <Select label="Orientación Solar" value={params.solarOrientation} onChange={(e) => handleChange("solarOrientation", e.target.value)} options={EC.SOLAR_ORIENTATIONS} disabled={disabled} />
+          </div>
+        </div>
       </Section>
 
       {/* ── FASE 4: DISEÑO FÍSICO Y PROGRAMA ───────────────────────── */}
@@ -224,6 +230,14 @@ export default function ExteriorForm({
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-5 mt-5">
               <Select label="Tipo de Cubierta" value={params.roofType} onChange={(e) => handleChange("roofType", e.target.value)} options={EC.ROOF_TYPES} disabled={disabled} />
               <Select label="Esquema Espacial" value={params.layoutType} onChange={(e) => handleChange("layoutType", e.target.value)} options={EC.LAYOUT_TYPES} disabled={disabled} />
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-5 mt-5">
+              <Select label="Sistema Constructivo" value={params.constructionSystem} onChange={(e) => handleChange("constructionSystem", e.target.value)} options={EC.CONSTRUCTION_SYSTEMS} disabled={disabled} />
+              <Select label="Material de Cubierta" value={params.roofMaterial} onChange={(e) => handleChange("roofMaterial", e.target.value)} options={EC.ROOF_MATERIALS} disabled={disabled} />
+              <Select label="Tipo de Aberturas" value={params.windowType} onChange={(e) => handleChange("windowType", e.target.value)} options={EC.WINDOW_TYPES} disabled={disabled} />
+            </div>
+            <div className="mt-6">
+              {renderChipsGroup("Estrategias Pasivas / Bioclimáticas", "passiveStrategies", EC.PASSIVE_STRATEGIES, "Cómo responde el edificio al sol, al viento y al agua.", true)}
             </div>
           </div>
 
@@ -280,15 +294,7 @@ export default function ExteriorForm({
           <div>
             <Subtitle>Dirección de Cámara</Subtitle>
             <div className="space-y-5">
-              <Select label="Preset de Cámara" value={params.cameraPreset} onChange={(e) => handleChange("cameraPreset", e.target.value)} options={SC.CAMERA_PRESET_NAMES} disabled={disabled} />
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
-                <Select label="Lente" value={params.focalLength} onChange={(e) => handleChange("focalLength", e.target.value)} options={SC.FOCAL_LENGTHS} disabled={disabled} />
-                <Select label="Diafragma" value={params.aperture} onChange={(e) => handleChange("aperture", e.target.value)} options={SC.APERTURES} disabled={disabled} />
-              </div>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
-                <Select label="Ángulo" value={params.cameraAngle} onChange={(e) => handleChange("cameraAngle", e.target.value)} options={SC.ANGLES} disabled={disabled} />
-                <Select label="Composición" value={params.composition} onChange={(e) => handleChange("composition", e.target.value)} options={SC.COMPOSITIONS} disabled={disabled} />
-              </div>
+              <CameraFields params={params} onChange={handleChange} disabled={disabled} scene="exterior" />
               <AmbienceSelects params={params} onChange={handleChange} disabled={disabled} people />
             </div>
           </div>
@@ -306,14 +312,8 @@ export default function ExteriorForm({
           </div>
 
           <div>
-            <Subtitle>Dirección Creativa Adicional</Subtitle>
-            <DebouncedInput 
-              type="textarea"
-              value={params.artDirection} 
-              onChange={(val) => handleChange("artDirection", val)} 
-              placeholder="Instrucciones artísticas específicas o detalles que no cubran los selectores..." 
-              disabled={disabled}
-            />
+            <Subtitle>Dirección Creativa y Exclusiones</Subtitle>
+            <CreativeFields params={params} onChange={handleChange} disabled={disabled} />
           </div>
         </div>
       </Section>
