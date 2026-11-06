@@ -54,7 +54,9 @@ export default function PolygonZoneModal({ image, initial, onApply, onClose }: P
       const cw = stage.clientWidth;
       const ch = stage.clientHeight;
       if (!cw || !ch) return;
-      const scale = Math.min(cw / image.width, ch / image.height, MAX_UPSCALE);
+      const fitScale = Math.min(cw / image.width, ch / image.height);
+      const minComfortableScale = 360 / Math.max(1, Math.min(image.width, image.height));
+      const scale = Math.min(fitScale, Math.max(MAX_UPSCALE, minComfortableScale));
       setSize({ w: Math.floor(image.width * scale), h: Math.floor(image.height * scale) });
     };
     fit();

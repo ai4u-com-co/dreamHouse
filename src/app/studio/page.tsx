@@ -29,6 +29,7 @@ import type { RestoreResult } from '@/lib/restore-params';
 import { LightboxProvider } from '@/context/LightboxContext';
 import MemoryGuard from '@/components/MemoryGuard';
 import type { EditMaskPayload } from '@/components/SketchCanvas';
+import type { Pt } from '@/lib/polygon-zone';
 import { readImageMetadataFromFile } from '@/lib/image-metadata';
 import { sanitizeAssistantParams, sanitizeSourceParams, cleanLabel } from '@/lib/assistant-params';
 import type { DreamHouseImageMetadata } from '@/lib/image-metadata';
@@ -67,6 +68,8 @@ export default function StudioPage() {
 function StudioContent() {
   const [files, setFiles] = useState<File[]>([]);
   const [lotFile, setLotFile] = useState<File | null>(null);
+  const [lotZonePolygons, setLotZonePolygons] = useState<Pt[][]>([]);
+  const [lotZoneFile, setLotZoneFile] = useState<File | null>(null);
   const [exteriorReferenceFile, setExteriorReferenceFile] = useState<File | null>(null);
   const [floorPlanFile, setFloorPlanFile] = useState<File | null>(null);
   const [editCompositeFile, setEditCompositeFile] = useState<File | null>(null);
@@ -87,11 +90,12 @@ function StudioContent() {
   const { userId, credits, isAdmin } = useAuth();
 
   // Costo ANTES de generar: mismo núcleo que el servidor, con los píxeles reales de las imágenes que se enviarán
+  const effectiveLotForMode = params.mode === 'planta' && lotZoneFile ? lotZoneFile : lotFile;
   const inputFiles = useMemo(() => pickOpenAIInputs<File>(params.mode, {
-    lot: lotFile, exteriorRef: exteriorReferenceFile, floorPlan: floorPlanFile, references: files, objects: objectFiles,
+    lot: effectiveLotForMode, exteriorRef: exteriorReferenceFile, floorPlan: floorPlanFile, references: files, objects: objectFiles,
     editImage: editMask?.base ?? editCompositeFile ?? lotFile,
   }).concat(params.mode === 'edit' && editMask ? [editMask.mask] : []),
-  [params.mode, lotFile, exteriorReferenceFile, floorPlanFile, files, objectFiles, editMask, editCompositeFile]);
+  [params.mode, effectiveLotForMode, lotFile, exteriorReferenceFile, floorPlanFile, files, objectFiles, editMask, editCompositeFile]);
   const inputPixels = useFilePixels(inputFiles);
   const quote: QuoteState = useMemo(() => {
     const q = quoteRender(params as unknown as Record<string, unknown>, { inputImagePixels: inputPixels, isAdmin, estimate: true });
@@ -172,7 +176,16 @@ function StudioContent() {
   // recomprimido en un canvas y no los conserva.
   const handleLotFileChange = (file: File | null) => {
     setLotFile(file);
+    setLotZonePolygons([]);
+    setLotZoneFile(null);
+    setParams(prev => (prev.hasLotZone ? { ...prev, hasLotZone: false } : prev));
     if (!file) void applySourceRender(null);
+  };
+
+  const handleLotZoneChange = (polygons: Pt[][], compositeFile: File | null) => {
+    setLotZonePolygons(polygons);
+    setLotZoneFile(compositeFile);
+    setParams(prev => ({ ...prev, hasLotZone: polygons.length > 0 }));
   };
 
   /** En edición, al cambiar o quitar la base se descarta el boceto y la máscara de la imagen anterior */
@@ -219,7 +232,16 @@ function StudioContent() {
     const m = params.mode;
     const list: LoadedFile[] = [];
     if (lotFile) {
-      list.push({ label: m === 'exterior' || m === 'planta' ? 'TERRENO' : m === 'interior' ? 'ESPACIO' : m === 'vistas' ? 'CASA' : 'BASE', name: lotFile.name, used: true });
+      const lotLabel = m === 'planta' && lotZonePolygons.length > 0
+        ? 'TERRENO+ZONA'
+        : m === 'exterior' || m === 'planta'
+          ? 'TERRENO'
+          : m === 'interior'
+            ? 'ESPACIO'
+            : m === 'vistas'
+              ? 'CASA'
+              : 'BASE';
+      list.push({ label: lotLabel, name: lotFile.name, used: true });
     }
     if (exteriorReferenceFile) list.push({ label: 'CASA ACT.', name: exteriorReferenceFile.name, used: m === 'exterior' });
     if (floorPlanFile) list.push({ label: m === 'planta' ? 'BOCETO' : 'PLANO', name: floorPlanFile.name, used: m === 'planta' || m === 'exterior' || m === 'interior' });
@@ -240,6 +262,8 @@ function StudioContent() {
     });
     setFiles([]);
     setLotFile(null);
+    setLotZonePolygons([]);
+    setLotZoneFile(null);
     setExteriorReferenceFile(null);
     setFloorPlanFile(null);
     setEditCompositeFile(null);
@@ -432,8 +456,9 @@ function StudioContent() {
         files.forEach((file) => {
           formData.append('files', file);
         });
-        if (lotFile) {
-          formData.append('lotImage', lotFile);
+        const lotToSend = params.mode === 'planta' && lotZoneFile ? lotZoneFile : lotFile;
+        if (lotToSend) {
+          formData.append('lotImage', lotToSend);
         }
         if (exteriorReferenceFile) {
           formData.append('exteriorReferenceImage', exteriorReferenceFile);
@@ -453,7 +478,11 @@ function StudioContent() {
           objectFiles.forEach((file) => formData.append('objectImages', file));
         }
         
-        const finalParams = { ...params, hasExteriorReference: !!exteriorReferenceFile };
+        const finalParams = {
+          ...params,
+          hasExteriorReference: !!exteriorReferenceFile,
+          hasLotZone: params.mode === 'planta' && lotZonePolygons.length > 0,
+        };
         formData.append('params', JSON.stringify(finalParams));
 
         // Con la sesión de Google (el servidor cobra los créditos); `ownerId` = la cuenta que pidió este render
@@ -531,6 +560,8 @@ function StudioContent() {
     // Reset files since we don't store them in history (only the params)
     setFiles([]);
     setLotFile(null);
+    setLotZonePolygons([]);
+    setLotZoneFile(null);
     setExteriorReferenceFile(null);
     setFloorPlanFile(null);
     setEditCompositeFile(null);
@@ -774,6 +805,8 @@ function StudioContent() {
               onFloorPlanFileChange={setFloorPlanFile}
               lotFile={lotFile}
               onLotFileChange={handleLotFileChange}
+              lotZonePolygons={lotZonePolygons}
+              onLotZoneChange={handleLotZoneChange}
             />
           ) : params.mode === 'exterior' ? (
             <ExteriorForm

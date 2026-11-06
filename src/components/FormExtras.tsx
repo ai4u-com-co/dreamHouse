@@ -113,16 +113,26 @@ export function CreativeFields({ params, onChange, disabled, artDirection = true
   return (
     <div className="space-y-6">
       {artDirection && (
-        <div className="flex flex-col gap-2">
-          <label htmlFor="field-art-direction" className="text-xs font-semibold text-muted-foreground uppercase tracking-widest pl-1">Dirección creativa</label>
-          <p className="text-xs text-muted-foreground opacity-70 font-mono tracking-tight px-1">Máxima prioridad: la IA lo cumple al pie de la letra, por encima de los demás parámetros.</p>
+        <div className="flex flex-col gap-2 p-4 border border-primary/40 bg-primary/5">
+          <div className="flex items-center justify-between gap-2 flex-wrap">
+            <label htmlFor="field-art-direction" className="text-xs font-bold text-foreground uppercase tracking-widest">
+              Dirección creativa (Instrucción Principal)
+            </label>
+            <span className="text-[11px] font-mono font-bold uppercase tracking-wider px-2 py-0.5 bg-primary text-primary-foreground">
+              Máxima prioridad
+            </span>
+          </div>
+          <p className="text-xs text-muted-foreground font-mono tracking-tight">
+            Opcional pero con máxima fuerza: todo lo que escribas aquí manda por encima de cualquier selector o regla por defecto.
+          </p>
           <DebouncedInput
             id="field-art-direction"
             type="textarea"
             value={params.artDirection || ''}
             onChange={(val) => onChange('artDirection', val)}
-            placeholder="Instrucciones artísticas específicas o detalles que no cubran los selectores..."
+            placeholder="Describe con libertad cómo quieres la distribución, relaciones entre espacios, estilo o detalles específicos..."
             disabled={disabled}
+            className="min-h-[104px]"
           />
         </div>
       )}

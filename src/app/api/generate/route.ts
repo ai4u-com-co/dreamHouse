@@ -298,7 +298,7 @@ export async function POST(req: NextRequest) {
     } else if (params.mode === 'interior') {
       narrativePrompt = buildInteriorPrompt(params, params.aiModel, !!lotImage);
     } else if (params.mode === 'exterior') {
-      narrativePrompt = buildExteriorPrompt(params, !!exteriorReferenceImage, params.aiModel);
+      narrativePrompt = buildExteriorPrompt(params, !!exteriorReferenceImage, params.aiModel, !!floorPlanImage);
     } else if (params.mode === 'vistas') {
       narrativePrompt = buildVistasPrompt(params, params.viewType || 'Perspectiva Principal (Hero Shot)', params.aiModel);
     } else {
@@ -326,7 +326,9 @@ export async function POST(req: NextRequest) {
           ? "the house to photograph (reference): the SAME house must appear, identical in form, materials and design; only the camera changes"
           : params.mode === 'interior'
             ? "the existing space to redesign: keep its architectural shell (walls, openings, ceiling height) and its camera viewpoint"
-            : "the lot or terrain photo (site context to integrate the building into)";
+            : params.mode === 'planta' && params.hasLotZone
+              ? "the lot or terrain photo with a highlighted red polygon marking the exact buildable zone where the floor plan must be created: fit the floor plan footprint, orientation and layout to that marked zone (do not copy the red selection overlay lines into the final drawing)"
+              : "the lot or terrain photo (site context to integrate the building into)";
         if (params.mode === 'vistas' && lotImage) {
           openaiInputs.push({ file: lotImage, role: lotRole });
         }
@@ -340,7 +342,10 @@ export async function POST(req: NextRequest) {
           openaiInputs.push({ file: lotImage, role: lotRole });
         }
         if (floorPlanImage) {
-          openaiInputs.push({ file: floorPlanImage, role: "the floor plan or sketch (geometry only): preserve its exact layout, proportions and perspective; do not add new elements; do not copy its linework, labels, dimensions or any text into the image" });
+          const floorPlanRole = params.mode === 'exterior'
+            ? "GEOMETRIC SHAPE REFERENCE ONLY (floor plan): this image defines SOLELY the 3D footprint, perimeter boundaries and volumetric shape of the house (1:1). It does NOT dictate style, materials, colors or lighting. The exterior photo MUST strictly comply with all prompt parameters (materials, architectural style, roof type, levels, landscaping, lighting and Creative Direction) onto this geometric shape, without copying 2D drafting lines or text labels into the photo"
+            : "HARD GEOMETRIC ANCHOR (floor plan or sketch): preserve its exact layout, spatial division, proportions and perimeter footprint while applying the requested parameters; do not copy raw 2D labels or dimension text into the image";
+          openaiInputs.push({ file: floorPlanImage, role: floorPlanRole });
         }
         if ((params.mode === 'exterior' || params.mode === 'planta') && lotImage) {
           openaiInputs.push({ file: lotImage, role: lotRole });
@@ -373,11 +378,15 @@ export async function POST(req: NextRequest) {
       if (params.mode === "planta") {
         mandate = [
           'ARCHITECTURAL FLOOR PLAN MANDATE:',
-          '- Generate a coherent architectural floor plan and spatial division strictly matching the requested room counts, areas and zoning.',
-          params.bedrooms > 0 ? `- Show exactly ${params.bedrooms} bedroom${params.bedrooms > 1 ? 's' : ''}.` : '',
+          '- Generate a coherent architectural floor plan and spatial division matching any specified room counts, areas and zoning (freely proposing a balanced layout for any unspecified parameters).',
+          params.bedrooms > 0 ? `- Show ${params.bedrooms} bedroom${params.bedrooms > 1 ? 's' : ''}.` : '',
           params.bathrooms > 0 ? `- Show ${params.bathrooms} bathroom${params.bathrooms > 1 ? 's' : ''}.` : '',
           floorPlanImage ? '- Respect the overall footprint and layout proportions of the provided reference sketch.' : '',
-          lotImage ? '- Fit the floor plan footprint within the geometry of the provided site/lot reference.' : '',
+          lotImage && params.hasLotZone
+            ? '- Fit the floor plan footprint and orientation specifically to the highlighted polygon zone marked on the provided lot photo; do not draw the red selection overlay lines.'
+            : lotImage
+              ? '- Fit the floor plan footprint within the geometry of the provided site/lot reference.'
+              : '',
         ].filter(Boolean).join('\n');
       } else if (params.mode === "interior") {
         mandate = ['INTERNAL SPATIAL MANDATE:',
@@ -390,13 +399,19 @@ export async function POST(req: NextRequest) {
           floorPlanImage ? '- Preserve the exact layout, proportions and perspective of the floor plan or sketch; do not add new elements or text.' : '',
         ].filter(Boolean).join('\n');
       } else if (params.mode === "exterior") {
-        const structureMandate = exteriorReferenceImage 
-          ? "PRESERVE general architectural volumes and facade structure from reference image."
-          : floorPlanImage
-            ? "Preserve the exact layout, proportions and perspective of the floor plan or sketch; do not add new elements or text."
-            : "Compose the building from the written specification only.";
-        mandate = `ARCHITECTURAL EXTERIOR MANDATE:
-- ${structureMandate}${params.levels > 0 ? `\n- Show exactly ${params.levels} floors.` : ''}`;
+        const structureLines = [
+          exteriorReferenceImage
+            ? "PRESERVE general architectural volumes and facade structure from the house reference image."
+            : "",
+          floorPlanImage
+            ? "HARD CONSTRAINT (FLOOR PLAN = SHAPE ONLY, PROMPT = FULL EXTERIOR SPECIFICATION): The provided floor plan image defines ONLY the 1:1 geometric boundaries and footprint shape (wings, recesses, courtyards, terraces, entry and window/door bays). It is strictly a geometry reference, NOT an aesthetic one. The exterior render MUST fulfill ALL parameters specified in the prompt (architectural style, facade materials, textures, roof design, levels, landscaping, environment, lighting and Creative Direction); do not draw flat 2D plan lines or text labels."
+            : "",
+          !exteriorReferenceImage && !floorPlanImage
+            ? "Compose the building from the written specification only."
+            : "",
+          params.levels > 0 ? `Show exactly ${params.levels} floors.` : "",
+        ].filter(Boolean);
+        mandate = `ARCHITECTURAL EXTERIOR MANDATE:\n${structureLines.map((l) => `- ${l}`).join('\n')}`;
       } else if (params.mode === "vistas") {
         mandate = `ARCHITECTURAL PORTFOLIO MANDATE:
 - House anchor: Image 1 is the house. In every view repeat its massing, number of floors, roof, window and door rhythm, materials and colors exactly; only the camera changes.
@@ -456,7 +471,7 @@ export async function POST(req: NextRequest) {
         ? `\n- Also avoid: ${params.negativePrompt.trim()}`
         : "";
       const creativePriority = params.artDirection?.trim()
-        ? "\n- The CREATIVE DIRECTION in the brief above has the highest priority: where it conflicts with a default rule here, it wins (except the structural integrity of the base image)."
+        ? `\n- SUPREME MANDATE — The CREATIVE DIRECTION in the brief above has the highest priority and is MANDATORY: execute every spatial, functional and visual instruction in "${params.artDirection.trim()}" literally and completely; where it conflicts with any default rule, preset or parameter here, it wins unconditionally (except the structural integrity of the base image).`
         : "";
       fullPrompt = `${openaiImageGuide ? `${openaiImageGuide}\n\n` : ""}${narrativePrompt}
 

@@ -129,8 +129,21 @@ export default function ExteriorForm({
         <SectionDescription>Sube las fotos y planos que guiarán la estructura de la generación.</SectionDescription>
         <div className="space-y-8">
           <div>
-            <Subtitle>Referencias Visuales / Inspiración (Máx. 5)</Subtitle>
-            <ReferenceUploader files={files} onFilesChange={onFilesChange} />
+            <Subtitle>Slot de Planta Arquitectónica (Geometría y Forma de la Casa)</Subtitle>
+            <FloorPlanUploader 
+              file={floorPlanFile} 
+              onFileChange={onFloorPlanFileChange} 
+              title="Plano Residencial / Planta Guía"
+              description="La planta sirve únicamente como referencia de la forma y geometría de la casa (huella 1:1, alas, patios y vanos). La foto exterior debe cumplir con todos los demás parámetros que configures en el formulario y en el prompt."
+            />
+            {floorPlanFile && (
+              <div className="mt-3 p-4 border border-primary/40 bg-primary/5 text-xs text-muted-foreground leading-relaxed" role="status">
+                <span className="font-bold uppercase tracking-wider text-primary block mb-1">
+                  Slot de Planta activo: forma y geometría ancladas (1:1)
+                </span>
+                La planta solo define la forma y geometría de la casa. La fachada exterior, materiales, estilo arquitectónico, cubierta, niveles, paisaje, iluminación y dirección creativa se generan cumpliendo fielmente con los parámetros del prompt.
+              </div>
+            )}
           </div>
 
           <div>
@@ -156,13 +169,8 @@ export default function ExteriorForm({
           </div>
 
           <div>
-            <Subtitle>Plano de Planta (Guía Geométrica)</Subtitle>
-            <FloorPlanUploader 
-              file={floorPlanFile} 
-              onFileChange={onFloorPlanFileChange} 
-              title="Plano Residencial"
-              description="Sube el plano de planta. El exterior respetará la geometría del plano."
-            />
+            <Subtitle>Referencias Visuales / Inspiración (Máx. 5)</Subtitle>
+            <ReferenceUploader files={files} onFilesChange={onFilesChange} />
           </div>
         </div>
       </Section>

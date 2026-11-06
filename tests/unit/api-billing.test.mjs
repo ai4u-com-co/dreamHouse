@@ -131,7 +131,7 @@ test('generate: usa SOLO la clave del servidor; ignora cualquier clave que mande
 });
 
 test('generate: el cobro es EXACTAMENTE v.credits del núcleo (calidad, tamaño, variantes)', async () => {
-  for (const [over, quality, size, n] of [
+  for (const [over, quality, , n] of [
     [{ renderQuality: 'Alta', renderOutputResolution: '2K', renderAspectRatio: '1:1' }, 'high', 1920 * 1920, 1],
     [{ renderQuality: 'Muy alta' }, 'xhigh', 1376 * 768, 1],
     [{ renderQuality: 'Máxima', renderAspectRatio: '1:1' }, 'max', 1024 * 1024, 1],

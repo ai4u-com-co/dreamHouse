@@ -107,7 +107,12 @@ export function getLightingPhysics(timeOfDay: string, rawLightingType: string, s
   return `The scene is captured during ${timeOfDay}${seasonCtx}, with ${lightingType} lighting that defines shadow direction, sculpts the building's volumes, and confirms the physical depth of every surface plane.`;
 }
 
-export function buildExteriorPrompt(params: DreamHouseParams, hasStructuralReference: boolean = false, targetModel?: string): string {
+export function buildExteriorPrompt(
+  params: DreamHouseParams,
+  hasStructuralReference: boolean = false,
+  targetModel?: string,
+  hasFloorPlanReference: boolean = false,
+): string {
   const projectType = lookup(PROJECT_TYPE_MAP, params.projectType) || params.projectType || "building";
   let scaleDesc = "modern structure";
   if (params.size) {
@@ -132,15 +137,29 @@ export function buildExteriorPrompt(params: DreamHouseParams, hasStructuralRefer
     ? `Located in the urban context of ${params.city}`
     : `Rooted in a ${params.environment || 'carefully considered'} environment`;
 
+  const floorPlanHardBlock = hasFloorPlanReference
+    ? `\nHARD GEOMETRIC CONSTRAINT — FLOOR PLAN SLOT (SHAPE & GEOMETRY ONLY vs PROMPT SPECIFICATION):
+- FLOOR PLAN IS GEOMETRIC BLUEPRINT ONLY: The provided floor plan image is SOLELY and EXCLUSIVELY a reference for the 3D footprint, perimeter boundaries, wings, recesses, courtyards, setbacks and spatial geometry (1:1 shape of the house). It does NOT define or restrict the exterior aesthetic, colors, materials, style or lighting.
+- PROMPT GOVERNS ALL EXTERIOR APPEARANCE & PARAMETERS: The generated exterior photo MUST fully and faithfully execute every single parameter from the prompt (architectural style, facade materials, textures, color palette, roof type and covering, number of levels, window design, landscaping, site environment, lighting, camera and Creative Direction).
+- 2D-to-3D Extrusion: Extrude the 3D volume directly from the floor plan's footprint shape, dressing that geometry completely according to the prompt parameters (never render flat 2D drafting lines, dimension text or annotations on the ground).\n`
+    : "";
+
   if (isOpenAI) {
+    const subjectDesc = hasStructuralReference && hasFloorPlanReference
+      ? `reimagined version of the ${projectType} from reference image, strictly obeying the footprint and spatial layout of the provided floor plan`
+      : hasStructuralReference
+        ? `reimagined version of the ${projectType} from reference image`
+        : hasFloorPlanReference
+          ? `3D architectural exterior of a ${scaleDesc} ${projectType} extruded and built strictly from the provided floor plan reference`
+          : `${scaleDesc} ${projectType}`;
     const prompt = `
 [INTENDED USE: Professional Architectural Portfolio Image]
 ${creativeDirectionLead(params) ? `\n${creativeDirectionLead(params)}\n` : ""}
 SCENE & CONTEXT:
-- Subject: ${hasStructuralReference ? `reimagined version of the ${projectType} from reference image` : `${scaleDesc} ${projectType}`}
+- Subject: ${subjectDesc}
 - Camera Angle: ${params.cameraAngle || 'eye-level'} view
 - Location/Setting: ${siteDesc}
-
+${floorPlanHardBlock}
 ARCHITECTURAL SPECIFICATION:
 - Style: ${styleDesc} character${architectDesc ? `, drawing from the language of ${architectDesc}` : ""}
 ${params.layoutType ? `- Layout: Organized with a ${lookup(FORM_ORGANIZATION_MAP, params.layoutType) || params.layoutType} configuration\n` : ""}${params.levels > 0 ? `- Levels: Distributed across exactly ${params.levels} floors\n` : ""}- Materials: ${materialDesc || "traditional architectural facade materials"}
@@ -164,6 +183,9 @@ ${creativeDirectionBlock(params) ? `\n${creativeDirectionBlock(params)}\n` : ""}
     prompt = `${article} ${style.medium} — ${params.cameraAngle || 'eye-level'} view — documenting a reimagined version of the ${projectType} shown in the reference image. `;
   } else {
     prompt = `${article} ${style.medium} — ${params.cameraAngle || 'eye-level'} view — of a ${scaleDesc} ${projectType}. `;
+  }
+  if (hasFloorPlanReference) {
+    prompt += `HARD GEOMETRIC CONSTRAINT (FLOOR PLAN SLOT): The provided floor plan image is strictly a 1:1 reference for the house's 3D footprint and geometry (perimeter, wings, recesses, courtyards, terraces and openings) — it is NOT an aesthetic reference. The exterior photo must fully fulfill ALL prompt parameters (style, facade materials, roof, levels, landscaping, lighting and Creative Direction) onto that shape, without copying flat 2D drafting lines or text. `;
   }
 
   if (present(params.city)) {
