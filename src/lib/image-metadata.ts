@@ -40,7 +40,7 @@ export interface DreamHouseImageMetadata {
  * Campos de diseño que se incrustan por defecto. Es una LISTA EXPLÍCITA: un campo nuevo del formulario
  * no viaja dentro de la imagen hasta que alguien lo agregue aquí a propósito.
  * Quedan fuera, y solo se incrustan si el usuario lo pide (`embedDetails`): la ciudad, las notas y
- * textos libres (`artDirection`, `technicalNotes`, `negativePrompt`, `editPrompt`) y el prompt completo.
+ * textos libres (`artDirection`, `negativePrompt`, `editPrompt`) y el prompt completo.
  */
 export const DESIGN_PARAM_KEYS = [
   'architecturalStyles', 'architect', 'mood', 'materials', 'finishLevel', 'colorPalette',
@@ -53,11 +53,12 @@ export const DESIGN_PARAM_KEYS = [
   'roomType', 'roomSizeM2', 'furnitureStyle', 'interiorLighting', 'flooringMaterial', 'ceilingDetail',
   'bedrooms', 'bathrooms', 'kitchenType', 'livingAreaType',
   'editChangeType', 'editIntensity', 'editPreserve',
+  'siteTopography', 'solarOrientation', 'constructionSystem', 'roofMaterial', 'passiveStrategies', 'windowType', 'wallFinish',
 ] as const satisfies ReadonlyArray<keyof DreamHouseParams>;
 
 /** Solo con permiso expreso del usuario: ubicación y textos libres */
 export const DETAIL_PARAM_KEYS = [
-  'city', 'artDirection', 'technicalNotes', 'negativePrompt', 'editPrompt',
+  'city', 'artDirection', 'negativePrompt', 'editPrompt',
 ] as const satisfies ReadonlyArray<keyof DreamHouseParams>;
 
 /** Parámetros que se pueden incrustar: la lista de diseño, y los detalles solo si `includeDetails` */

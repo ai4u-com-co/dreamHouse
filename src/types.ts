@@ -54,7 +54,6 @@ export interface SharedParams {
   renderVariants: number;
   /** "low" solo la puede usar un administrador; el servidor lo verifica */
   renderModeration: "auto" | "low";
-  thinkingLevel: "Minimal" | "High";
   renderQuality: RenderQuality;
   /** Incrustar los parámetros dentro del archivo de imagen generado (XMP/iTXt) */
   embedMetadata: boolean;
@@ -64,7 +63,6 @@ export interface SharedParams {
   sourceRender?: SourceRender;
 
   // Creative (Shared)
-  technicalNotes: string;
   artDirection: string;
   negativePrompt: string;
   editPrompt: string;
@@ -89,6 +87,14 @@ export interface ExteriorSpecificParams {
   vegetation: string[];
   architecturalDetails: string[];
   hasExteriorReference?: boolean;
+  /** Emplazamiento y construcción */
+  siteTopography: string;
+  solarOrientation: string;
+  constructionSystem: string;
+  roofMaterial: string;
+  passiveStrategies: string[];
+  /** Tipo de aberturas (aplica a exterior, interior, vistas y edición) */
+  windowType: string;
 }
 
 export interface InteriorSpecificParams {
@@ -102,6 +108,7 @@ export interface InteriorSpecificParams {
   bathrooms: number;
   kitchenType: string;
   livingAreaType: string;
+  wallFinish: string;
 }
 
 export interface VistasSpecificParams {
@@ -148,11 +155,9 @@ export const DEFAULT_PARAMS: DreamHouseParams = {
   renderBackground: "auto",
   renderVariants: 1,
   renderModeration: "auto",
-  thinkingLevel: "Minimal",
   renderQuality: "Borrador",
   embedMetadata: true,
   embedDetails: false,
-  technicalNotes: "",
   artDirection: "",
   negativePrompt: "",
   editPrompt: "",
@@ -176,6 +181,12 @@ export const DEFAULT_PARAMS: DreamHouseParams = {
   vegetation: [],
   architecturalDetails: [],
   hasExteriorReference: false,
+  siteTopography: "",
+  solarOrientation: "",
+  constructionSystem: "",
+  roofMaterial: "",
+  passiveStrategies: [],
+  windowType: "",
 
   // Interior
   roomType: "",
@@ -188,6 +199,7 @@ export const DEFAULT_PARAMS: DreamHouseParams = {
   bathrooms: 0,
   kitchenType: "",
   livingAreaType: "",
+  wallFinish: "",
 
   // Vistas
   selectedVistas: [],

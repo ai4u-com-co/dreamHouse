@@ -73,6 +73,14 @@ export const PARAM_MODES = {
   parkingSpots: EXT,
   socialAreas: EXT,
 
+  // ── Emplazamiento y construcción (la vista lo hereda del render original) ──
+  siteTopography: EXT_VISTAS,
+  solarOrientation: EXT_VISTAS,
+  constructionSystem: EXT_VISTAS,
+  roofMaterial: EXT_VISTAS,
+  passiveStrategies: EXT_VISTAS,
+  windowType: DESIGN_EDIT,
+
   // ── Solo interior ──
   roomType: INT_EDIT,
   roomSizeM2: INT,
@@ -82,6 +90,7 @@ export const PARAM_MODES = {
   ceilingDetail: INT_EDIT,
   kitchenType: INT,
   livingAreaType: INT,
+  wallFinish: INT_EDIT,
 
   // ── Solo edición ──
   editChangeType: EDIT,

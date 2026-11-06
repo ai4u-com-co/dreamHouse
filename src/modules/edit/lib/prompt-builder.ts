@@ -52,6 +52,8 @@ export function editDesignLines(params: DreamHouseParams): string[] {
     when(params.architecturalStyles, (v) => `Style of the new design: ${joinList(v)}`),
     when(params.architect, (v) => `Design influence: the principles and sensibility of ${joinList(v, '&')}`),
     when(params.mood, (v) => `Mood: ${v}`),
+    when(params.wallFinish, (v) => `Wall finish, if walls are part of the edit: ${v}`),
+    when(params.windowType, (v) => `Openings, if windows or doors are part of the edit: ${v}`),
     when(params.materials, (v) => `Materials to use: ${joinList(v)}`),
     when(params.flooringMaterial, (v) => `Flooring, if it is part of the edit: ${v}`),
     when(params.ceilingDetail, (v) => `Ceiling, if it is part of the edit: ${v}`),

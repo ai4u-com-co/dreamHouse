@@ -115,6 +115,8 @@ export default function PromptPreview({ params, loadedFiles = [] }: PromptPrevie
         { label: 'ENTORNO', value: params.environment, key: 'environment' },
         { label: 'AGUA', value: params.waterBody, key: 'waterBody' },
         { label: 'TIEMPO', value: params.weatherCondition, key: 'weatherCondition' },
+        { label: 'TERRENO', value: params.siteTopography, key: 'siteTopography' },
+        { label: 'ORIENTAC.', value: params.solarOrientation, key: 'solarOrientation' },
       ],
     },
     {
@@ -127,6 +129,9 @@ export default function PromptPreview({ params, loadedFiles = [] }: PromptPrevie
         { label: 'NIVELES', value: params.levels, key: 'levels' },
         { label: 'CUBIERTA', value: params.roofType, key: 'roofType' },
         { label: 'PLANTA', value: params.layoutType, key: 'layoutType' },
+        { label: 'SISTEMA', value: params.constructionSystem, key: 'constructionSystem' },
+        { label: 'MAT. CUBIERTA', value: params.roofMaterial, key: 'roofMaterial' },
+        { label: 'BIOCLIMA', value: params.passiveStrategies, key: 'passiveStrategies' },
       ],
     },
     {
@@ -164,6 +169,8 @@ export default function PromptPreview({ params, loadedFiles = [] }: PromptPrevie
       items: [
         { label: 'REVESTIM.', value: params.materials, key: 'materials' },
         { label: 'CALIDAD', value: params.finishLevel, key: 'finishLevel' },
+        { label: 'MUROS', value: params.wallFinish, key: 'wallFinish' },
+        { label: 'ABERTURAS', value: params.windowType, key: 'windowType' },
         { label: 'DETALLES', value: params.architecturalDetails, key: 'architecturalDetails' },
       ],
     },
@@ -205,7 +212,6 @@ export default function PromptPreview({ params, loadedFiles = [] }: PromptPrevie
         { label: 'CALIDAD', value: params.aiModel.includes('OpenAI') ? params.renderQuality : '', key: 'renderQuality' },
         { label: 'RATIO', value: params.renderAspectRatio, key: 'renderAspectRatio', modes: NOT_EDIT },
         { label: 'RESOLUCIÓN', value: params.renderOutputResolution, key: 'renderOutputResolution', modes: NOT_EDIT },
-        { label: 'THINKING', value: params.thinkingLevel !== 'Minimal' ? params.thinkingLevel : '', modes: NOT_EDIT },
       ],
     },
     {
@@ -214,7 +220,6 @@ export default function PromptPreview({ params, loadedFiles = [] }: PromptPrevie
       icon: <PenLine className="w-3.5 h-3.5" />,
       items: [
         { label: 'EDITAR', value: params.editPrompt, key: 'editPrompt', modes: ['edit'] },
-        { label: 'TÉCNICAS', value: params.technicalNotes, key: 'technicalNotes', modes: NOT_EDIT },
         { label: 'ART DIR.', value: params.artDirection, key: 'artDirection', modes: NOT_EDIT },
         { label: 'EXCLUIR', value: params.negativePrompt, key: 'negativePrompt' },
       ],

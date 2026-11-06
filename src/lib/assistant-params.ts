@@ -17,17 +17,17 @@ import { DESIGN_PARAM_KEYS } from '@/lib/image-metadata';
 /** Campos que el asistente nunca debe tocar */
 const BLOCKED_KEYS = new Set<string>([
   'mode', 'aiModel', 'renderQuality', 'embedMetadata', 'embedDetails', 'sourceRender', 'selectedVistas',
-  'viewType', 'editPrompt', 'thinkingLevel', 'hasExteriorReference',
+  'viewType', 'editPrompt', 'hasExteriorReference',
 ]);
 
 /** Únicos campos de texto libre admitidos (solo desde el asistente, nunca desde metadatos de imagen) */
-const FREE_TEXT_KEYS = new Set<string>(['city', 'artDirection', 'technicalNotes', 'negativePrompt']);
+const FREE_TEXT_KEYS = new Set<string>(['city', 'artDirection', 'negativePrompt']);
 export const FREE_TEXT_MAX_LENGTH = 200;
 
 /** Valores admitidos por campo (los mismos que ofrecen los selectores del formulario) */
 const OPTIONS: Partial<Record<keyof DreamHouseParams, readonly string[]>> = {
   architecturalStyles: SC.STYLES, architect: SC.ARCHITECTS, mood: SC.MOODS, colorPalette: SC.COLORS,
-  cameraAngle: SC.ANGLES, composition: SC.COMPOSITIONS, timeOfDay: SC.TIMES_OF_DAY, season: SC.SEASONS,
+  cameraAngle: [...SC.ANGLES, ...SC.INTERIOR_ANGLES], composition: [...SC.COMPOSITIONS, ...SC.INTERIOR_COMPOSITIONS], timeOfDay: SC.TIMES_OF_DAY, season: SC.SEASONS,
   lighting: SC.LIGHTING_TYPES, humanContext: SC.HUMAN_CONTEXT,
   cameraPreset: SC.CAMERA_PRESET_NAMES, focalLength: SC.FOCAL_LENGTHS, aperture: SC.APERTURES,
   filmSimulation: [...SC.FUJIFILM_FILM_SIMULATIONS, ...SC.UNIVERSAL_FILM_LOOKS, DEFAULT_PARAMS.filmSimulation],
@@ -36,10 +36,12 @@ const OPTIONS: Partial<Record<keyof DreamHouseParams, readonly string[]>> = {
   projectType: EC.PROJECT_TYPES, climate: EC.CLIMATES, environment: EC.ENVIRONMENTS, waterBody: EC.WATER_BODIES,
   weatherCondition: EC.WEATHER_CONDITIONS, roofType: EC.ROOF_TYPES, parkingType: EC.PARKING_TYPES,
   layoutType: EC.LAYOUT_TYPES, socialAreas: EC.SOCIAL_AREAS, architecturalDetails: EC.ARCHITECTURAL_DETAILS,
-  materials: EC.MATERIALS, finishLevel: EC.FINISH_LEVELS, exteriorElements: EC.EXTERIOR_ELEMENTS, vegetation: EC.VEGETATION,
+  materials: [...new Set([...EC.MATERIALS, ...IC.INTERIOR_MATERIALS])], finishLevel: EC.FINISH_LEVELS, exteriorElements: EC.EXTERIOR_ELEMENTS, vegetation: EC.VEGETATION,
   roomType: IC.ROOM_TYPES, furnitureStyle: IC.FURNITURE_STYLES, interiorLighting: IC.INTERIOR_LIGHTING_TYPES,
   flooringMaterial: IC.FLOORING_MATERIALS, ceilingDetail: IC.CEILING_DETAILS,
   kitchenType: IC.KITCHEN_TYPES, livingAreaType: IC.LIVING_AREA_TYPES,
+  siteTopography: EC.SITE_TOPOGRAPHIES, solarOrientation: EC.SOLAR_ORIENTATIONS, constructionSystem: EC.CONSTRUCTION_SYSTEMS,
+  roofMaterial: EC.ROOF_MATERIALS, passiveStrategies: EC.PASSIVE_STRATEGIES, windowType: EC.WINDOW_TYPES, wallFinish: IC.WALL_FINISHES,
   editChangeType: EDC.EDIT_CHANGE_TYPES, editIntensity: EDC.EDIT_INTENSITIES, editPreserve: EDC.EDIT_PRESERVE_OPTIONS,
 };
 

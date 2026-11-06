@@ -24,11 +24,13 @@ const SAMPLE = {
   materials: ['Acero'], finishLevel: 'Lujo/Premium', colorPalette: ['Blanco'],
   cameraAngle: 'Nivel de ojos', composition: 'Simétrica', humanContext: 'Familia disfrutando',
   bedrooms: 3, bathrooms: 2,
-  size: '250', levels: 3, roofType: 'Cubierta verde', layoutType: 'Open plan', architecturalDetails: ['Voladizos'],
+  size: '250', levels: 3, roofType: 'Cubierta verde', layoutType: 'Planta abierta', architecturalDetails: ['Voladizos'],
   exteriorElements: ['Pérgola'], vegetation: ['Palmas'], parkingType: 'Garaje cerrado (2+ autos)', parkingSpots: 4,
   socialAreas: ['Piscina'],
   roomType: 'Cocina gourmet', roomSizeM2: 28, furnitureStyle: ['Escandinavo'], interiorLighting: ['Iluminación indirecta (Cove lighting)'],
   flooringMaterial: 'Roble', ceilingDetail: 'Vigas de madera', kitchenType: 'Isla central', livingAreaType: 'Doble altura',
+  siteTopography: 'Ladera pronunciada', solarOrientation: 'Fachada principal al norte', constructionSystem: 'Guadua / Bambú estructural',
+  roofMaterial: 'Teja de barro', passiveStrategies: ['Aleros profundos'], windowType: 'Muro cortina', wallFinish: 'Estuco veneciano',
   editChangeType: 'Cambiar el color', editIntensity: 'Radical (transformación total)', editPreserve: ['Perspectiva y encuadre'],
 };
 
@@ -69,7 +71,7 @@ const FORMS = {
   edit: 'src/modules/edit/components/EditForm.tsx',
 };
 const SHARED_FILES = ['src/components/FormFields.tsx', 'src/components/FormExtras.tsx'];
-const SHARED_COMPONENTS = ['ChipsField', 'EssenceFields', 'SiteFields', 'HomeProgramFields', 'AmbienceSelects', 'OutputOptions'];
+const SHARED_COMPONENTS = ['ChipsField', 'EssenceFields', 'SiteFields', 'HomeProgramFields', 'AmbienceSelects', 'OutputOptions', 'CameraFields', 'CreativeFields'];
 
 /** Cuerpo de un componente compartido (desde `export function Name` hasta el siguiente `\nexport` o el fin) */
 function componentBody(name) {
@@ -155,4 +157,79 @@ test('edición: el tipo de espacio, el maestro y lo que se conserva llegan al pr
   assert.match(text, /Tadao Ando/);
   assert.match(text, /EDITED AREA ONLY/);
   assert.match(text, /perspective, framing and camera viewpoint and the doors and windows/);
+});
+
+// ── Controles que existían en el estado pero no en pantalla (auditoría) ──
+for (const mode of ['exterior', 'interior', 'edit', 'vistas']) {
+  test(`${mode}: se puede escribir qué NO debe aparecer (negativePrompt tiene control)`, () => {
+    const file = { ...FORMS, vistas: 'src/modules/vistas/components/VistasForm.tsx' }[mode];
+    assert.match(componentBody('CreativeFields'), /negativePrompt/);
+    assert.match(read(file), /<CreativeFields\b/, `${mode} debe pintar CreativeFields`);
+  });
+}
+
+test('cámara: exterior e interior pintan CameraFields y el look de película/profundidad de campo tienen control', () => {
+  for (const mode of ['exterior', 'interior']) assert.match(read(FORMS[mode]), /<CameraFields\b/);
+  const body = componentBody('CameraFields');
+  assert.match(body, /filmSimulation/);
+  assert.match(body, /depthOfField/);
+});
+
+test('cámara: un look de película que no pertenece a la cámara elegida no llega al prompt', async () => {
+  const { cameraSentence } = await import('@/modules/shared/lib/prompt-helpers');
+  const canon = { ...DEFAULT_PARAMS, cameraPreset: 'Canon EOS R5 II', filmSimulation: 'Classic Chrome' };
+  assert.doesNotMatch(cameraSentence(canon), /Classic Chrome/);
+  const fuji = { ...DEFAULT_PARAMS, cameraPreset: 'Fujifilm X100 VI', filmSimulation: 'Classic Chrome' };
+  assert.match(cameraSentence(fuji), /Classic Chrome/);
+});
+
+test('interior: ángulos, composiciones y luz no ofrecen opciones de exterior', async () => {
+  const SC = await import('@/modules/shared/constants');
+  assert.ok(!SC.INTERIOR_ANGLES.some((a) => /dron|drone|calle/i.test(a)));
+  assert.ok(!SC.INTERIOR_COMPOSITIONS.some((c) => /cielo|árboles|agua/i.test(c)));
+  assert.ok(!SC.INTERIOR_DAYLIGHT_TYPES.includes('Arquitectónica exterior'));
+});
+
+test('el prompt exterior usa la profundidad de campo elegida (fotográfico)', () => {
+  const base = { ...DEFAULT_PARAMS, mode: 'exterior' };
+  for (const model of [OPENAI, GEMINI]) {
+    const a = buildExteriorPrompt(base, false, model);
+    const b = buildExteriorPrompt({ ...base, depthOfField: 'Poca (f/1.8–f/2.8, fondo muy suave)' }, false, model);
+    assert.notEqual(a, b);
+  }
+});
+
+test('cada tipo de espacio de interior tiene su descripción: ninguno cae en el genérico', async () => {
+  const { ROOM_TYPES } = await import('@/modules/interior/constants');
+  const { ROOM_MAP } = await import('@/modules/interior/lib/prompt-builder');
+  const missing = ROOM_TYPES.filter((r) => !ROOM_MAP[r]);
+  assert.deepEqual(missing, [], `Tipos de espacio sin descripción en ROOM_MAP: ${missing.join(', ')}`);
+});
+
+test('vistas: el emplazamiento y la construcción del render original se heredan y llegan al prompt', async () => {
+  const { buildVistasPrompt } = await import('@/modules/vistas/lib/prompt-builder');
+  const keys = ['siteTopography', 'solarOrientation', 'constructionSystem', 'roofMaterial', 'passiveStrategies', 'windowType'];
+  for (const model of [OPENAI, GEMINI]) {
+    const base = { ...DEFAULT_PARAMS, mode: 'vistas' };
+    const before = buildVistasPrompt(base, 'Perspectiva Principal (Hero Shot)', model);
+    for (const key of keys) {
+      const after = buildVistasPrompt({ ...base, [key]: SAMPLE[key] }, 'Perspectiva Principal (Hero Shot)', model);
+      assert.notEqual(after, before, `vistas/${model}: "${key}" no llega al prompt`);
+    }
+  }
+});
+
+test('las listas no tienen repetidos ni elementos vacíos', async () => {
+  const lists = {
+    ...(await import('@/modules/shared/constants')),
+    ...(await import('@/modules/exterior/constants')),
+    ...(await import('@/modules/interior/constants')),
+    ...(await import('@/modules/edit/constants')),
+  };
+  for (const [name, list] of Object.entries(lists)) {
+    if (!Array.isArray(list) || !list.every((x) => typeof x === 'string') || name === 'OUTPUT_RESOLUTIONS') continue;
+    const lower = list.map((x) => x.toLowerCase());
+    assert.equal(new Set(lower).size, lower.length, `${name} tiene elementos repetidos`);
+    assert.ok(list.every((x) => x.trim()), `${name} tiene un elemento vacío`);
+  }
 });

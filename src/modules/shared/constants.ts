@@ -6,15 +6,18 @@ export const STYLES = [
   "Africano vernáculo",
   "Alpino/Chalet",
   "Andaluz",
+  "Andino / Vernáculo colombiano",
   "Antebellum",
   "Árabe contemporáneo",
   "Art Deco",
   "Art Nouveau",
+  "Arts & Crafts",
   "Australiano contemporáneo",
   "Balinés",
   "Barroco",
   "Bauhaus",
   "Beaux-Arts",
+  "Bioclimático",
   "Biofílico",
   "Blob Architecture",
   "Bohemio de lujo",
@@ -26,7 +29,6 @@ export const STYLES = [
   "Caribeño",
   "Coastal Modern",
   "Colonial",
-  "Container",
   "Contemporáneo",
   "Craftsman/Bungalow",
   "De Stijl",
@@ -40,22 +42,22 @@ export const STYLES = [
   "Florida/Miami Deco",
   "Futurista",
   "Georgian",
+  "Gótico Revival",
   "Greek Revival",
   "Griego isleño",
-  "Gótico Revival",
   "Hacienda moderna",
   "Hanok (Coreano)",
   "High-Tech",
   "Industrial",
   "Japandi",
   "Japonés tradicional",
-  "Loft",
   "Marroquí/Morisco",
   "Mediterráneo",
   "Metabolista",
   "Mexicano contemporáneo",
   "Mid-Century Modern",
   "Minimalista",
+  "Modernismo tropical",
   "Moderno",
   "Mountain Modern",
   "Neo-brutalista",
@@ -70,12 +72,13 @@ export const STYLES = [
   "Prairie",
   "Provenzal",
   "Pueblo Revival",
-  "Pueblo/Adobe",
+  "Racionalismo",
   "Ranch",
+  "Regionalismo crítico",
   "Resort Modern",
   "Shingle Style",
+  "Streamline Moderne",
   "Sustentable/Eco",
-  "Tiny House",
   "Toscano",
   "Treehouse/Árbol",
   "Tropical",
@@ -89,6 +92,7 @@ export const STYLES = [
 export const ARCHITECTS = [
   "Alberto Campo Baeza",
   "Alejandro Aravena",
+  "Alvar Aalto",
   "Álvaro Siza",
   "Antoni Gaudí",
   "Arata Isozaki",
@@ -99,13 +103,15 @@ export const ARCHITECTS = [
   "Daniel Libeskind",
   "David Adjaye",
   "David Chipperfield",
-  "Diller Scofidio + Renfro",
   "Diébédo Francis Kéré",
+  "Diller Scofidio + Renfro",
   "Eduardo Souto de Moura",
   "Frank Gehry",
   "Frank Lloyd Wright",
   "Frida Escobedo",
   "Fumihiko Maki",
+  "Geoffrey Bawa",
+  "Giancarlo Mazzanti",
   "Glenn Murcutt",
   "Grafton Architects",
   "Heatherwick Studio",
@@ -114,12 +120,16 @@ export const ARCHITECTS = [
   "Jean Nouvel",
   "John Pawson",
   "Junya Ishigami",
+  "Jørn Utzon",
   "Kengo Kuma",
   "Lacaton & Vassal",
   "Le Corbusier",
+  "Lina Bo Bardi",
   "Louis Kahn",
   "Ludwig Mies van der Rohe",
+  "Luis Barragán",
   "MAD Architects",
+  "Mario Botta",
   "Moshe Safdie",
   "MVRDV",
   "Norman Foster",
@@ -129,14 +139,19 @@ export const ARCHITECTS = [
   "Paulo Mendes da Rocha",
   "Peter Eisenman",
   "Peter Zumthor",
+  "Pezo von Ellrichshausen",
   "Rafael Moneo",
   "Rem Koolhaas",
   "Renzo Piano",
+  "Ricardo Legorreta",
   "Richard Meier",
+  "Rogelio Salmona",
   "SANAA (Sejima + Nishizawa)",
   "Santiago Calatrava",
   "Shigeru Ban",
+  "Simón Vélez",
   "Sin arquitecto específico",
+  "Smiljan Radic",
   "Snøhetta",
   "Sou Fujimoto",
   "Steven Holl",
@@ -230,8 +245,6 @@ export const OUTPUT_RESOLUTIONS = ["1K", "2K", "Personalizado"];
 
 /** Formatos que admite GPT Image 2.5 (relación máxima 3:1) */
 export const ASPECT_RATIOS = ["16:9", "1:1", "4:3", "3:2", "4:5", "5:4", "3:4", "2:3", "9:16", "21:9"];
-
-export const THINKING_LEVELS = ["High", "Minimal"];
 
 /** Calidad de render (OpenAI): etiqueta de la UI → valor de la API (ver generate/route.ts) */
 export const RENDER_QUALITIES = ["Borrador", "Estándar", "Alta", "Muy alta", "Máxima"] as const;
@@ -329,4 +342,46 @@ export const UNIVERSAL_FILM_LOOKS = [
   "Neutral / Natural"
 ];
 
-export const DEPTH_OF_FIELD_OPTIONS = ["Media", "Poca", "Tilt-Shift", "Total"];
+/** El primero es el predeterminado (DEFAULT_PARAMS.depthOfField) */
+export const DEPTH_OF_FIELD_OPTIONS = [
+  "Total (f/8–f/11, todo nítido)",
+  "Media (f/4–f/5.6, fondo suavizado)",
+  "Poca (f/1.8–f/2.8, fondo muy suave)",
+  "Tilt-Shift (efecto miniatura)",
+];
+
+/** Looks de película que ofrece cada cámara: las Fujifilm tienen sus simulaciones; el resto, looks universales */
+export function filmLooksFor(presetName: string): string[] {
+  const preset = CAMERA_PRESETS.find((c) => c.name === presetName);
+  return preset?.isFujifilm ? FUJIFILM_FILM_SIMULATIONS : UNIVERSAL_FILM_LOOKS;
+}
+
+// ── Cámara por módulo: un interior no se fotografía «desde un dron» ni «contra el cielo» ──
+export const INTERIOR_ANGLES = [
+  "Desde la entrada",
+  "Esquina (gran angular)",
+  "Frontal al muro principal",
+  "Nivel de ojos",
+  "Contrapicado al techo",
+  "Detalle cercano (close-up)",
+  "Vista cenital del espacio",
+];
+
+export const INTERIOR_COMPOSITIONS = [
+  "Capas de profundidad (primer plano)",
+  "Encuadre a través de un vano o puerta",
+  "Líneas guía dramáticas",
+  "Reflejo en espejo o superficie pulida",
+  "Regla de tercios",
+  "Simétrica centrada",
+];
+
+/** Luz natural que cabe dentro de un espacio (sin «Arquitectónica exterior») */
+export const INTERIOR_DAYLIGHT_TYPES = [
+  "Ambiental difusa",
+  "Blue hour fría",
+  "Golden hour cálida",
+  "Interior visible (noche)",
+  "Natural dramática (contrastes)",
+  "Natural suave",
+];

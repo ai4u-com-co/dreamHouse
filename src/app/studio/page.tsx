@@ -220,7 +220,6 @@ function StudioContent() {
     setParams({
       ...DEFAULT_PARAMS,
       city: "",
-      technicalNotes: "",
       artDirection: "",
       negativePrompt: "",
       editPrompt: "",
@@ -261,11 +260,11 @@ function StudioContent() {
       architecturalStyles: pickMulti(SC.STYLES, 3),
       architect: pickMulti(SC.ARCHITECTS, 2),
       mood: pick(SC.MOODS),
-      cameraAngle: pick(SC.ANGLES),
-      composition: pick(SC.COMPOSITIONS),
+      cameraAngle: pick(isInt ? SC.INTERIOR_ANGLES : SC.ANGLES),
+      composition: pick(isInt ? SC.INTERIOR_COMPOSITIONS : SC.COMPOSITIONS),
       timeOfDay: pick(SC.TIMES_OF_DAY),
       season: pick(SC.SEASONS),
-      lighting: pick(SC.LIGHTING_TYPES),
+      lighting: pick(isInt ? SC.INTERIOR_DAYLIGHT_TYPES : SC.LIGHTING_TYPES),
       humanContext: pick(SC.HUMAN_CONTEXT),
       renderStyle: pick(SC.RENDER_STYLES),
 

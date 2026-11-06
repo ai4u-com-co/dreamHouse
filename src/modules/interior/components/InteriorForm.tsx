@@ -8,7 +8,7 @@ import { Sparkles, Armchair, LayoutGrid, Layers, Palette, Camera, ImageIcon, Pen
 import { Section } from '@/components/ui/Section';
 import { Select } from '@/components/ui/Select';
 import { ChipsField, EssenceFields, SiteFields, HomeProgramFields } from '@/components/FormFields';
-import { AmbienceSelects } from '@/components/FormExtras';
+import { AmbienceSelects, CameraFields, CreativeFields } from '@/components/FormExtras';
 import ObjectUploader from '@/components/ObjectUploader';
 import { DebouncedInput } from '@/components/ui/DebouncedInput';
 
@@ -74,6 +74,7 @@ export default function InteriorForm({ params, onChange, disabled, activeSection
   const finishesSummary = [
     params.flooringMaterial,
     params.ceilingDetail,
+    params.wallFinish,
     params.materials.join(', ')
   ].filter(Boolean).join(' · ') || 'Sin definir';
 
@@ -151,7 +152,7 @@ export default function InteriorForm({ params, onChange, disabled, activeSection
         <SectionDescription>Dónde está el espacio y qué luz recibe: define lo que se ve por las ventanas y el color de la luz natural. Comparte los datos con el módulo Exterior.</SectionDescription>
         <div className="space-y-8">
           <SiteFields params={params} onChange={handleChange} disabled={disabled} />
-          <AmbienceSelects params={params} onChange={handleChange} disabled={disabled} people hint="La hora, la estación y el tipo de luz describen la luz natural que entra al espacio." />
+          <AmbienceSelects params={params} onChange={handleChange} disabled={disabled} people hint="La hora, la estación y el tipo de luz describen la luz natural que entra al espacio." lightingOptions={SC.INTERIOR_DAYLIGHT_TYPES} />
         </div>
       </Section>
 
@@ -215,8 +216,10 @@ export default function InteriorForm({ params, onChange, disabled, activeSection
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
             <Select label="Suelo / Pavimento" value={params.flooringMaterial} onChange={(e) => handleChange("flooringMaterial", e.target.value)} options={IC.FLOORING_MATERIALS} disabled={disabled} />
             <Select label="Techo / Cielorraso" value={params.ceilingDetail} onChange={(e) => handleChange("ceilingDetail", e.target.value)} options={IC.CEILING_DETAILS} disabled={disabled} />
+            <Select label="Acabado de Muros" value={params.wallFinish} onChange={(e) => handleChange("wallFinish", e.target.value)} options={IC.WALL_FINISHES} disabled={disabled} />
+            <Select label="Tipo de Aberturas" value={params.windowType} onChange={(e) => handleChange("windowType", e.target.value)} options={EC.WINDOW_TYPES} disabled={disabled} />
           </div>
-          {renderChipsGroup("Revestimientos", "materials", EC.MATERIALS, "Materiales de muros y superficies.", true)}
+          {renderChipsGroup("Materiales", "materials", IC.INTERIOR_MATERIALS, "Materiales presentes en el espacio.", true)}
           <Select label="Nivel de Acabado" value={params.finishLevel} onChange={(e) => handleChange("finishLevel", e.target.value)} options={EC.FINISH_LEVELS} disabled={disabled} />
         </div>
       </Section>
@@ -242,17 +245,7 @@ export default function InteriorForm({ params, onChange, disabled, activeSection
         onToggle={() => onSectionChange('photography')}
         summary={cameraSummary}
       >
-        <div className="space-y-6">
-          <Select label="Dirección de Fotografía" value={params.cameraPreset} onChange={(e) => handleChange("cameraPreset", e.target.value)} options={SC.CAMERA_PRESET_NAMES} disabled={disabled} />
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
-            <Select label="Distancia Focal" value={params.focalLength} onChange={(e) => handleChange("focalLength", e.target.value)} options={SC.FOCAL_LENGTHS} disabled={disabled} />
-            <Select label="Apertura" value={params.aperture} onChange={(e) => handleChange("aperture", e.target.value)} options={SC.APERTURES} disabled={disabled} />
-          </div>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
-            <Select label="Ángulo" value={params.cameraAngle} onChange={(e) => handleChange("cameraAngle", e.target.value)} options={SC.ANGLES} disabled={disabled} />
-            <Select label="Composición" value={params.composition} onChange={(e) => handleChange("composition", e.target.value)} options={SC.COMPOSITIONS} disabled={disabled} />
-          </div>
-        </div>
+        <CameraFields params={params} onChange={handleChange} disabled={disabled} scene="interior" />
       </Section>
 
       {/* ── 08 SALIDA ──────────────────────────────────────────── */}
@@ -274,13 +267,7 @@ export default function InteriorForm({ params, onChange, disabled, activeSection
 
       {/* ── 09 DIRECCIÓN ───────────────────────────────────────── */}
       <Section title="Dirección Creativa" number="14" icon={<PenLine className="w-5 h-5" />} isOpen={activeSection === 'creative'} onToggle={() => onSectionChange('creative')}>
-        <DebouncedInput
-          type="textarea"
-          value={params.artDirection || ""}
-          onChange={(val) => handleChange("artDirection", val)}
-          placeholder="Notas sobre el estilismo o la luz..."
-          disabled={disabled}
-        />
+        <CreativeFields params={params} onChange={handleChange} disabled={disabled} />
       </Section>
     </div>
   );
