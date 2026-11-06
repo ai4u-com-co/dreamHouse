@@ -51,20 +51,26 @@ export const CLIMATES = [
   "Mediterráneo",
   "Montañoso",
   "Oceánico",
+  "Subtropical húmedo",
+  "Templado/Andino",
   "Tropical"
 ];
 
 export const ENVIRONMENTS = [
   "Bosque",
   "Desierto",
+  "Humedal",
   "Isla",
   "Lago/Río",
   "Montaña",
+  "Páramo / Alta montaña",
   "Playa",
   "Rural",
+  "Selva/Amazonía",
   "Suburbana",
   "Urbana centro",
-  "Urbana residencial"
+  "Urbana residencial",
+  "Valle / Zona cafetera"
 ];
 
 export const WATER_BODIES = [
@@ -110,15 +116,15 @@ export const ROOF_TYPES = [
 export const PARKING_TYPES = ["Cochera techada abierta", "Espacio abierto/Driveway", "Garaje cerrado (1 auto)", "Garaje cerrado (2+ autos)", "Sin estacionamiento"];
 
 export const LAYOUT_TYPES = [
-  "Courtyard-centered",
-  "Linear/Corridor",
-  "Loft-style",
-  "Open plan",
-  "Pavilion-style",
-  "Radial/Central",
-  "Split-level",
-  "Traditional (zonificado)",
-  "Wing-based"
+  "Alrededor de un patio central",
+  "Lineal / en barra",
+  "Tipo loft (volumen abierto)",
+  "Planta abierta",
+  "Pabellones separados",
+  "Radial / núcleo central",
+  "Medios niveles",
+  "Tradicional (zonificado)",
+  "Por alas"
 ];
 
 export const SOCIAL_AREAS = [
@@ -138,7 +144,22 @@ export const SOCIAL_AREAS = [
   "Wine cellar/Bodega"
 ];
 
-export const ARCHITECTURAL_DETAILS = ["Espacios abiertos", "Grandes ventanales", "Puerta monumental", "Techos altos"];
+export const ARCHITECTURAL_DETAILS = [
+  "Arcos",
+  "Chimenea volumétrica",
+  "Doble altura",
+  "Escalera escultórica",
+  "Espacios abiertos",
+  "Esquina acristalada",
+  "Grandes ventanales",
+  "Marcos de ventana profundos",
+  "Mirador / Balcón corrido",
+  "Patio interior",
+  "Pórtico de entrada",
+  "Puerta monumental",
+  "Techos altos",
+  "Voladizos"
+];
 
 export const MATERIALS = [
   "Acero",
@@ -167,17 +188,13 @@ export const EXTERIOR_ELEMENTS = [
   "Cancha deportiva",
   "Cerca viva",
   "Chimenea exterior",
-  "Cochera abierta",
-  "Cocina exterior",
   "Deck de madera",
   "Espejo de agua",
   "Fuente",
-  "Garaje visible",
   "Iluminación arquitectónica",
   "Jacuzzi",
   "Muro perimetral",
   "Paneles solares",
-  "Piscina",
   "Piscina infinity",
   "Pérgola",
   "Roof garden",
@@ -195,4 +212,68 @@ export const VEGETATION = [
   "Mínima/Desértica",
   "Palmeras",
   "Tropical exuberante"
+];
+
+// ── Emplazamiento y construcción (lo que un arquitecto fija antes de dibujar) ──
+export const SITE_TOPOGRAPHIES = [
+  "Terreno plano",
+  "Pendiente suave",
+  "Ladera pronunciada",
+  "Borde de acantilado o barranco",
+  "Hondonada o depresión",
+  "Terrazas escalonadas",
+  "Lote en esquina",
+];
+
+export const SOLAR_ORIENTATIONS = [
+  "Fachada principal al norte",
+  "Fachada principal al sur",
+  "Fachada principal al oriente (amanecer)",
+  "Fachada principal al occidente (atardecer)",
+];
+
+export const CONSTRUCTION_SYSTEMS = [
+  "Muros portantes de ladrillo",
+  "Pórticos de concreto",
+  "Estructura de acero",
+  "Madera laminada (CLT / glulam)",
+  "Guadua / Bambú estructural",
+  "Tierra (tapia pisada / adobe)",
+  "Prefabricado modular",
+  "Contenedores marítimos",
+  "Mixto (concreto + madera)",
+];
+
+export const ROOF_MATERIALS = [
+  "Teja de barro",
+  "Teja metálica / zinc",
+  "Losa de concreto",
+  "Cubierta vegetal",
+  "Shingle / Tablilla de madera",
+  "Paja o palma",
+  "Membrana impermeabilizante",
+  "Vidrio / Policarbonato",
+];
+
+export const WINDOW_TYPES = [
+  "Ventanal de piso a techo",
+  "Ventanas corridas horizontales",
+  "Ventanas verticales esbeltas",
+  "Muro cortina",
+  "Celosías de madera",
+  "Ventanas pequeñas empotradas",
+  "Ventanas con arco",
+  "Puertas plegables al jardín",
+];
+
+export const PASSIVE_STRATEGIES = [
+  "Aleros profundos",
+  "Ventilación cruzada",
+  "Celosías / Brise-soleil",
+  "Patio interior",
+  "Fachada verde",
+  "Paneles solares",
+  "Recolección de agua lluvia",
+  "Masa térmica",
+  "Doble fachada",
 ];

@@ -107,14 +107,14 @@ Return a JSON object with any of the following keys if they are mentioned or inf
 - "mood" (string) - MUST be one of: ${JSON.stringify(SC.MOODS)}
 - "architecturalStyles" (array of strings, max 2) - MUST match elements of: ${JSON.stringify(SC.STYLES)}
 - "architect" (array of strings, max 2) - MUST match elements of: ${JSON.stringify(SC.ARCHITECTS)}
-- "materials" (array of strings, max 3) - MUST match elements of: ${JSON.stringify(EC.MATERIALS)}
+- "materials" (array of strings, max 3) - MUST match elements of: ${JSON.stringify(IC.INTERIOR_MATERIALS)}
 - "finishLevel" (string) - MUST be one of: ${JSON.stringify(EC.FINISH_LEVELS)}
 - "colorPalette" (array of strings, max 2) - MUST match elements of: ${JSON.stringify(SC.COLORS)}
-- "cameraAngle" (string) - MUST be one of: ${JSON.stringify(SC.ANGLES)}
-- "composition" (string) - MUST be one of: ${JSON.stringify(SC.COMPOSITIONS)}
+- "cameraAngle" (string) - MUST be one of: ${JSON.stringify(SC.INTERIOR_ANGLES)}
+- "composition" (string) - MUST be one of: ${JSON.stringify(SC.INTERIOR_COMPOSITIONS)}
 - "timeOfDay" (string) - MUST be one of: ${JSON.stringify(SC.TIMES_OF_DAY)}
 - "season" (string) - MUST be one of: ${JSON.stringify(SC.SEASONS)}
-- "lighting" (string) - MUST be one of: ${JSON.stringify(SC.LIGHTING_TYPES)}
+- "lighting" (string) - MUST be one of: ${JSON.stringify(SC.INTERIOR_DAYLIGHT_TYPES)}
 
 Rules:
 1. OUTPUT: ONLY a valid JSON object with the keys above; no prose, no markdown, no extra keys.

@@ -25,7 +25,19 @@ export const ROOM_MAP: Record<string, string> = {
   "Recibidor/Entryway": "a grand and welcoming entryway",
   "Sala de estar/Living room": "a breathtaking expansive living room",
   "Terraza/Deck interior": "a seamless indoor-outdoor terrace",
-  "Vestidor/Walk-in closet": "a bespoke luxury walk-in closet"
+  "Vestidor/Walk-in closet": "a bespoke luxury walk-in closet",
+  "Balcón / Terraza privada": "a private balcony or terrace with a strong connection to the outdoors",
+  "Baño social / Medio baño": "a compact, carefully designed guest powder room",
+  "Cocina sencilla / Cocineta": "a practical everyday kitchen, well organized and lived-in",
+  "Comedor informal / Diario": "a relaxed everyday dining area",
+  "Despensa": "an organized walk-in pantry with shelving and storage",
+  "Dormitorio secundario": "a comfortable secondary bedroom",
+  "Dormitorio infantil / Juvenil": "a bright, playful children's or teenager's bedroom",
+  "Escalera / Hall de escaleras": "a sculptural staircase hall",
+  "Garaje / Taller": "a tidy garage and workshop space",
+  "Lavandería / Cuarto de servicio": "a functional laundry and utility room",
+  "Oficina / Home office": "a focused home office",
+  "Lobby / Vestíbulo de edificio": "a refined building lobby and entrance hall"
 };
 
 export const FURNITURE_MAP: Record<string, string> = {

@@ -5,7 +5,7 @@ import clsx from 'clsx';
 import { Check, LayoutGrid, ImageIcon } from 'lucide-react';
 import { Section } from '@/components/ui/Section';
 import { Select } from '@/components/ui/Select';
-import { OutputOptions, AmbienceSelects } from '@/components/FormExtras';
+import { OutputOptions, AmbienceSelects, CreativeFields } from '@/components/FormExtras';
 import * as SC from '../../shared/constants';
 
 interface VistasFormProps {
@@ -102,6 +102,9 @@ export default function VistasForm({ params, onChange, disabled, activeSection, 
         </div>
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-5">
           <Select label="Estilo de Imagen" value={params.renderStyle} onChange={(e) => handleChange("renderStyle", e.target.value)} options={SC.RENDER_STYLES} disabled={disabled} />
+        </div>
+        <div className="mt-5">
+          <CreativeFields params={params} onChange={handleChange} disabled={disabled} artDirection={false} />
         </div>
       </Section>
     </div>

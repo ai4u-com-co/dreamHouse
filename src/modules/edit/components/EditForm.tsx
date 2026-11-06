@@ -1,6 +1,6 @@
 import React from 'react';
 import { DreamHouseParams } from '@/types';
-import { OutputOptions } from '@/components/FormExtras';
+import { OutputOptions, CreativeFields } from '@/components/FormExtras';
 import * as SC from '../../shared/constants';
 import * as EC from '../../exterior/constants';
 import * as IC from '../../interior/constants';
@@ -26,6 +26,9 @@ interface EditFormProps {
   onCompositeImageUpdate: (file: File | null) => void;
   onMaskUpdate: (payload: EditMaskPayload | null) => void;
 }
+
+/** En edición el espacio puede ser un interior o una fachada: ambos catálogos de materiales */
+const ALL_MATERIALS = [...new Set([...EC.MATERIALS, ...IC.INTERIOR_MATERIALS])].sort((a, b) => a.localeCompare(b, 'es'));
 
 function SectionDescription({ children }: { children: React.ReactNode }) {
   return (
@@ -68,6 +71,7 @@ export default function EditForm({
   const finishesSummary = [
     params.flooringMaterial,
     params.ceilingDetail,
+    params.wallFinish,
     params.materials.join(', '),
     params.furnitureStyle.join(', '),
     params.colorPalette.join(', '),
@@ -156,8 +160,10 @@ export default function EditForm({
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
             <Select label="Suelo / Pavimento" value={params.flooringMaterial} onChange={(e) => handleChange("flooringMaterial", e.target.value)} options={IC.FLOORING_MATERIALS} disabled={disabled} />
             <Select label="Techo / Cielorraso" value={params.ceilingDetail} onChange={(e) => handleChange("ceilingDetail", e.target.value)} options={IC.CEILING_DETAILS} disabled={disabled} />
+            <Select label="Acabado de Muros" value={params.wallFinish} onChange={(e) => handleChange("wallFinish", e.target.value)} options={IC.WALL_FINISHES} disabled={disabled} />
+            <Select label="Tipo de Aberturas" value={params.windowType} onChange={(e) => handleChange("windowType", e.target.value)} options={EC.WINDOW_TYPES} disabled={disabled} />
           </div>
-          <ChipsField params={params} onChange={handleChange} disabled={disabled} label="Materiales y Revestimientos" field="materials" options={EC.MATERIALS} helpText="Materiales de muros y superficies." scrollable />
+          <ChipsField params={params} onChange={handleChange} disabled={disabled} label="Materiales y Revestimientos" field="materials" options={ALL_MATERIALS} helpText="Materiales de muros y superficies." scrollable />
           <ChipsField params={params} onChange={handleChange} disabled={disabled} label="Mobiliario" field="furnitureStyle" options={IC.FURNITURE_STYLES} helpText="Estilo de las piezas de mobiliario." scrollable />
           <ChipsField params={params} onChange={handleChange} disabled={disabled} label="Luminarias" field="interiorLighting" options={IC.INTERIOR_LIGHTING_TYPES} helpText="Tipo de luminarias, si el cambio las incluye." scrollable />
           <ChipsField params={params} onChange={handleChange} disabled={disabled} label="Colores Dominantes" field="colorPalette" options={SC.COLORS} helpText="Gama cromática del cambio." />
@@ -172,6 +178,9 @@ export default function EditForm({
         </div>
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-5">
           <Select label="Estilo Render" value={params.renderStyle} onChange={(e) => handleChange("renderStyle", e.target.value)} options={SC.RENDER_STYLES} disabled={disabled} />
+        </div>
+        <div className="mt-5">
+          <CreativeFields params={params} onChange={handleChange} disabled={disabled} artDirection={false} />
         </div>
       </Section>
 

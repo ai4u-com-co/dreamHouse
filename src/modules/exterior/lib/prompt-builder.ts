@@ -61,15 +61,15 @@ const VOLUMETRIC_SCALE_MAP: Record<string, string> = {
 };
 
 const FORM_ORGANIZATION_MAP: Record<string, string> = {
-  "Courtyard-centered": "organized around a central contemplative courtyard",
-  "Linear/Corridor": "composed of a series of linear, interconnected volumes",
-  "Loft-style": "conceived as an expansive open-volume loft with industrial proportions",
-  "Open plan": "exhibiting an airy and interconnected spatial organization",
-  "Pavilion-style": "designed as a cluster of distinct, site-specific pavilions",
-  "Radial/Central": "radiating from a singular central core",
-  "Split-level": "distributed across staggered, multi-level volumetric planes",
-  "Traditional (zonificado)": "clearly articulated into distinct functional zones",
-  "Wing-based": "split into specialized wings for optimized privacy and function"
+  "Alrededor de un patio central": "organized around a central contemplative courtyard",
+  "Lineal / en barra": "composed of a series of linear, interconnected volumes",
+  "Tipo loft (volumen abierto)": "conceived as an expansive open-volume loft with industrial proportions",
+  "Planta abierta": "exhibiting an airy and interconnected spatial organization",
+  "Pabellones separados": "designed as a cluster of distinct, site-specific pavilions",
+  "Radial / núcleo central": "radiating from a singular central core",
+  "Medios niveles": "distributed across staggered, multi-level volumetric planes",
+  "Tradicional (zonificado)": "clearly articulated into distinct functional zones",
+  "Por alas": "split into specialized wings for optimized privacy and function"
 };
 
 export function getLightingPhysics(timeOfDay: string, rawLightingType: string, season: string): string {
@@ -145,7 +145,7 @@ ${params.layoutType ? `- Layout: Organized with a ${lookup(FORM_ORGANIZATION_MAP
 - Material Detail: Honest textures with physical thickness, weathering at base, and clear joint shadow lines. No digital smoothness or plastic sheen.
 ${bulletSection('ADDITIONAL DESIGN SPECIFICATION', detailLines)}
 ${style.photographic ? 'PHOTOGRAPHY & LIGHTING' : 'VISUAL TREATMENT & LIGHTING'}:
-${camera ? `- Camera Config: ${camera}\n` : ""}- Lighting: ${lightingPhys}
+${camera ? `- Camera Config: ${camera}\n` : ""}${style.photographic && params.depthOfField ? `- Depth of Field: ${params.depthOfField}\n` : ""}- Lighting: ${lightingPhys}
 ${params.artDirection ? `- Art Direction: ${params.artDirection}\n` : ""}
 CONSTRAINTS & QUALITY:
 - Look: ${style.look}
@@ -193,6 +193,7 @@ CONSTRAINTS & QUALITY:
   prompt += `${lightingPhys} `;
 
   if (camera) prompt += `${camera.charAt(0).toUpperCase()}${camera.slice(1)}. `;
+  if (style.photographic && params.depthOfField) prompt += `Depth of field: ${params.depthOfField}. `;
 
   if (params.artDirection) {
     prompt += `\nCreative Direction: ${params.artDirection}. `;
