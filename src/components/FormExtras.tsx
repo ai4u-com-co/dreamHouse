@@ -115,6 +115,7 @@ export function CreativeFields({ params, onChange, disabled, artDirection = true
       {artDirection && (
         <div className="flex flex-col gap-2">
           <label htmlFor="field-art-direction" className="text-xs font-semibold text-muted-foreground uppercase tracking-widest pl-1">Dirección creativa</label>
+          <p className="text-xs text-muted-foreground opacity-70 font-mono tracking-tight px-1">Máxima prioridad: la IA lo cumple al pie de la letra, por encima de los demás parámetros.</p>
           <DebouncedInput
             id="field-art-direction"
             type="textarea"

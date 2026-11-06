@@ -3,6 +3,8 @@ import { lookup } from '@/lib/safe-lookup';
 import {
   bulletSection,
   cameraSentence,
+  creativeDirectionBlock,
+  creativeDirectionLead,
   exteriorDetailLines,
   joinList,
   narrativeSentence,
@@ -133,7 +135,7 @@ export function buildExteriorPrompt(params: DreamHouseParams, hasStructuralRefer
   if (isOpenAI) {
     const prompt = `
 [INTENDED USE: Professional Architectural Portfolio Image]
-
+${creativeDirectionLead(params) ? `\n${creativeDirectionLead(params)}\n` : ""}
 SCENE & CONTEXT:
 - Subject: ${hasStructuralReference ? `reimagined version of the ${projectType} from reference image` : `${scaleDesc} ${projectType}`}
 - Camera Angle: ${params.cameraAngle || 'eye-level'} view
@@ -146,12 +148,12 @@ ${params.layoutType ? `- Layout: Organized with a ${lookup(FORM_ORGANIZATION_MAP
 ${bulletSection('ADDITIONAL DESIGN SPECIFICATION', detailLines)}
 ${style.photographic ? 'PHOTOGRAPHY & LIGHTING' : 'VISUAL TREATMENT & LIGHTING'}:
 ${camera ? `- Camera Config: ${camera}\n` : ""}${style.photographic && params.depthOfField ? `- Depth of Field: ${params.depthOfField}\n` : ""}- Lighting: ${lightingPhys}
-${params.artDirection ? `- Art Direction: ${params.artDirection}\n` : ""}
+
 CONSTRAINTS & QUALITY:
 - Look: ${style.look}
 - Composition: The building is the SOLE PROTAGONIST. Neutral background (open sky, landscape, or vegetation).
-- Exclude: No neighboring buildings, no adjacent houses, no other structures, no party walls, no visible neighbors in the background. No watermarks, no logos.
-`.trim();
+- Exclude: No neighboring buildings, no adjacent houses, no other structures, no party walls, no visible neighbors in the background${creativeDirectionBlock(params) ? ' (unless the CREATIVE DIRECTION asks otherwise)' : ''}. No watermarks, no logos.
+${creativeDirectionBlock(params) ? `\n${creativeDirectionBlock(params)}\n` : ""}`.trim();
     return prompt;
   }
 
@@ -195,10 +197,6 @@ CONSTRAINTS & QUALITY:
   if (camera) prompt += `${camera.charAt(0).toUpperCase()}${camera.slice(1)}. `;
   if (style.photographic && params.depthOfField) prompt += `Depth of field: ${params.depthOfField}. `;
 
-  if (params.artDirection) {
-    prompt += `\nCreative Direction: ${params.artDirection}. `;
-  }
-
   if (style.photographic) {
     // Quality: specific photographic criteria, not generic tags
     prompt += `\nThe image must feel like a working architectural photographer's best frame — `;
@@ -211,5 +209,8 @@ CONSTRAINTS & QUALITY:
 
   prompt += `\nCRITICAL COMPOSITION RULE: The building is the SOLE PROTAGONIST of this image. The background must be neutral — open sky, landscape, vegetation, or abstract environment. NEVER include neighboring buildings, adjacent houses, other structures, or visible neighbors in the background. No urban density, no party walls, no competing architecture. The subject must stand alone.`;
 
-  return prompt.trim();
+  const creative = creativeDirectionBlock(params);
+  if (creative) prompt += `\n\n${creative}`;
+
+  return `${creativeDirectionLead(params) ? `${creativeDirectionLead(params)}\n\n` : ''}${prompt}`.trim();
 }

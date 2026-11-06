@@ -104,7 +104,7 @@ export default function VistasForm({ params, onChange, disabled, activeSection, 
           <Select label="Estilo de Imagen" value={params.renderStyle} onChange={(e) => handleChange("renderStyle", e.target.value)} options={SC.RENDER_STYLES} disabled={disabled} />
         </div>
         <div className="mt-5">
-          <CreativeFields params={params} onChange={handleChange} disabled={disabled} artDirection={false} />
+          <CreativeFields params={params} onChange={handleChange} disabled={disabled} />
         </div>
       </Section>
     </div>

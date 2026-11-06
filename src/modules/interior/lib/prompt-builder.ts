@@ -4,6 +4,8 @@ import { PROJECT_TYPE_MAP } from '@/modules/exterior/lib/prompt-builder';
 import {
   bulletSection,
   cameraSentence,
+  creativeDirectionBlock,
+  creativeDirectionLead,
   interiorDetailLines,
   joinList,
   narrativeSentence,
@@ -101,7 +103,7 @@ export function buildInteriorPrompt(params: DreamHouseParams, targetModel?: stri
   if (isOpenAI) {
     const prompt = `
 [INTENDED USE: Professional Architectural Interior Design Visualization]
-
+${creativeDirectionLead(params) ? `\n${creativeDirectionLead(params)}\n` : ""}
 SCENE & CONTEXT:
 - Subject: ${roomDesc}${scaleDesc ? ` (${scaleDesc})` : ""}
 - Perspective: ${present(params.cameraAngle) ? `${params.cameraAngle}, inside the space` : "Inside the space, looking at the layout and key features"}
@@ -110,11 +112,11 @@ ARCHITECTURAL & DESIGN SPECIFICATION:
 - Style: ${styleDesc} character${architectDesc ? `, shaped by the design principles of ${architectDesc}` : ""}
 ${furnitureDesc ? `- Furniture: Curated pieces of ${furnitureDesc}. Each piece sits with physical weight, showing natural material texture and subtle wear at contact points.\n` : ""}${params.flooringMaterial ? `- Flooring: ${params.flooringMaterial}, rendered with convincing grain and joint lines\n` : ""}${params.ceilingDetail ? `- Ceiling: ${params.ceilingDetail}, confirmed by subtle shadow and texture\n` : ""}${materialList ? `- Materials: ${materialList} elements throughout the space. Each material must show honest texture, grain direction, and micro-imperfections.\n` : ""}${colorDesc ? `- Color Palette: ${colorDesc}, colors shifting naturally across surfaces based on light angle\n` : ""}${bulletSection('ADDITIONAL DESIGN SPECIFICATION', detailLines)}
 ${style.photographic ? 'PHOTOGRAPHY & LIGHTING' : 'VISUAL TREATMENT & LIGHTING'}:
-${camera ? `- Camera Config: ${camera}\n` : ""}${style.photographic ? `- Depth of Field: ${params.depthOfField || "Natural depth of field separating foreground from background"}\n` : ""}${lightingDesc ? `- Lighting: Illuminated by ${lightingDesc}. Light falls with natural gradient and fall-off from bright source to soft shadow.\n` : ""}${params.artDirection ? `- Art Direction: ${params.artDirection}\n` : ""}
+${camera ? `- Camera Config: ${camera}\n` : ""}${style.photographic ? `- Depth of Field: ${params.depthOfField || "Natural depth of field separating foreground from background"}\n` : ""}${lightingDesc ? `- Lighting: Illuminated by ${lightingDesc}. Light falls with natural gradient and fall-off from bright source to soft shadow.\n` : ""}
 CONSTRAINTS & QUALITY:
 - Look: ${style.photographic ? `${style.look} High tactile presence and physical weight.` : style.look}
 - Exclude: ${style.photographic ? "No digital/CGI smoothness, no plastic surfaces, no over-sharpened edges. " : ""}No watermarks, no logos.
-`.trim();
+${creativeDirectionBlock(params) ? `\n${creativeDirectionBlock(params)}\n` : ""}`.trim();
     return prompt;
   }
 
@@ -164,10 +166,6 @@ CONSTRAINTS & QUALITY:
     prompt += `depth of field separates foreground objects from a naturally softened background. `;
   }
 
-  if (params.artDirection) {
-    prompt += `\nCreative Direction: ${params.artDirection}. `;
-  }
-
   if (style.photographic) {
     // Quality instruction: specific realism criteria, not generic tags
     prompt += `\nThe image must feel like a photograph, not a render: imperfect enough to be believed, `;
@@ -178,5 +176,8 @@ CONSTRAINTS & QUALITY:
     prompt += `\n${style.look}`;
   }
 
-  return prompt.trim();
+  const creative = creativeDirectionBlock(params);
+  if (creative) prompt += `\n\n${creative}`;
+
+  return `${creativeDirectionLead(params) ? `${creativeDirectionLead(params)}\n\n` : ''}${prompt}`.trim();
 }

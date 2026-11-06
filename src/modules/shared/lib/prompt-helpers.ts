@@ -153,3 +153,36 @@ export function bulletSection(title: string, lines: string[]): string {
 export function narrativeSentence(lines: string[]): string {
   return lines.length ? `${lines.join('. ')}. ` : '';
 }
+
+// ---------- dirección creativa: la instrucción de mayor autoridad ----------
+
+/** Texto de la dirección creativa, limpio (cadena vacía si no hay) */
+export function creativeDirectionText(params: DreamHouseParams): string {
+  return typeof params.artDirection === 'string' ? params.artDirection.trim() : '';
+}
+
+/**
+ * Línea de apertura: avisa al modelo, desde el principio del prompt, de que existe una dirección creativa
+ * que manda sobre todo lo demás (el detalle va al final, donde el modelo pesa más lo último que lee).
+ */
+export function creativeDirectionLead(params: DreamHouseParams): string {
+  return creativeDirectionText(params)
+    ? "The client's CREATIVE DIRECTION (at the end of this brief) has the HIGHEST PRIORITY and overrides every other parameter, preset and default rule."
+    : '';
+}
+
+/**
+ * Bloque final con la dirección creativa del cliente. Gana sobre cualquier estilo, parámetro, regla de
+ * composición o valor por defecto. `keepIdentity` es para las vistas: la casa de la referencia no se
+ * rediseña, pero todo lo demás (cámara, atmósfera, tratamiento visual) obedece a la dirección.
+ */
+export function creativeDirectionBlock(params: DreamHouseParams, keepIdentity = false): string {
+  const text = creativeDirectionText(params);
+  if (!text) return '';
+  return [
+    'CREATIVE DIRECTION — HIGHEST PRIORITY (written by the client):',
+    text,
+    'Follow this direction literally and completely, down to every detail it mentions. Where it conflicts with any style, preset, parameter, default composition rule or earlier instruction in this brief, THIS DIRECTION WINS. Do not dilute, reinterpret, soften or ignore any part of it.',
+    keepIdentity ? 'The only exception is the identity of the house in the reference image, which must stay the same.' : '',
+  ].filter(Boolean).join('\n');
+}
