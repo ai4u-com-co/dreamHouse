@@ -7,6 +7,7 @@ import { DEFAULT_PARAMS } from '@/types';
 import { buildExteriorPrompt } from '@/modules/exterior/lib/prompt-builder';
 import { buildInteriorPrompt } from '@/modules/interior/lib/prompt-builder';
 import { buildVistasPrompt } from '@/modules/vistas/lib/prompt-builder';
+import { buildPlantaPrompt } from '@/modules/planta/lib/prompt-builder';
 
 const OPENAI = 'GPT Image 2.5 Sunburst (OpenAI)';
 const GEMINI = 'Gemini 3.1 Flash Image Preview';
@@ -14,12 +15,13 @@ const read = (path) => readFileSync(new URL(`../../${path}`, import.meta.url), '
 const CREATIVE = 'Atardecer con neblina baja y SIN ningún vecino; que se sienta como una fotografía de revista de 1970';
 
 const BUILDERS = {
+  planta: (p, m) => buildPlantaPrompt(p, m),
   exterior: (p, m) => buildExteriorPrompt(p, false, m),
   interior: (p, m) => buildInteriorPrompt(p, m),
   vistas: (p, m) => buildVistasPrompt(p, 'Perspectiva Principal (Hero Shot)', m),
 };
 
-for (const mode of ['exterior', 'interior', 'vistas']) {
+for (const mode of ['planta', 'exterior', 'interior', 'vistas']) {
   for (const model of [OPENAI, GEMINI]) {
     const tag = `${mode}/${model.split(' ')[0]}`;
     test(`${tag}: la dirección creativa va completa, al final y con prioridad máxima`, () => {
@@ -48,8 +50,8 @@ test('exterior: la regla de «sin vecinos» cede ante la dirección creativa', (
   assert.match(text, /unless the CREATIVE DIRECTION asks otherwise/);
 });
 
-test('la dirección creativa se ofrece en exterior, interior y vistas', () => {
-  for (const f of ['src/modules/exterior/components/ExteriorForm.tsx', 'src/modules/interior/components/InteriorForm.tsx', 'src/modules/vistas/components/VistasForm.tsx']) {
+test('la dirección creativa se ofrece en planta, exterior, interior y vistas', () => {
+  for (const f of ['src/modules/planta/components/PlantaForm.tsx', 'src/modules/exterior/components/ExteriorForm.tsx', 'src/modules/interior/components/InteriorForm.tsx', 'src/modules/vistas/components/VistasForm.tsx']) {
     const tag = read(f).match(/<CreativeFields[^>]*>/)?.[0] ?? '';
     assert.ok(tag, `${f} debe pintar CreativeFields`);
     assert.doesNotMatch(tag, /artDirection=\{false\}/, `${f} debe ofrecer la dirección creativa`);

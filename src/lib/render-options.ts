@@ -86,6 +86,7 @@ export function pickOpenAIInputs<T>(
 ): T[] {
   if (mode === 'edit') return c.editImage ? [c.editImage] : [];
   if (mode === 'vistas') return c.lot ? [c.lot] : [];
+  if (mode === 'planta') return [c.floorPlan, c.lot].filter((x): x is T => !!x);
   const objects = mode === 'interior' ? c.objects.slice(0, 13) : [];
   const base = [mode === 'exterior' ? c.exteriorRef : null, c.floorPlan, c.lot].filter((x): x is T => !!x);
   const room = Math.max(0, OPENAI_MAX_INPUT_IMAGES - base.length - objects.length);

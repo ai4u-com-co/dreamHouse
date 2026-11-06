@@ -134,5 +134,42 @@ test.describe('DreamHouse Studio E2E MVP', () => {
     
     await expect(page.getByText('Render generated successfully!')).toBeVisible();
   });
+
+  test('Planta Workflow: Program, Responsive (375/768/1024/1440) and Lift to Exterior', async ({ page }) => {
+    // Switch to Planta module
+    await page.getByRole('button', { name: 'Planta', exact: true }).click();
+    await expect(page.getByText('Fase 1: Programa y Dimensiones')).toBeVisible();
+
+    // Fill spatial division program
+    await page.getByLabel('Área Construida (m²)').fill('220');
+    await page.getByLabel('Niveles / Pisos').fill('2');
+    await page.getByLabel('Frente del Lote (m)').fill('12');
+    await page.getByLabel('Fondo del Lote (m)').fill('25');
+    await page.getByLabel('Dormitorios').fill('4');
+    await page.getByLabel('Baños').fill('3');
+    await page.getByText('Estudio / Home Office', { exact: true }).click();
+
+    // Check responsive viewports (no horizontal overflow at 375, 768, 1024, 1440)
+    for (const [width, height] of [[375, 812], [768, 1024], [1024, 768], [1440, 900]] as const) {
+      await page.setViewportSize({ width, height });
+      const overflow = await page.evaluate(() => document.documentElement.scrollWidth > window.innerWidth);
+      expect(overflow, `No debe haber scroll horizontal a ${width}px`).toBe(false);
+    }
+
+    // Generate floor plan
+    await page.getByRole('button', { name: 'Generate planta render' }).click();
+    await expect(page.getByText('Render generated successfully!')).toBeVisible();
+
+    // Verify "Levantar en Exterior" button transfers floor plan and switches to Exterior preserving program
+    const liftBtn = page.getByRole('button', { name: 'Levantar en Exterior' });
+    await expect(liftBtn).toBeVisible();
+    await liftBtn.click();
+
+    await expect(page.getByText('Planta cargada como Plano Residencial en Arquitectura Exterior con todo tu programa espacial.')).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Generate exterior render' })).toBeVisible();
+    // Design Spec shows the loaded PLANO file and preserved size/bedrooms
+    await expect(page.locator('span:text-is("PLANO")')).toBeVisible();
+    await expect(page.locator('span:text-is("220")')).toBeVisible();
+  });
 });
 

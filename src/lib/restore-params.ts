@@ -36,7 +36,7 @@ export interface RestoreResult {
 }
 export interface RestoreFailure { ok: false; message: string }
 
-const MODES: readonly string[] = ['exterior', 'interior', 'edit', 'vistas'];
+const MODES: readonly string[] = ['planta', 'exterior', 'interior', 'edit', 'vistas'];
 const TEXT_KEYS = ['city', 'artDirection', 'negativePrompt', 'editPrompt'] as const;
 
 function toResult(raw: unknown, source: RestoreResult['source'], mode: unknown, houseName: unknown): RestoreResult | RestoreFailure {

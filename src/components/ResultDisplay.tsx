@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Download, RefreshCw, Sparkles, Maximize2, LayoutGrid, Wand } from 'lucide-react';
+import { Download, RefreshCw, Sparkles, Maximize2, LayoutGrid, Wand, Home } from 'lucide-react';
 import Image from 'next/image';
 import { Button } from './ui/Button';
 import clsx from 'clsx';
@@ -46,8 +46,10 @@ interface ResultDisplayProps {
   vistasImages?: { type: string; url: string | null; loading?: boolean }[];
   activeVistaIndex?: number;
   houseName?: string | null;
+  /** Modo actual para mostrar las acciones de continuación adecuadas (ej. «Levantar en Exterior» desde Planta) */
+  mode?: string;
   /** Usa el render mostrado como imagen base de otro módulo (sus parámetros viajan en el propio archivo) */
-  onUseAsBase?: (target: 'vistas' | 'edit') => void;
+  onUseAsBase?: (target: 'exterior' | 'vistas' | 'edit') => void;
 }
 
 
@@ -61,6 +63,7 @@ export default function ResultDisplay({
   vistasImages,
   activeVistaIndex = 0,
   houseName,
+  mode,
   onUseAsBase
 }: ResultDisplayProps) {
   const [messageIndex, setMessageIndex] = useState(0);
@@ -249,14 +252,25 @@ export default function ResultDisplay({
                     </a>
                     {onUseAsBase && (
                       <>
-                        <button
-                          type="button"
-                          onClick={() => onUseAsBase('vistas')}
-                          className="inline-flex items-center justify-center gap-2 px-4 py-2 min-h-[44px] text-sm font-semibold text-white bg-black/50 backdrop-blur-md border border-white/20 rounded-lg hover:bg-white/20 transition-colors"
-                        >
-                          <LayoutGrid className="w-4 h-4" aria-hidden="true" />
-                          Crear vistas
-                        </button>
+                        {mode === 'planta' ? (
+                          <button
+                            type="button"
+                            onClick={() => onUseAsBase('exterior')}
+                            className="inline-flex items-center justify-center gap-2 px-4 py-2 min-h-[44px] text-sm font-semibold text-white bg-black/50 backdrop-blur-md border border-white/20 rounded-lg hover:bg-white/20 transition-colors"
+                          >
+                            <Home className="w-4 h-4" aria-hidden="true" />
+                            Levantar en Exterior
+                          </button>
+                        ) : (
+                          <button
+                            type="button"
+                            onClick={() => onUseAsBase('vistas')}
+                            className="inline-flex items-center justify-center gap-2 px-4 py-2 min-h-[44px] text-sm font-semibold text-white bg-black/50 backdrop-blur-md border border-white/20 rounded-lg hover:bg-white/20 transition-colors"
+                          >
+                            <LayoutGrid className="w-4 h-4" aria-hidden="true" />
+                            Crear vistas
+                          </button>
+                        )}
                         <button
                           type="button"
                           onClick={() => onUseAsBase('edit')}

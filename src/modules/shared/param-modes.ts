@@ -19,23 +19,28 @@ import type { DreamHouseParams, GenerationMode } from '@/types';
 
 type Modes = readonly GenerationMode[];
 
-const EXT: Modes = ['exterior'];
+const PLANTA: Modes = ['planta'];
 const INT: Modes = ['interior'];
 const EDIT: Modes = ['edit'];
+const PLANTA_EXT: Modes = ['planta', 'exterior'];
+const PLANTA_INT: Modes = ['planta', 'interior'];
 const EXT_INT: Modes = ['exterior', 'interior'];
+const PLANTA_EXT_INT: Modes = ['planta', 'exterior', 'interior'];
 const EXT_VISTAS: Modes = ['exterior', 'vistas'];
+const PLANTA_EXT_VISTAS: Modes = ['planta', 'exterior', 'vistas'];
 const ALL_DESIGN: Modes = ['exterior', 'interior', 'vistas'];
 // Edición: la dirección de diseño de la zona que se cambia (opcional). La luz, el sitio y la cámara NO
 // aplican: la edición conserva los de la imagen original.
 const DESIGN_EDIT: Modes = ['exterior', 'interior', 'vistas', 'edit'];
+const ALL_MODES: Modes = ['planta', 'exterior', 'interior', 'vistas', 'edit'];
 const INT_EDIT: Modes = ['interior', 'edit'];
 
 export const PARAM_MODES = {
   // ── Esencia del proyecto (compartida: se edita en un módulo y se ve en el otro) ──
-  projectType: DESIGN_EDIT,
-  architecturalStyles: DESIGN_EDIT,
-  architect: DESIGN_EDIT,
-  mood: DESIGN_EDIT,
+  projectType: ALL_MODES,
+  architecturalStyles: ALL_MODES,
+  architect: ALL_MODES,
+  mood: ALL_MODES,
 
   // ── Sitio y luz natural (en interior definen lo que entra por las ventanas) ──
   city: ALL_DESIGN,
@@ -48,54 +53,62 @@ export const PARAM_MODES = {
   lighting: ALL_DESIGN,
 
   // ── Materialidad y estética ──
-  materials: DESIGN_EDIT,
+  materials: ALL_MODES,
   finishLevel: DESIGN_EDIT,
-  colorPalette: DESIGN_EDIT,
+  colorPalette: ALL_MODES,
 
   // ── Cámara y escena ──
   cameraAngle: EXT_INT,
   composition: EXT_INT,
   humanContext: EXT_INT,
 
-  // ── Programa de la vivienda (dormitorios/baños: contexto también para el exterior) ──
-  bedrooms: EXT_INT,
-  bathrooms: EXT_INT,
+  // ── Programa de la vivienda (dormitorios/baños: compartido entre planta, exterior e interior) ──
+  bedrooms: PLANTA_EXT_INT,
+  bathrooms: PLANTA_EXT_INT,
 
-  // ── Solo exterior (y vistas, que lo hereda) ──
-  size: EXT_VISTAS,
-  levels: EXT_VISTAS,
+  // ── Volumetría, huella y programa exterior (compartidos entre planta, exterior y vistas) ──
+  size: PLANTA_EXT_VISTAS,
+  levels: PLANTA_EXT_VISTAS,
   roofType: EXT_VISTAS,
-  layoutType: EXT_VISTAS,
+  layoutType: PLANTA_EXT_VISTAS,
   architecturalDetails: EXT_VISTAS,
   exteriorElements: EXT_VISTAS,
   vegetation: EXT_VISTAS,
-  parkingType: EXT,
-  parkingSpots: EXT,
-  socialAreas: EXT,
+  parkingType: PLANTA_EXT,
+  parkingSpots: PLANTA_EXT,
+  socialAreas: PLANTA_EXT,
 
-  // ── Emplazamiento y construcción (la vista lo hereda del render original) ──
-  siteTopography: EXT_VISTAS,
-  solarOrientation: EXT_VISTAS,
-  constructionSystem: EXT_VISTAS,
+  // ── Emplazamiento y construcción (compartidos con planta y vistas) ──
+  siteTopography: PLANTA_EXT_VISTAS,
+  solarOrientation: PLANTA_EXT_VISTAS,
+  constructionSystem: PLANTA_EXT_VISTAS,
   roofMaterial: EXT_VISTAS,
-  passiveStrategies: EXT_VISTAS,
+  passiveStrategies: PLANTA_EXT_VISTAS,
   windowType: DESIGN_EDIT,
 
-  // ── Solo interior ──
+  // ── Interior (cocina y zona social también se definen desde la planta) ──
   roomType: INT_EDIT,
   roomSizeM2: INT,
   furnitureStyle: INT_EDIT,
   interiorLighting: INT_EDIT,
   flooringMaterial: INT_EDIT,
   ceilingDetail: INT_EDIT,
-  kitchenType: INT,
-  livingAreaType: INT,
+  kitchenType: PLANTA_INT,
+  livingAreaType: PLANTA_INT,
   wallFinish: INT_EDIT,
 
   // ── Solo edición ──
   editChangeType: EDIT,
   editIntensity: EDIT,
   editPreserve: EDIT,
+
+  // ── Solo planta arquitectónica (división espacial y representación del plano) ──
+  floorPlanStyle: PLANTA,
+  lotWidthM: PLANTA,
+  lotDepthM: PLANTA,
+  planSpaces: PLANTA,
+  zoningLayout: PLANTA,
+  floorPlanAnnotations: PLANTA,
 } as const satisfies Partial<Record<keyof DreamHouseParams, Modes>>;
 
 export type RegisteredParam = keyof typeof PARAM_MODES;
@@ -111,6 +124,6 @@ export function appliesTo(key: keyof DreamHouseParams, mode: GenerationMode): bo
 }
 
 /** Parámetros que el módulo debe poder editar (excluye 'vistas', que hereda y no edita) */
-export function editableParams(mode: 'exterior' | 'interior' | 'edit'): RegisteredParam[] {
+export function editableParams(mode: 'planta' | 'exterior' | 'interior' | 'edit'): RegisteredParam[] {
   return (Object.keys(PARAM_MODES) as RegisteredParam[]).filter((k) => appliesTo(k, mode));
 }

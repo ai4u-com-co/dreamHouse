@@ -6,6 +6,8 @@ import { PROJECT_TYPES } from '@/modules/exterior/constants';
 import { buildExteriorPrompt, PROJECT_TYPE_MAP } from '@/modules/exterior/lib/prompt-builder';
 import { buildInteriorPrompt } from '@/modules/interior/lib/prompt-builder';
 import { buildVistasPrompt, effectiveVistaParams } from '@/modules/vistas/lib/prompt-builder';
+import { buildPlantaPrompt, FLOOR_PLAN_STYLE_MAP, ZONING_LAYOUT_MAP } from '@/modules/planta/lib/prompt-builder';
+import { FLOOR_PLAN_STYLES, ZONING_LAYOUTS } from '@/modules/planta/constants';
 import { ARCHITECTURAL_VISTAS, VISTA_DESCRIPTIONS, VISTA_KINDS } from '@/modules/vistas/constants';
 
 const OPENAI = 'GPT Image 2.5 Sunburst (OpenAI)';
@@ -26,12 +28,18 @@ test('todos los tipos de proyecto tienen traducción al inglés', () => {
 
 test('con los parámetros por defecto ningún prompt tiene huecos (todos los modos y proveedores)', () => {
   for (const model of [OPENAI, GEMINI]) {
+    assertNoHoles(buildPlantaPrompt(p({ aiModel: model, mode: 'planta' }), model), `planta/${model}`);
     assertNoHoles(buildExteriorPrompt(p({ aiModel: model }), false, model), `exterior/${model}`);
     assertNoHoles(buildInteriorPrompt(p({ aiModel: model }), model), `interior/${model}`);
     for (const view of ARCHITECTURAL_VISTAS) {
       assertNoHoles(buildVistasPrompt(p({ aiModel: model }), view, model), `vistas/${view}/${model}`);
     }
   }
+});
+
+test('planta: todos los estilos de plano y criterios de zonificación tienen descripción en inglés', () => {
+  for (const s of FLOOR_PLAN_STYLES) assert.ok(FLOOR_PLAN_STYLE_MAP[s], `sin descripción en FLOOR_PLAN_STYLE_MAP: ${s}`);
+  for (const z of ZONING_LAYOUTS) assert.ok(ZONING_LAYOUT_MAP[z], `sin descripción en ZONING_LAYOUT_MAP: ${z}`);
 });
 
 test('con materiales pero sin nivel de acabado no queda "finished to a  standard"', () => {

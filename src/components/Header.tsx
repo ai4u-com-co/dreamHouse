@@ -72,7 +72,7 @@ export default function Header() {
             maxWidth: 1440,
             width: '100%',
             mx: 'auto',
-            px: { xs: 3, md: 6 },
+            px: { xs: 3, lg: 3, xl: 6 },
             height: 72,
             display: 'flex',
             alignItems: 'center',
@@ -89,7 +89,7 @@ export default function Header() {
             sx={{
               display: { xs: 'none', lg: 'flex' },
               alignItems: 'center',
-              gap: 6,
+              gap: { lg: 2.5, xl: 6 },
             }}
           >
             {NAV_LINKS.map(({ label, href }) => (

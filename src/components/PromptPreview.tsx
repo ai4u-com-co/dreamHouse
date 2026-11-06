@@ -40,6 +40,7 @@ interface ParamGroup {
 }
 
 const MODE_LABELS: Record<GenerationMode, string> = {
+  planta: 'Planta',
   exterior: 'Exterior',
   interior: 'Interior',
   edit: 'Edición',
@@ -65,8 +66,8 @@ function isFactoryDefault(item: ParamItem): boolean {
 }
 
 const INT_EDIT: GenerationMode[] = ['interior', 'edit'];
-const EXT_VISTAS: GenerationMode[] = ['exterior', 'vistas'];
-const NOT_EDIT: GenerationMode[] = ['exterior', 'interior', 'vistas'];
+const EXT_VISTAS: GenerationMode[] = ['planta', 'exterior', 'vistas'];
+const NOT_EDIT: GenerationMode[] = ['planta', 'exterior', 'interior', 'vistas'];
 
 export default function PromptPreview({ params, loadedFiles = [] }: PromptPreviewProps) {
   const mode = params.mode;
@@ -126,9 +127,12 @@ export default function PromptPreview({ params, loadedFiles = [] }: PromptPrevie
       modes: EXT_VISTAS,
       items: [
         { label: 'TAMAÑO', value: params.size, key: 'size' },
+        { label: 'FRENTE', value: params.lotWidthM, key: 'lotWidthM' },
+        { label: 'FONDO', value: params.lotDepthM, key: 'lotDepthM' },
         { label: 'NIVELES', value: params.levels, key: 'levels' },
         { label: 'CUBIERTA', value: params.roofType, key: 'roofType' },
         { label: 'PLANTA', value: params.layoutType, key: 'layoutType' },
+        { label: 'ZONIFICAC.', value: params.zoningLayout, key: 'zoningLayout' },
         { label: 'SISTEMA', value: params.constructionSystem, key: 'constructionSystem' },
         { label: 'MAT. CUBIERTA', value: params.roofMaterial, key: 'roofMaterial' },
         { label: 'BIOCLIMA', value: params.passiveStrategies, key: 'passiveStrategies' },
@@ -151,15 +155,18 @@ export default function PromptPreview({ params, loadedFiles = [] }: PromptPrevie
       number: '08',
       title: 'Programa Arquitectónico',
       icon: <LayoutGrid className="w-3.5 h-3.5" />,
-      modes: ['exterior', 'interior'],
+      modes: ['planta', 'exterior', 'interior'],
       items: [
+        { label: 'PLANO', value: params.floorPlanStyle, key: 'floorPlanStyle' },
         { label: 'HABITAC.', value: params.bedrooms, key: 'bedrooms' },
         { label: 'BAÑOS', value: params.bathrooms, key: 'bathrooms' },
         { label: 'COCINA', value: params.kitchenType, key: 'kitchenType' },
         { label: 'SALA', value: params.livingAreaType, key: 'livingAreaType' },
+        { label: 'AMBIENTES', value: params.planSpaces, key: 'planSpaces' },
         { label: 'PARQUEO', value: params.parkingSpots, key: 'parkingSpots' },
         { label: 'TIPO PKG', value: params.parkingType, key: 'parkingType' },
         { label: 'ÁREAS SOC.', value: params.socialAreas, key: 'socialAreas' },
+        { label: 'COTAS/INFO', value: params.floorPlanAnnotations, key: 'floorPlanAnnotations' },
       ],
     },
     {

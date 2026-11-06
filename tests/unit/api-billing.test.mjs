@@ -270,7 +270,7 @@ test('generate: una imagen de entrada enorme (> 2048x2048) responde 400 sin cobr
 test('generate: el espejo del cliente (pickOpenAIInputs) elige las mismas imágenes que el servidor', async () => {
   const img = (n) => sharp({ create: { width: 640, height: 640, channels: 3, background: '#888' } }).jpeg().toBuffer().then((b) => new File([b], `${n}.jpg`, { type: 'image/jpeg' }));
   const [lot, ref, plan, r1, r2, o1] = await Promise.all(['lot', 'ref', 'plan', 'r1', 'r2', 'o1'].map(img));
-  for (const mode of ['exterior', 'interior', 'vistas']) {
+  for (const mode of ['planta', 'exterior', 'interior', 'vistas']) {
     reset();
     const form = new FormData();
     form.append('params', JSON.stringify({ ...DEFAULT_PARAMS, mode, selectedVistas: ['x'], renderAspectRatio: '1:1' }));

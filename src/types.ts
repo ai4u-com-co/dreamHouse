@@ -1,6 +1,6 @@
 import { DEFAULT_VISTAS } from '@/modules/vistas/constants';
 
-export type GenerationMode = "exterior" | "interior" | "edit" | "vistas";
+export type GenerationMode = "planta" | "exterior" | "interior" | "edit" | "vistas";
 
 /** Render del que se deriva esta generación (vistas, ediciones): sus parámetros se usan para mantener fidelidad */
 export interface SourceRender {
@@ -127,7 +127,22 @@ export interface EditSpecificParams {
   editPreserve: string[];
 }
 
-export type DreamHouseParams = SharedParams & ExteriorSpecificParams & InteriorSpecificParams & VistasSpecificParams & EditSpecificParams;
+export interface PlantaSpecificParams {
+  /** Tipo de representación gráfica de la planta (2D técnica, 2D humanizada, 3D cortada, diagrama, croquis) */
+  floorPlanStyle: string;
+  /** Frente del terreno o huella en metros (0 = automático) */
+  lotWidthM: number;
+  /** Fondo del terreno o huella en metros (0 = automático) */
+  lotDepthM: number;
+  /** Ambientes y espacios complementarios del programa arquitectónico */
+  planSpaces: string[];
+  /** Criterio de distribución, zonificación y circulación interna */
+  zoningLayout: string;
+  /** Elementos gráficos, cotas y anotaciones que se dibujan en el plano */
+  floorPlanAnnotations: string[];
+}
+
+export type DreamHouseParams = SharedParams & ExteriorSpecificParams & InteriorSpecificParams & VistasSpecificParams & EditSpecificParams & PlantaSpecificParams;
 
 export const DEFAULT_PARAMS: DreamHouseParams = {
   // Shared
@@ -210,4 +225,12 @@ export const DEFAULT_PARAMS: DreamHouseParams = {
   editChangeType: "",
   editIntensity: "",
   editPreserve: [],
+
+  // Planta Arquitectónica
+  floorPlanStyle: "",
+  lotWidthM: 0,
+  lotDepthM: 0,
+  planSpaces: [],
+  zoningLayout: "",
+  floorPlanAnnotations: [],
 };
