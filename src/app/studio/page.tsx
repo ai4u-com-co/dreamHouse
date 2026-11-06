@@ -9,15 +9,17 @@ import ExteriorForm from '@/modules/exterior/components/ExteriorForm';
 import InteriorForm from '@/modules/interior/components/InteriorForm';
 import EditForm from '@/modules/edit/components/EditForm';
 import VistasForm from '@/modules/vistas/components/VistasForm';
+import PlantaForm from '@/modules/planta/components/PlantaForm';
 import ResultDisplay from '@/components/ResultDisplay';
 import PromptPreview, { type LoadedFile } from '@/components/PromptPreview';
 import { DreamHouseParams, DEFAULT_PARAMS } from '@/types';
-import { Wand2, AlertCircle, RotateCcw, Dices, CheckCircle2, Home, Armchair, Maximize2, Camera, PenLine, Wand, ImageIcon } from 'lucide-react';
+import { Wand2, AlertCircle, RotateCcw, Dices, CheckCircle2, Home, Armchair, Maximize2, Camera, PenLine, Wand, ImageIcon, LayoutGrid } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { Section } from '@/components/ui/Section';
 import * as SC from '@/modules/shared/constants';
 import * as EC from '@/modules/exterior/constants';
 import * as IC from '@/modules/interior/constants';
+import * as PC from '@/modules/planta/constants';
 import clsx from 'clsx';
 import { useHistory } from '@/lib/hooks/useHistory';
 import HistoryGallery from '@/components/HistoryGallery';
@@ -117,13 +119,13 @@ function StudioContent() {
 
   // El mismo archivo "principal" (lotFile) significa cosas distintas en cada módulo
   const MODE_NAMES: Record<DreamHouseParams['mode'], string> = {
-    exterior: 'Arquitectura Exterior', interior: 'Diseño Interior', edit: 'Edición', vistas: 'Vistas',
+    planta: 'Planta Arquitectónica', exterior: 'Arquitectura Exterior', interior: 'Diseño Interior', edit: 'Edición', vistas: 'Vistas',
   };
   const LOT_ROLE: Record<DreamHouseParams['mode'], string> = {
-    exterior: 'la foto del terreno', interior: 'la foto del espacio actual', vistas: 'la casa a fotografiar', edit: 'la imagen base a editar',
+    planta: 'la foto del terreno', exterior: 'la foto del terreno', interior: 'la foto del espacio actual', vistas: 'la casa a fotografiar', edit: 'la imagen base a editar',
   };
   const FIRST_SECTION: Record<DreamHouseParams['mode'], string> = {
-    exterior: 'concept', interior: 'context', vistas: 'context', edit: 'sketch',
+    planta: 'program', exterior: 'concept', interior: 'context', vistas: 'context', edit: 'sketch',
   };
 
   /** Cambia de módulo: abre su primera sección y avisa qué se conserva y con qué rol */
@@ -132,8 +134,8 @@ function StudioContent() {
     setParams(prev => ({ ...prev, mode }));
     setActiveSection(FIRST_SECTION[mode]);
     // Un solo estado para todos los módulos: lo compartido se conserva y lo exclusivo queda guardado por si se vuelve
-    const shared = mode === 'exterior' || mode === 'interior'
-      ? 'Se conservan tu esencia (tipo, mood, estilo, arquitecto), el sitio y la luz: lo que cambies aquí también cambia en el otro módulo.'
+    const shared = mode === 'planta' || mode === 'exterior' || mode === 'interior'
+      ? 'Se conservan tu programa (m², pisos, cuartos, baños), la esencia y el sitio: lo que cambies aquí también queda listo en los demás módulos.'
       : '';
     const photo = lotFile ? `La foto cargada se usará como ${LOT_ROLE[mode]}.` : '';
     const message = [shared, photo].filter(Boolean).join(' ');
@@ -182,22 +184,29 @@ function StudioContent() {
   };
 
   /** Convierte el render mostrado en la imagen base de otro módulo (sus parámetros viajan en el archivo) */
-  const handleUseResultAsBase = async (target: 'vistas' | 'edit') => {
+  const handleUseResultAsBase = async (target: 'exterior' | 'vistas' | 'edit') => {
     const url = params.mode === 'vistas' ? (vistasResults[activeVistaIndex]?.url ?? imageUrl) : imageUrl;
     if (!url) return;
     try {
       const blob = await (await fetch(url)).blob();
       const ext = blob.type === 'image/png' ? 'png' : 'jpg';
-      const file = new File([blob], `${(houseName || 'render').replace(/\s+/g, '-')}.${ext}`, { type: blob.type });
-      setLotFile(file);
-      setEditCompositeFile(null);
-      setEditMask(null);
+      const file = new File([blob], `${(houseName || (params.mode === 'planta' ? 'planta-arquitectonica' : 'render')).replace(/\s+/g, '-')}.${ext}`, { type: blob.type });
       const source = toSourceRender(await readImageMetadataFromFile(file));
-      setParams(prev => ({ ...prev, mode: target, sourceRender: source }));
-      setActiveSection(FIRST_SECTION[target]);
-      showToast(source
-        ? `Render cargado como base de ${MODE_NAMES[target]} con sus parámetros originales.`
-        : `Render cargado como base de ${MODE_NAMES[target]}.`);
+      if (target === 'exterior') {
+        setFloorPlanFile(file);
+        setParams(prev => ({ ...prev, mode: 'exterior', sourceRender: source }));
+        setActiveSection('media');
+        showToast('Planta cargada como Plano Residencial en Arquitectura Exterior con todo tu programa espacial.');
+      } else {
+        setLotFile(file);
+        setEditCompositeFile(null);
+        setEditMask(null);
+        setParams(prev => ({ ...prev, mode: target, sourceRender: source }));
+        setActiveSection(FIRST_SECTION[target]);
+        showToast(source
+          ? `Render cargado como base de ${MODE_NAMES[target]} con sus parámetros originales.`
+          : `Render cargado como base de ${MODE_NAMES[target]}.`);
+      }
       setTimeout(() => document.getElementById('studio')?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 100);
     } catch (err) {
       console.error('No se pudo usar el render como base:', err);
@@ -210,10 +219,10 @@ function StudioContent() {
     const m = params.mode;
     const list: LoadedFile[] = [];
     if (lotFile) {
-      list.push({ label: m === 'exterior' ? 'TERRENO' : m === 'interior' ? 'ESPACIO' : m === 'vistas' ? 'CASA' : 'BASE', name: lotFile.name, used: true });
+      list.push({ label: m === 'exterior' || m === 'planta' ? 'TERRENO' : m === 'interior' ? 'ESPACIO' : m === 'vistas' ? 'CASA' : 'BASE', name: lotFile.name, used: true });
     }
     if (exteriorReferenceFile) list.push({ label: 'CASA ACT.', name: exteriorReferenceFile.name, used: m === 'exterior' });
-    if (floorPlanFile) list.push({ label: 'PLANO', name: floorPlanFile.name, used: m === 'exterior' || m === 'interior' });
+    if (floorPlanFile) list.push({ label: m === 'planta' ? 'BOCETO' : 'PLANO', name: floorPlanFile.name, used: m === 'planta' || m === 'exterior' || m === 'interior' });
     if (files.length) list.push({ label: 'REFERENC.', name: `${files.length} imagen${files.length > 1 ? 'es' : ''}`, used: m === 'exterior' || m === 'interior' });
     if (objectFiles.length) list.push({ label: 'OBJETOS', name: `${objectFiles.length} pieza${objectFiles.length > 1 ? 's' : ''}`, used: m === 'interior' });
     if (m === 'edit' && editMask) list.push({ label: 'MÁSCARA', name: 'zona pintada', used: true });
@@ -251,9 +260,11 @@ function StudioContent() {
       return shuffled.slice(0, count);
     };
 
+    const isPlanta = params.mode === 'planta';
     const isExt = params.mode === 'exterior';
     const isInt = params.mode === 'interior';
-    const isExtOrInt = isExt || isInt; // esencia y sitio se comparten entre exterior e interior (ver PARAM_MODES)
+    const isExtOrPlanta = isExt || isPlanta;
+    const isExtOrInt = isExt || isInt || isPlanta; // esencia y programa se comparten entre planta, exterior e interior
     const randomProjectType = pick(EC.PROJECT_TYPES);
     // Metros cuadrados coherentes con el tipo: una tiny house no puede ser una mansión
     const randomSize = randomProjectType === 'Tiny house' ? '35' : String(60 + Math.floor(Math.random() * 740));
@@ -272,25 +283,25 @@ function StudioContent() {
       humanContext: pick(SC.HUMAN_CONTEXT),
       renderStyle: pick(SC.RENDER_STYLES),
 
-      // Exterior
+      // Exterior & Planta
       projectType: isExtOrInt ? randomProjectType : params.projectType,
       city: params.city,
       climate: isExtOrInt ? pick(EC.CLIMATES) : params.climate,
       environment: isExtOrInt ? pick(EC.ENVIRONMENTS) : params.environment,
       waterBody: isExtOrInt ? pick(EC.WATER_BODIES) : params.waterBody,
       weatherCondition: isExtOrInt ? pick(EC.WEATHER_CONDITIONS) : params.weatherCondition,
-      size: isExt ? randomSize : params.size,
-      levels: isExt ? Math.floor(Math.random() * 5) + 1 : params.levels,
+      size: isExtOrPlanta ? randomSize : params.size,
+      levels: isExtOrPlanta ? Math.floor(Math.random() * 3) + 1 : params.levels,
       roofType: isExt ? pick(EC.ROOF_TYPES) : params.roofType,
-      layoutType: isExt ? pick(EC.LAYOUT_TYPES) : params.layoutType,
-      parkingSpots: isExt ? Math.floor(Math.random() * 3) : params.parkingSpots,
-      parkingType: isExt ? pick(EC.PARKING_TYPES) : params.parkingType,
-      socialAreas: isExt ? pickMulti(EC.SOCIAL_AREAS, 2) : params.socialAreas,
+      layoutType: isExtOrPlanta ? pick(EC.LAYOUT_TYPES) : params.layoutType,
+      parkingSpots: isExtOrPlanta ? Math.floor(Math.random() * 3) : params.parkingSpots,
+      parkingType: isExtOrPlanta ? pick(EC.PARKING_TYPES) : params.parkingType,
+      socialAreas: isExtOrPlanta ? pickMulti(EC.SOCIAL_AREAS, 2) : params.socialAreas,
       exteriorElements: isExt ? pickMulti(EC.EXTERIOR_ELEMENTS, 4) : params.exteriorElements,
       vegetation: isExt ? pickMulti(EC.VEGETATION, 3) : params.vegetation,
       architecturalDetails: isExt ? pickMulti(EC.ARCHITECTURAL_DETAILS, 2) : params.architecturalDetails,
 
-      // Interior
+      // Interior & Planta
       roomType: isInt ? pick(IC.ROOM_TYPES) : params.roomType,
       furnitureStyle: isInt ? pickMulti(IC.FURNITURE_STYLES, 2) : params.furnitureStyle,
       interiorLighting: isInt ? pickMulti(IC.INTERIOR_LIGHTING_TYPES, 2) : params.interiorLighting,
@@ -298,8 +309,16 @@ function StudioContent() {
       ceilingDetail: isInt ? pick(IC.CEILING_DETAILS) : params.ceilingDetail,
       bedrooms: isExtOrInt ? Math.floor(Math.random() * 4) + 1 : params.bedrooms,
       bathrooms: isExtOrInt ? Math.floor(Math.random() * 3) + 1 : params.bathrooms,
-      kitchenType: isInt ? pick(IC.KITCHEN_TYPES) : params.kitchenType,
-      livingAreaType: isInt ? pick(IC.LIVING_AREA_TYPES) : params.livingAreaType,
+      kitchenType: (isInt || isPlanta) ? pick(IC.KITCHEN_TYPES) : params.kitchenType,
+      livingAreaType: (isInt || isPlanta) ? pick(IC.LIVING_AREA_TYPES) : params.livingAreaType,
+
+      // Planta
+      floorPlanStyle: isPlanta ? pick(PC.FLOOR_PLAN_STYLES) : params.floorPlanStyle,
+      lotWidthM: isPlanta ? 8 + Math.floor(Math.random() * 18) : params.lotWidthM,
+      lotDepthM: isPlanta ? 15 + Math.floor(Math.random() * 25) : params.lotDepthM,
+      planSpaces: isPlanta ? pickMulti(PC.PLAN_SPACES, 4) : params.planSpaces,
+      zoningLayout: isPlanta ? pick(PC.ZONING_LAYOUTS) : params.zoningLayout,
+      floorPlanAnnotations: isPlanta ? pickMulti(PC.FLOOR_PLAN_ANNOTATIONS, 3) : params.floorPlanAnnotations,
       
       // Edición: no se toca lo que el usuario escribió
       editPrompt: params.editPrompt,
@@ -448,7 +467,7 @@ function StudioContent() {
         try {
           for (const [k, url] of all.entries()) {
             const { pruned } = await saveToHistory({
-              mode: params.mode as 'exterior' | 'interior' | 'edit' | 'vistas',
+              mode: params.mode,
               params: finalParams, // los parámetros que de verdad se enviaron (incluye si había casa de referencia)
               imageUrl: url,
               houseName: data.houseName,
@@ -546,7 +565,9 @@ function StudioContent() {
                   const { params: safe, dropped } = sanitizeAssistantParams(parsedData);
                   setParams(prev => ({ ...prev, ...safe }));
                   if (dropped.length) showToast(`El asistente propuso ${dropped.length} valor(es) que el formulario no ofrece; se ignoraron.`);
-                  if (params.mode === 'exterior') {
+                  if (params.mode === 'planta') {
+                    setActiveSection('program');
+                  } else if (params.mode === 'exterior') {
                     setActiveSection('concept');
                   } else if (params.mode === 'interior') {
                     setActiveSection('identity');
@@ -587,10 +608,10 @@ function StudioContent() {
 
           {/* Toast Notification */}
           {toastMessage && (
-            <div className="fixed top-24 right-6 z-50 animate-fade-in-up">
-              <div className="bg-foreground text-background px-6 py-3 rounded-full shadow-2xl flex items-center gap-3">
-                <CheckCircle2 className="w-5 h-5 text-primary" />
-                <span className="text-sm font-bold uppercase tracking-wide">{toastMessage}</span>
+            <div className="fixed top-24 right-4 left-4 sm:left-auto sm:right-6 sm:max-w-xl z-50 animate-fade-in-up">
+              <div className="bg-foreground text-background px-5 py-3 rounded-2xl shadow-2xl flex items-center gap-3">
+                <CheckCircle2 className="w-5 h-5 text-primary shrink-0" />
+                <span className="text-xs sm:text-sm font-bold uppercase tracking-wide break-words min-w-0">{toastMessage}</span>
               </div>
             </div>
           )}
@@ -604,13 +625,24 @@ function StudioContent() {
             isOpen={activeSection === 'mode'}
             onToggle={() => toggleSection('mode')}
             summary={
+              params.mode === 'planta' ? "Planta Arquitectónica" :
               params.mode === 'exterior' ? "Arquitectura Exterior" :
               params.mode === 'interior' ? "Diseño Interior" :
               params.mode === 'edit' ? "Editar Imagen con IA" :
               "Portafolio de Vistas"
             }
           >
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
+              <button
+                onClick={() => switchMode('planta')}
+                className={clsx(
+                  "flex flex-col items-center gap-3 p-6 border transition-all",
+                  params.mode === "planta" ? "bg-primary text-primary-foreground" : "bg-card text-muted-foreground"
+                )}
+              >
+                <LayoutGrid className="w-8 h-8" />
+                <span className="text-xs font-bold uppercase tracking-widest">Planta</span>
+              </button>
               <button
                 onClick={() => switchMode('exterior')}
                 className={clsx(
@@ -634,7 +666,7 @@ function StudioContent() {
               <button
                 onClick={() => switchMode('edit')}
                 className={clsx(
-                  "flex flex-col items-center gap-3 p-6 border transition-all col-span-2 sm:col-span-1",
+                  "flex flex-col items-center gap-3 p-6 border transition-all",
                   params.mode === "edit" ? "bg-primary text-primary-foreground" : "bg-card text-muted-foreground"
                 )}
               >
@@ -644,7 +676,7 @@ function StudioContent() {
               <button
                 onClick={() => switchMode('vistas')}
                 className={clsx(
-                  "flex flex-col items-center gap-3 p-6 border transition-all col-span-2 sm:col-span-1",
+                  "flex flex-col items-center gap-3 p-6 border transition-all sm:col-span-2 lg:col-span-1",
                   params.mode === "vistas" ? "bg-primary text-primary-foreground" : "bg-card text-muted-foreground"
                 )}
               >
@@ -656,7 +688,7 @@ function StudioContent() {
           </Section>
 
           {/* 02: Referencias Visuales (Shared) */}
-          {params.mode !== 'edit' && params.mode !== 'vistas' && params.mode !== 'exterior' && (
+          {params.mode !== 'edit' && params.mode !== 'vistas' && params.mode !== 'exterior' && params.mode !== 'planta' && (
           <Section
             title="Referencias Visuales"
             number="02"
@@ -670,7 +702,7 @@ function StudioContent() {
           )}
 
           {/* 03: Contexto (Mode-specific: Lote vs Espacio vs Base) */}
-          {params.mode !== 'edit' && params.mode !== 'exterior' && (
+          {params.mode !== 'edit' && params.mode !== 'exterior' && params.mode !== 'planta' && (
           <Section
             title={
                 params.mode === 'interior' ? "Foto del Espacio Actual" : 
@@ -712,7 +744,7 @@ function StudioContent() {
           )}
 
           {/* 04: Estructura (Mode-specific: Plano vs Layout) */}
-          {params.mode !== 'edit' && params.mode !== 'vistas' && params.mode !== 'exterior' && (
+          {params.mode !== 'edit' && params.mode !== 'vistas' && params.mode !== 'exterior' && params.mode !== 'planta' && (
           <Section
             title="Distribución / Layout"
             number="04"
@@ -731,7 +763,19 @@ function StudioContent() {
           )}
 
           {/* Dinamically Rendered Module Form */}
-          {params.mode === 'exterior' ? (
+          {params.mode === 'planta' ? (
+            <PlantaForm
+              params={params}
+              onChange={setParams}
+              disabled={isLoading}
+              activeSection={activeSection}
+              onSectionChange={toggleSection}
+              floorPlanFile={floorPlanFile}
+              onFloorPlanFileChange={setFloorPlanFile}
+              lotFile={lotFile}
+              onLotFileChange={handleLotFileChange}
+            />
+          ) : params.mode === 'exterior' ? (
             <ExteriorForm
               params={params}
               onChange={setParams}
@@ -840,11 +884,12 @@ function StudioContent() {
                   imageUrl={imageUrl}
                   isLoading={isLoading}
                   onRegenerate={handleGenerate}
-                  title={houseName || (params.mode === 'vistas' ? "Portafolio de Vistas" : `Final ${params.mode}`)}
-                  subtitle={params.mode === 'vistas' ? "Set de visualizaciones arquitectónicas" : `Photorealistic ${params.mode} visualization`}
+                  title={houseName || (params.mode === 'vistas' ? "Portafolio de Vistas" : params.mode === 'planta' ? "Planta Arquitectónica" : `Final ${params.mode}`)}
+                  subtitle={params.mode === 'vistas' ? "Set de visualizaciones arquitectónicas" : params.mode === 'planta' ? "Programa y distribución espacial" : `Photorealistic ${params.mode} visualization`}
                   vistasImages={params.mode === 'vistas' ? vistasResults : undefined}
                   activeVistaIndex={activeVistaIndex}
                   houseName={houseName}
+                  mode={params.mode}
                   onUseAsBase={handleUseResultAsBase}
                 />
                 {(() => {
@@ -968,9 +1013,11 @@ function AIAssistantPanel({ mode, onParseSuccess, onError, onToast }: AIAssistan
             }
           }}
           placeholder={
-            mode === 'exterior' 
-              ? "Ej: Una villa de lujo minimalista frente al mar de Tadao Ando con concreto y madera, piscina infinity en atardecer..."
-              : "Ej: Una cocina gourmet con isla central y vigas de madera expuestas en el techo, madera clara y mármol..."
+            mode === 'planta'
+              ? "Ej: Casa de 180 m² en 1 piso en lote de 12x25 m, 3 alcobas, 3 baños, estudio, cuarto de ropas, cocina con isla y patio central..."
+              : mode === 'exterior' 
+                ? "Ej: Una villa de lujo minimalista frente al mar de Tadao Ando con concreto y madera, piscina infinity en atardecer..."
+                : "Ej: Una cocina gourmet con isla central y vigas de madera expuestas en el techo, madera clara y mármol..."
           }
           disabled={isParsingNlp}
           className="flex-grow bg-background border border-border px-4 py-3 text-sm focus:ring-1 focus:ring-primary outline-none transition-all"

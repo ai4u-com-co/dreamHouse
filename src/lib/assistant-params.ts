@@ -3,6 +3,7 @@ import * as SC from '@/modules/shared/constants';
 import * as EC from '@/modules/exterior/constants';
 import * as IC from '@/modules/interior/constants';
 import * as EDC from '@/modules/edit/constants';
+import * as PC from '@/modules/planta/constants';
 import { DESIGN_PARAM_KEYS } from '@/lib/image-metadata';
 
 // ============================================
@@ -43,6 +44,7 @@ const OPTIONS: Partial<Record<keyof DreamHouseParams, readonly string[]>> = {
   siteTopography: EC.SITE_TOPOGRAPHIES, solarOrientation: EC.SOLAR_ORIENTATIONS, constructionSystem: EC.CONSTRUCTION_SYSTEMS,
   roofMaterial: EC.ROOF_MATERIALS, passiveStrategies: EC.PASSIVE_STRATEGIES, windowType: EC.WINDOW_TYPES, wallFinish: IC.WALL_FINISHES,
   editChangeType: EDC.EDIT_CHANGE_TYPES, editIntensity: EDC.EDIT_INTENSITIES, editPreserve: EDC.EDIT_PRESERVE_OPTIONS,
+  floorPlanStyle: PC.FLOOR_PLAN_STYLES, planSpaces: PC.PLAN_SPACES, zoningLayout: PC.ZONING_LAYOUTS, floorPlanAnnotations: PC.FLOOR_PLAN_ANNOTATIONS,
 };
 
 /** Máximo de elementos por lista (lo que el propio prompt del asistente le pide) */

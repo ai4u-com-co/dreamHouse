@@ -13,6 +13,7 @@ import { buildExteriorPrompt } from '@/modules/exterior/lib/prompt-builder';
 import { buildInteriorPrompt } from '@/modules/interior/lib/prompt-builder';
 import { buildEditPrompt } from '@/modules/edit/lib/prompt-builder';
 import { buildVistasPrompt } from '@/modules/vistas/lib/prompt-builder';
+import { buildPlantaPrompt } from '@/modules/planta/lib/prompt-builder';
 import { APP_ID, authenticate, charge, chargeFailure, isAdmin, noChargeNote, recordUsage, refund, topUp, type Charge } from '@/lib/billing';
 
 // Vercel: «Muy alta» tarda ~30 s y «Máxima» ~60 s o más (medido); con varias variantes y entradas, más. 300 s es el tope del plan Pro.
@@ -66,6 +67,7 @@ async function validateEditMaskPair(baseFile: File, maskFile: File): Promise<str
 // Qué archivos usa cada módulo. `lotImage` es el archivo "principal" y significa algo distinto en cada uno:
 // exterior = foto del terreno · interior = foto del espacio actual · vistas = la casa a fotografiar.
 const INPUTS_BY_MODE: Record<string, { lot: boolean; exteriorRef: boolean; floorPlan: boolean; files: boolean; objects: boolean }> = {
+  planta: { lot: true, exteriorRef: false, floorPlan: true, files: false, objects: false },
   exterior: { lot: true, exteriorRef: true, floorPlan: true, files: true, objects: false },
   interior: { lot: true, exteriorRef: false, floorPlan: true, files: true, objects: true },
   vistas: { lot: true, exteriorRef: false, floorPlan: false, files: false, objects: false },
@@ -291,7 +293,9 @@ export async function POST(req: NextRequest) {
 
     // --- NEW: Narrative Prompt Building ---
     let narrativePrompt = "";
-    if (params.mode === 'interior') {
+    if (params.mode === 'planta') {
+      narrativePrompt = buildPlantaPrompt(params, params.aiModel, !!(floorPlanImage || lotImage));
+    } else if (params.mode === 'interior') {
       narrativePrompt = buildInteriorPrompt(params, params.aiModel, !!lotImage);
     } else if (params.mode === 'exterior') {
       narrativePrompt = buildExteriorPrompt(params, !!exteriorReferenceImage, params.aiModel);
@@ -338,7 +342,7 @@ export async function POST(req: NextRequest) {
         if (floorPlanImage) {
           openaiInputs.push({ file: floorPlanImage, role: "the floor plan or sketch (geometry only): preserve its exact layout, proportions and perspective; do not add new elements; do not copy its linework, labels, dimensions or any text into the image" });
         }
-        if (params.mode === 'exterior' && lotImage) {
+        if ((params.mode === 'exterior' || params.mode === 'planta') && lotImage) {
           openaiInputs.push({ file: lotImage, role: lotRole });
         }
         // Interior puede sumar objetos (hasta 13) + espacio + plano + referencias: las referencias de estilo
@@ -366,7 +370,16 @@ export async function POST(req: NextRequest) {
 
     let mandate = "";
     if (useOpenAI) {
-      if (params.mode === "interior") {
+      if (params.mode === "planta") {
+        mandate = [
+          'ARCHITECTURAL FLOOR PLAN MANDATE:',
+          '- Generate a coherent architectural floor plan and spatial division strictly matching the requested room counts, areas and zoning.',
+          params.bedrooms > 0 ? `- Show exactly ${params.bedrooms} bedroom${params.bedrooms > 1 ? 's' : ''}.` : '',
+          params.bathrooms > 0 ? `- Show ${params.bathrooms} bathroom${params.bathrooms > 1 ? 's' : ''}.` : '',
+          floorPlanImage ? '- Respect the overall footprint and layout proportions of the provided reference sketch.' : '',
+          lotImage ? '- Fit the floor plan footprint within the geometry of the provided site/lot reference.' : '',
+        ].filter(Boolean).join('\n');
+      } else if (params.mode === "interior") {
         mandate = ['INTERNAL SPATIAL MANDATE:',
           params.roomType ? `- Respect room functionality: ${params.roomType}.` : '',
           params.furnitureStyle.length ? `- Render furniture: ${params.furnitureStyle.join(', ')}.` : '',

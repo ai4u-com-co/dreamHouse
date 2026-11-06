@@ -68,8 +68,9 @@ test('edición: el tamaño es auto y se cobra por los píxeles de la base (acota
   assert.equal(tiny.value.options.pixels, 655_360);
 });
 
-test('pickOpenAIInputs: vistas solo la casa; interior suma objetos; el tope es 17', () => {
+test('pickOpenAIInputs: vistas solo la casa; planta boceto y lote; interior suma objetos; el tope es 17', () => {
   assert.deepEqual(pickOpenAIInputs('vistas', { lot: 'L', exteriorRef: 'E', floorPlan: 'P', references: ['r'], objects: ['o'] }), ['L']);
+  assert.deepEqual(pickOpenAIInputs('planta', { lot: 'L', exteriorRef: 'E', floorPlan: 'P', references: ['r'], objects: ['o'] }), ['P', 'L']);
   assert.deepEqual(pickOpenAIInputs('interior', { lot: 'L', floorPlan: 'P', references: ['r'], objects: ['o'] }), ['P', 'L', 'r', 'o']);
   const refs = Array.from({ length: 20 }, (_, i) => `r${i}`);
   assert.equal(pickOpenAIInputs('exterior', { lot: 'L', exteriorRef: 'E', floorPlan: 'P', references: refs, objects: [] }).length, 17);

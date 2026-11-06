@@ -10,7 +10,7 @@ import { validateCustomSize } from '@/lib/openai-image-core.ts';
 // OJO: esto es para CARGAR (historial, formularios). El servidor NO se apoya en esta normalización para las opciones que
 // se cobran: las valida estrictas con `resolveImageOptions` (ver render-options.ts) y rechaza con 400 lo que no sea válido.
 
-const MODES = new Set(['exterior', 'interior', 'edit', 'vistas']);
+const MODES = new Set(['planta', 'exterior', 'interior', 'edit', 'vistas']);
 const inList = (list: readonly string[], v: unknown): v is string => typeof v === 'string' && list.includes(v);
 
 /** Valores antiguos de la resolución: "" y "512" eran 1K (lo más barato); "4K" se acotaba a 2K. */

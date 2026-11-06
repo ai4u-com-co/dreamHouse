@@ -9,6 +9,7 @@ import * as SC from '@/modules/shared/constants';
 import * as EC from '@/modules/exterior/constants';
 import * as IC from '@/modules/interior/constants';
 import * as EDC from '@/modules/edit/constants';
+import * as PC from '@/modules/planta/constants';
 import { embedImageMetadata, readImageMetadata, pickEmbeddableParams, DESIGN_PARAM_KEYS, DETAIL_PARAM_KEYS } from '@/lib/image-metadata';
 import { sanitizeRestoredParams } from '@/lib/assistant-params';
 import { buildParamsFile, parseParamsFile, restoreParamsFromFile } from '@/lib/restore-params';
@@ -37,6 +38,8 @@ const FULL = {
   flooringMaterial: IC.FLOORING_MATERIALS[1], ceilingDetail: IC.CEILING_DETAILS[1], bedrooms: 3, bathrooms: 2,
   kitchenType: IC.KITCHEN_TYPES[1], livingAreaType: IC.LIVING_AREA_TYPES[1], wallFinish: IC.WALL_FINISHES[1],
   editChangeType: EDC.EDIT_CHANGE_TYPES[1], editIntensity: EDC.EDIT_INTENSITIES[1], editPreserve: [EDC.EDIT_PRESERVE_OPTIONS[1]],
+  floorPlanStyle: PC.FLOOR_PLAN_STYLES[1], lotWidthM: 12, lotDepthM: 25, planSpaces: [PC.PLAN_SPACES[1]],
+  zoningLayout: PC.ZONING_LAYOUTS[1], floorPlanAnnotations: [PC.FLOOR_PLAN_ANNOTATIONS[1]],
   artDirection: LONG_TEXT, negativePrompt: 'sin autos\nsin carteles', editPrompt: 'quitar el árbol del frente',
 };
 

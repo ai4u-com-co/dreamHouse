@@ -11,6 +11,7 @@ import { PARAM_MODES, editableParams, modesFor } from '@/modules/shared/param-mo
 import { buildExteriorPrompt } from '@/modules/exterior/lib/prompt-builder';
 import { buildInteriorPrompt } from '@/modules/interior/lib/prompt-builder';
 import { buildEditPrompt } from '@/modules/edit/lib/prompt-builder';
+import { buildPlantaPrompt } from '@/modules/planta/lib/prompt-builder';
 
 const OPENAI = 'GPT Image 2.5 Sunburst (OpenAI)';
 const GEMINI = 'Gemini 3.1 Flash Image Preview';
@@ -32,12 +33,16 @@ const SAMPLE = {
   siteTopography: 'Ladera pronunciada', solarOrientation: 'Fachada principal al norte', constructionSystem: 'Guadua / Bambú estructural',
   roofMaterial: 'Teja de barro', passiveStrategies: ['Aleros profundos'], windowType: 'Muro cortina', wallFinish: 'Estuco veneciano',
   editChangeType: 'Cambiar el color', editIntensity: 'Radical (transformación total)', editPreserve: ['Perspectiva y encuadre'],
+  floorPlanStyle: 'Planta 3D Cortada (Isométrica / Axonométrica sin techo)', lotWidthM: 12, lotDepthM: 25,
+  planSpaces: ['Estudio / Home Office'], zoningLayout: 'Organizada alrededor de patio central',
+  floorPlanAnnotations: ['Áreas en m² por ambiente'],
 };
 
 // Algunos campos solo se expresan junto a otro (p. ej. las plazas, si hay estacionamiento)
 const NEEDS = { parkingSpots: { parkingType: 'Garaje cerrado (2+ autos)' } };
 
 const BUILDERS = {
+  planta: (params, model) => buildPlantaPrompt(params, model),
   exterior: (params, model) => buildExteriorPrompt(params, false, model),
   interior: (params, model) => buildInteriorPrompt(params, model),
   edit: (params) => buildEditPrompt(params),
@@ -50,7 +55,7 @@ test('el registro y la prueba están al día: todo parámetro registrado tiene v
   }
 });
 
-for (const mode of ['exterior', 'interior', 'edit']) {
+for (const mode of ['planta', 'exterior', 'interior', 'edit']) {
   for (const key of editableParams(mode)) {
     test(`${mode}: "${key}" llega al prompt (OpenAI y Gemini)`, () => {
       // Línea base con materiales para que `finishLevel` también se exprese en exterior
@@ -66,6 +71,7 @@ for (const mode of ['exterior', 'interior', 'edit']) {
 
 // ── Cada parámetro del módulo tiene un control en su formulario ──
 const FORMS = {
+  planta: 'src/modules/planta/components/PlantaForm.tsx',
   exterior: 'src/modules/exterior/components/ExteriorForm.tsx',
   interior: 'src/modules/interior/components/InteriorForm.tsx',
   edit: 'src/modules/edit/components/EditForm.tsx',
@@ -99,7 +105,7 @@ function controlSource(mode) {
   return source;
 }
 
-for (const mode of ['exterior', 'interior', 'edit']) {
+for (const mode of ['planta', 'exterior', 'interior', 'edit']) {
   test(`${mode}: todo parámetro que aplica tiene un control en el formulario`, () => {
     const source = controlSource(mode);
     const missing = editableParams(mode).filter((key) => !new RegExp(`['"]${key}['"]`).test(source));
@@ -160,7 +166,7 @@ test('edición: el tipo de espacio, el maestro y lo que se conserva llegan al pr
 });
 
 // ── Controles que existían en el estado pero no en pantalla (auditoría) ──
-for (const mode of ['exterior', 'interior', 'edit', 'vistas']) {
+for (const mode of ['planta', 'exterior', 'interior', 'edit', 'vistas']) {
   test(`${mode}: se puede escribir qué NO debe aparecer (negativePrompt tiene control)`, () => {
     const file = { ...FORMS, vistas: 'src/modules/vistas/components/VistasForm.tsx' }[mode];
     assert.match(componentBody('CreativeFields'), /negativePrompt/);
@@ -225,6 +231,7 @@ test('las listas no tienen repetidos ni elementos vacíos', async () => {
     ...(await import('@/modules/exterior/constants')),
     ...(await import('@/modules/interior/constants')),
     ...(await import('@/modules/edit/constants')),
+    ...(await import('@/modules/planta/constants')),
   };
   for (const [name, list] of Object.entries(lists)) {
     if (!Array.isArray(list) || !list.every((x) => typeof x === 'string') || name === 'OUTPUT_RESOLUTIONS') continue;

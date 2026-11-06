@@ -73,6 +73,7 @@ export default function HistoryGallery({
 
   const getModeIcon = (mode: string) => {
     switch (mode) {
+      case 'planta': return <Layout className="w-3 h-3" />;
       case 'exterior': return <Home className="w-3 h-3" />;
       case 'interior': return <Armchair className="w-3 h-3" />;
       case 'edit': return <Wand className="w-3 h-3" />;
@@ -82,6 +83,7 @@ export default function HistoryGallery({
 
   const getModeLabel = (mode: string) => {
     switch (mode) {
+      case 'planta': return 'Planta';
       case 'exterior': return 'Exterior';
       case 'interior': return 'Interior';
       case 'edit': return 'Edición';
