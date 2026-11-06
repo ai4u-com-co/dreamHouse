@@ -1,4 +1,5 @@
 import { DreamHouseParams, GenerationMode } from '../types';
+import { THUMBNAIL_VERSION } from './image-thumbnail';
 
 export interface GenerationRecord {
   id: string;
@@ -11,6 +12,8 @@ export interface GenerationRecord {
   hasFullImage?: boolean; // true si existe el render full-res en el store `fullImages`
   /** Id de la imagen (el de sus metadatos incrustados): enlaza un render con las vistas y ediciones que salieron de él */
   imageId?: string;
+  /** Versión de la miniatura (ver image-thumbnail.ts); sin campo = la antigua de 320 px */
+  thumbV?: number;
 }
 
 // El historial vive en el navegador. Cada persona tiene su PROPIA base (`DreamHouseDB-<user_id>`): en un navegador compartido,
@@ -73,7 +76,7 @@ export class DreamHouseDB {
     await this.init();
     const id = crypto.randomUUID();
     const timestamp = Date.now();
-    const fullRecord: GenerationRecord = { ...record, id, timestamp, hasFullImage: !!fullImage };
+    const fullRecord: GenerationRecord = { ...record, id, timestamp, hasFullImage: !!fullImage, thumbV: THUMBNAIL_VERSION };
 
     return new Promise((resolve, reject) => {
       const transaction = this.db!.transaction([STORE_NAME, IMAGES_STORE], 'readwrite');
@@ -149,6 +152,26 @@ export class DreamHouseDB {
       const request = store.get(id);
       request.onsuccess = () => resolve((request.result as Blob) ?? null);
       request.onerror = () => reject(request.error);
+    });
+  }
+
+  /** Reemplaza SOLO la miniatura de un registro (todo lo demás, incluida la fecha, queda igual). false si el registro ya no existe. */
+  async updateThumbnail(id: string, imageUrl: string, thumbV: number): Promise<boolean> {
+    await this.init();
+    return new Promise((resolve, reject) => {
+      const transaction = this.db!.transaction([STORE_NAME], 'readwrite');
+      const store = transaction.objectStore(STORE_NAME);
+      let updated = false;
+      transaction.oncomplete = () => resolve(updated);
+      transaction.onerror = () => reject(transaction.error);
+      transaction.onabort = () => reject(transaction.error);
+      const request = store.get(id);
+      request.onsuccess = () => {
+        const record = request.result as GenerationRecord | undefined;
+        if (!record) return;
+        store.put({ ...record, imageUrl, thumbV });
+        updated = true;
+      };
     });
   }
 

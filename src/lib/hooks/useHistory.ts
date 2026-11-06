@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { dbFor, GenerationRecord } from '../db';
-import { createThumbnail, THUMBNAIL_MAX_SIDE, THUMBNAIL_QUALITY } from '../image-thumbnail';
+import { createThumbnail, needsThumbnailUpgrade, THUMBNAIL_MAX_SIDE, THUMBNAIL_QUALITY, THUMBNAIL_VERSION } from '../image-thumbnail';
 
 /** Aviso de que el historial de una cuenta cambió por fuera del hook (p. ej. se importó el historial anterior). */
 export const HISTORY_CHANGED_EVENT = 'dh-history-changed';
@@ -39,6 +39,48 @@ export function useHistory(ownerId: string | null) {
   }, []);
 
   const refreshHistory = useCallback(() => refreshFor(currentOwner.current), [refreshFor]);
+
+  // Miniaturas antiguas (320 px al 60 %: «no se ve nada»): se rehacen desde el render completo, que SÍ está guardado.
+  // Una por una (decodificar un render grande a la vez) y en segundo plano; cada mejora se pinta en cuanto está lista.
+  // Lo que falle se salta en esta sesión (no se reintenta en bucle) y el registro conserva su miniatura.
+  const upgrading = useRef(false);
+  const failedUpgrades = useRef<Set<string>>(new Set());
+  useEffect(() => {
+    if (!ownerId || isLoading || upgrading.current) return;
+    const pending = history.filter((r) => needsThumbnailUpgrade(r) && !failedUpgrades.current.has(r.id));
+    if (!pending.length) return;
+    upgrading.current = true;
+    const owner = ownerId;
+    (async () => {
+      try {
+        for (const record of pending) {
+          if (currentOwner.current !== owner) return; // cambió la cuenta: se detiene
+          let url: string | null = null;
+          try {
+            const blob = await dbFor(owner).getFullImage(record.id);
+            if (!blob) { failedUpgrades.current.add(record.id); continue; }
+            const source = URL.createObjectURL(blob);
+            try {
+              const thumb = await createThumbnail(source, THUMBNAIL_MAX_SIDE, THUMBNAIL_QUALITY);
+              if (thumb.startsWith('data:image/')) url = thumb; // si falló, createThumbnail devuelve la entrada: no se guarda
+            } finally {
+              URL.revokeObjectURL(source);
+            }
+            if (!url) { failedUpgrades.current.add(record.id); continue; }
+            const ok = await dbFor(owner).updateThumbnail(record.id, url, THUMBNAIL_VERSION);
+            if (ok && currentOwner.current === owner) {
+              setHistory((prev) => prev.map((r) => (r.id === record.id ? { ...r, imageUrl: url as string, thumbV: THUMBNAIL_VERSION } : r)));
+            }
+          } catch (err) {
+            console.warn('No se pudo mejorar la miniatura de un registro:', err);
+            failedUpgrades.current.add(record.id);
+          }
+        }
+      } finally {
+        upgrading.current = false;
+      }
+    })();
+  }, [history, isLoading, ownerId]);
 
   // Al cambiar de cuenta (o cerrar sesión) se vacía lo que había en pantalla y se carga el historial de la nueva.
   useEffect(() => {
