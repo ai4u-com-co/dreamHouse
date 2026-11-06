@@ -167,7 +167,7 @@ export function creativeDirectionText(params: DreamHouseParams): string {
  */
 export function creativeDirectionLead(params: DreamHouseParams): string {
   return creativeDirectionText(params)
-    ? "The client's CREATIVE DIRECTION (at the end of this brief) has the HIGHEST PRIORITY and overrides every other parameter, preset and default rule."
+    ? "CRITICAL MANDATE — The client's CREATIVE DIRECTION (at the end of this brief) has the HIGHEST PRIORITY and overrides every other parameter, preset, style, room count and default rule."
     : '';
 }
 
@@ -180,9 +180,11 @@ export function creativeDirectionBlock(params: DreamHouseParams, keepIdentity = 
   const text = creativeDirectionText(params);
   if (!text) return '';
   return [
-    'CREATIVE DIRECTION — HIGHEST PRIORITY (written by the client):',
+    '====================================================================',
+    'CREATIVE DIRECTION — HIGHEST PRIORITY & MANDATORY (written by the client):',
     text,
-    'Follow this direction literally and completely, down to every detail it mentions. Where it conflicts with any style, preset, parameter, default composition rule or earlier instruction in this brief, THIS DIRECTION WINS. Do not dilute, reinterpret, soften or ignore any part of it.',
+    '====================================================================',
+    'SUPREMACY RULE: Follow this direction literally, completely and with absolute fidelity down to every spatial, functional, structural and visual detail it mentions. Where it conflicts with ANY style, preset, parameter, room count, default composition rule or earlier instruction in this brief, THIS DIRECTION WINS UNCONDITIONALLY. Do not dilute, reinterpret, soften, average out or ignore any part of it.',
     keepIdentity ? 'The only exception is the identity of the house in the reference image, which must stay the same.' : '',
   ].filter(Boolean).join('\n');
 }

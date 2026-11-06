@@ -107,7 +107,12 @@ export function getLightingPhysics(timeOfDay: string, rawLightingType: string, s
   return `The scene is captured during ${timeOfDay}${seasonCtx}, with ${lightingType} lighting that defines shadow direction, sculpts the building's volumes, and confirms the physical depth of every surface plane.`;
 }
 
-export function buildExteriorPrompt(params: DreamHouseParams, hasStructuralReference: boolean = false, targetModel?: string): string {
+export function buildExteriorPrompt(
+  params: DreamHouseParams,
+  hasStructuralReference: boolean = false,
+  targetModel?: string,
+  hasFloorPlanReference: boolean = false,
+): string {
   const projectType = lookup(PROJECT_TYPE_MAP, params.projectType) || params.projectType || "building";
   let scaleDesc = "modern structure";
   if (params.size) {
@@ -132,15 +137,29 @@ export function buildExteriorPrompt(params: DreamHouseParams, hasStructuralRefer
     ? `Located in the urban context of ${params.city}`
     : `Rooted in a ${params.environment || 'carefully considered'} environment`;
 
+  const floorPlanHardBlock = hasFloorPlanReference
+    ? `\nHARD GEOMETRIC CONSTRAINT — FLOOR PLAN SLOT (BOUNDARIES + FULL PARAMETER EXECUTION):
+- Hard Spatial Limits (1:1 Footprint): The provided floor plan image defines the strict geometric boundaries of the building — exact footprint, perimeter shape (L-shape, U-shape, courtyard, wings, setbacks, projections), entry position, outdoor terraces/pool/deck zones, and window/door bays along the facades. Do NOT exceed, distort or replace these spatial boundaries.
+- Full Parameter Execution Within Those Limits: While strictly obeying the floor plan's footprint and spatial limits, you MUST actively build and dress the 3D exterior applying ALL requested parameters in this brief (architectural style, facade materials, finish standard, color palette, roof type and covering, number of levels, window design, landscaping, site environment, lighting, camera angle and any Creative Direction).
+- 2D-to-3D Translation: Extrude the 2D plan into a real three-dimensional built exterior volume (never render flat 2D plan lines, dimension arrows or text labels on the ground).\n`
+    : "";
+
   if (isOpenAI) {
+    const subjectDesc = hasStructuralReference && hasFloorPlanReference
+      ? `reimagined version of the ${projectType} from reference image, strictly obeying the footprint and spatial layout of the provided floor plan`
+      : hasStructuralReference
+        ? `reimagined version of the ${projectType} from reference image`
+        : hasFloorPlanReference
+          ? `3D architectural exterior of a ${scaleDesc} ${projectType} extruded and built strictly from the provided floor plan reference`
+          : `${scaleDesc} ${projectType}`;
     const prompt = `
 [INTENDED USE: Professional Architectural Portfolio Image]
 ${creativeDirectionLead(params) ? `\n${creativeDirectionLead(params)}\n` : ""}
 SCENE & CONTEXT:
-- Subject: ${hasStructuralReference ? `reimagined version of the ${projectType} from reference image` : `${scaleDesc} ${projectType}`}
+- Subject: ${subjectDesc}
 - Camera Angle: ${params.cameraAngle || 'eye-level'} view
 - Location/Setting: ${siteDesc}
-
+${floorPlanHardBlock}
 ARCHITECTURAL SPECIFICATION:
 - Style: ${styleDesc} character${architectDesc ? `, drawing from the language of ${architectDesc}` : ""}
 ${params.layoutType ? `- Layout: Organized with a ${lookup(FORM_ORGANIZATION_MAP, params.layoutType) || params.layoutType} configuration\n` : ""}${params.levels > 0 ? `- Levels: Distributed across exactly ${params.levels} floors\n` : ""}- Materials: ${materialDesc || "traditional architectural facade materials"}
@@ -164,6 +183,9 @@ ${creativeDirectionBlock(params) ? `\n${creativeDirectionBlock(params)}\n` : ""}
     prompt = `${article} ${style.medium} — ${params.cameraAngle || 'eye-level'} view — documenting a reimagined version of the ${projectType} shown in the reference image. `;
   } else {
     prompt = `${article} ${style.medium} — ${params.cameraAngle || 'eye-level'} view — of a ${scaleDesc} ${projectType}. `;
+  }
+  if (hasFloorPlanReference) {
+    prompt += `HARD GEOMETRIC CONSTRAINT (FLOOR PLAN SLOT): The provided floor plan image defines the strict 1:1 geometric boundaries (footprint, perimeter wings, recesses, courtyards, terraces and window/door positions) — stay strictly within those spatial limits while fully applying all requested exterior parameters (style, facade materials, roof type, levels, landscaping, lighting and Creative Direction), without copying flat 2D drafting lines or text. `;
   }
 
   if (present(params.city)) {

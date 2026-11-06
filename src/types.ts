@@ -140,6 +140,8 @@ export interface PlantaSpecificParams {
   zoningLayout: string;
   /** Elementos gráficos, cotas y anotaciones que se dibujan en el plano */
   floorPlanAnnotations: string[];
+  /** Indica si el usuario marcó un polígono/zona sobre la foto del lote donde emplazar la planta */
+  hasLotZone?: boolean;
 }
 
 export type DreamHouseParams = SharedParams & ExteriorSpecificParams & InteriorSpecificParams & VistasSpecificParams & EditSpecificParams & PlantaSpecificParams;
@@ -233,4 +235,5 @@ export const DEFAULT_PARAMS: DreamHouseParams = {
   planSpaces: [],
   zoningLayout: "",
   floorPlanAnnotations: [],
+  hasLotZone: false,
 };

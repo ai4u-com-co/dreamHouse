@@ -129,8 +129,21 @@ export default function ExteriorForm({
         <SectionDescription>Sube las fotos y planos que guiarán la estructura de la generación.</SectionDescription>
         <div className="space-y-8">
           <div>
-            <Subtitle>Referencias Visuales / Inspiración (Máx. 5)</Subtitle>
-            <ReferenceUploader files={files} onFilesChange={onFilesChange} />
+            <Subtitle>Slot de Planta Arquitectónica (Límite Geométrico 1:1)</Subtitle>
+            <FloorPlanUploader 
+              file={floorPlanFile} 
+              onFileChange={onFloorPlanFileChange} 
+              title="Plano Residencial / Planta Guía"
+              description="Si cargas una planta aquí, su huella, perímetro y vanos actúan como límite geométrico duro (1:1), mientras la IA construye el exterior aplicando todos los demás parámetros que pidas (estilo, materiales, cubierta, pisos, paisaje y dirección creativa)."
+            />
+            {floorPlanFile && (
+              <div className="mt-3 p-4 border border-primary/40 bg-primary/5 text-xs text-muted-foreground leading-relaxed" role="status">
+                <span className="font-bold uppercase tracking-wider text-primary block mb-1">
+                  Slot de Planta activo: límites geométricos fijados
+                </span>
+                El exterior respetará estrictamente los límites espaciales, huella y distribución de la planta cargada, pero aplicará todos los parámetros de estilo, materiales, cubierta, niveles, clima y dirección creativa que configures en este módulo.
+              </div>
+            )}
           </div>
 
           <div>
@@ -156,13 +169,8 @@ export default function ExteriorForm({
           </div>
 
           <div>
-            <Subtitle>Plano de Planta (Guía Geométrica)</Subtitle>
-            <FloorPlanUploader 
-              file={floorPlanFile} 
-              onFileChange={onFloorPlanFileChange} 
-              title="Plano Residencial"
-              description="Sube el plano de planta. El exterior respetará la geometría del plano."
-            />
+            <Subtitle>Referencias Visuales / Inspiración (Máx. 5)</Subtitle>
+            <ReferenceUploader files={files} onFilesChange={onFilesChange} />
           </div>
         </div>
       </Section>

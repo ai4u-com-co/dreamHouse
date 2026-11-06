@@ -5,6 +5,7 @@ import {
   bulletSection,
   creativeDirectionBlock,
   creativeDirectionLead,
+  creativeDirectionText,
   joinList,
   narrativeSentence,
   present,
@@ -53,6 +54,9 @@ export function plantaDetailLines(params: DreamHouseParams): string[] {
         : '';
 
   return [
+    params.hasLotZone
+      ? 'Selected buildable zone on lot photo: fit the floor plan layout, orientation and footprint specifically to the highlighted polygon zone marked on the terrain image (do not reproduce the red selection overlay lines)'
+      : '',
     when(lotDims, (v) => `Lot / Footprint dimensions: ${v}`),
     when(params.size, (v) => `Total built area: ${/^\d+(\.\d+)?$/.test(v.trim()) ? `${v.trim()} m²` : v}`),
     when(params.levels, (v) => `Number of levels: ${v} floor${v > 1 ? 's' : ''} (show clear stair core and vertical connection if multi-story)`),
@@ -62,7 +66,7 @@ export function plantaDetailLines(params: DreamHouseParams): string[] {
     when(params.bathrooms, (v) => `Bathrooms: ${v} complete bathroom${v > 1 ? 's' : ''} with logical wet-wall plumbing grouping`),
     when(params.kitchenType, (v) => `Kitchen layout: ${v}`),
     when(params.livingAreaType, (v) => `Main living / social area: ${v}`),
-    when(params.planSpaces, (v) => `Additional required rooms and spaces in the plan: ${joinList(v)}`),
+    when(params.planSpaces, (v) => `Additional rooms and spaces in the plan: ${joinList(v)}`),
     when(parking, (v) => `Parking / Garage integration: ${v}`),
     when(params.socialAreas, (v) => `Outdoor social areas integrated into the plan: ${joinList(v)}`),
     when(params.solarOrientation, (v) => `Solar orientation: ${v}`),
@@ -78,12 +82,14 @@ export function plantaDetailLines(params: DreamHouseParams): string[] {
 
 export function buildPlantaPrompt(params: DreamHouseParams, targetModel?: string, hasBaseReference: boolean = false): string {
   const isOpenAI = targetModel?.includes('OpenAI') || false;
+  const hasCreative = Boolean(creativeDirectionText(params));
   const projectType = lookup(PROJECT_TYPE_MAP, params.projectType) || params.projectType || 'residential building';
   const styleDesc = joinList(params.architecturalStyles) || 'contemporary architectural';
   const architectDesc = joinList(params.architect, '&');
+  const defaultPlanStyle = FLOOR_PLAN_STYLE_MAP["Planta Humanizada 2D (Texturas, mobiliario y color)"];
   const planStyleDesc = lookup(FLOOR_PLAN_STYLE_MAP, params.floorPlanStyle)
     || params.floorPlanStyle
-    || FLOOR_PLAN_STYLE_MAP["Planta Humanizada 2D (Texturas, mobiliario y color)"];
+    || (hasCreative ? `${defaultPlanStyle} (unless the CREATIVE DIRECTION specifies a different representation, view or graphic style)` : defaultPlanStyle);
   const detailLines = plantaDetailLines(params);
 
   if (isOpenAI) {
@@ -93,12 +99,12 @@ ${creativeDirectionLead(params) ? `\n${creativeDirectionLead(params)}\n` : ''}
 FLOOR PLAN & SPATIAL BRIEF:
 - Subject: Architectural floor plan and spatial division for ${/^[aeiou]/i.test(projectType) ? 'an' : 'a'} ${projectType}${hasBaseReference ? ', adapting the geometry of the provided reference sketch or site photo' : ''}
 - Representation Style: ${planStyleDesc}
-- Architectural Language: ${styleDesc} spatial organization${architectDesc ? `, inspired by the plan logic and proportions of ${architectDesc}` : ''}
+- Architectural Language: ${styleDesc} spatial organization${architectDesc ? `, inspired by the plan logic and proportions of ${architectDesc}` : ''}${hasCreative && !params.architecturalStyles.length ? ' (guided primarily by the CREATIVE DIRECTION)' : ''}
 ${bulletSection('PROGRAM & SPATIAL DIVISION SPECIFICATION', detailLines)}
 ARCHITECTURAL DRAFTING & LAYOUT RULES:
-- Coherent circulation: Every room must have a logical door or opening, clear circulation paths, realistic furniture scale and functional adjacency (entry → social → kitchen/dining → private hallway → bedrooms/bathrooms).
+${hasBaseReference ? '- Hard Geometric Slot (Base Image Limits): Respect the spatial boundaries, footprint and proportions of the uploaded reference image/zone while still executing ALL requested program parameters, styles and instructions.\n' : ''}- Coherent circulation: Every room must have a logical door or opening, clear circulation paths, realistic furniture scale and functional adjacency (entry → social → kitchen/dining → private hallway → bedrooms/bathrooms).
 - Proportional wall thickness: Exterior structural walls thicker than interior partitions; wet areas (bathrooms, kitchen, laundry) grouped efficiently.
-- Framing: Full floor plan centered with clean breathing room around the perimeter on a neutral architectural sheet.
+- Framing: Full floor plan centered with clean breathing room around the perimeter on a neutral architectural sheet${hasCreative ? ' (unless the CREATIVE DIRECTION requests otherwise)' : ''}.${hasCreative ? '\n- Creative Direction Authority: Every spatial relationship, room adjacency, dimension, orientation, zone placement or special feature requested in the CREATIVE DIRECTION below must be executed as the primary design driver, overriding any generic default.' : ''}
 ${creativeDirectionBlock(params) ? `\n${creativeDirectionBlock(params)}\n` : ''}`.trim();
   }
 

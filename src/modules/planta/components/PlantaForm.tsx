@@ -8,13 +8,14 @@ import * as EC from '../../exterior/constants';
 import * as IC from '../../interior/constants';
 import * as SC from '../../shared/constants';
 import { OutputOptions, CreativeFields } from '@/components/FormExtras';
-import { LayoutGrid, Compass, Layers, Sparkles, ImageIcon } from 'lucide-react';
+import { LayoutGrid, Compass, Layers, Sparkles } from 'lucide-react';
 import { Section } from '@/components/ui/Section';
 import { Select } from '@/components/ui/Select';
 import { ChipsField, EssenceFields, HomeProgramFields } from '@/components/FormFields';
 import FloorPlanUploader from '@/components/FloorPlanUploader';
 import LotUploader from '@/components/LotUploader';
 import { DebouncedInput } from '@/components/ui/DebouncedInput';
+import type { Pt } from '@/lib/polygon-zone';
 
 interface PlantaFormProps {
   params: DreamHouseParams;
@@ -26,6 +27,8 @@ interface PlantaFormProps {
   onFloorPlanFileChange: (file: File | null) => void;
   lotFile: File | null;
   onLotFileChange: (file: File | null) => void;
+  lotZonePolygons?: Pt[][];
+  onLotZoneChange?: (polygons: Pt[][], compositeFile: File | null) => void;
 }
 
 function SectionDescription({ children }: { children: React.ReactNode }) {
@@ -54,6 +57,8 @@ export default function PlantaForm({
   onFloorPlanFileChange,
   lotFile,
   onLotFileChange,
+  lotZonePolygons,
+  onLotZoneChange,
 }: PlantaFormProps) {
   const handleChange = <K extends keyof DreamHouseParams>(key: K, value: DreamHouseParams[K]) => {
     onChange({ ...params, [key]: value });
@@ -79,33 +84,30 @@ export default function PlantaForm({
   );
 
   const programSummary = [
+    lotFile ? (lotZonePolygons?.length ? 'Lote + zona' : 'Foto del lote') : '',
+    floorPlanFile ? 'Boceto guía' : '',
     params.size ? (isNaN(Number(params.size)) ? params.size : `${params.size} m²`) : '',
     params.lotWidthM && params.lotDepthM ? `Lote ${params.lotWidthM}×${params.lotDepthM} m` : '',
     params.levels ? `${params.levels} ${params.levels === 1 ? 'piso' : 'pisos'}` : '',
     params.bedrooms ? `${params.bedrooms} hab.` : '',
     params.bathrooms ? `${params.bathrooms} baños` : '',
-  ].filter(Boolean).join(' · ') || 'Sin definir';
+  ].filter(Boolean).join(' · ') || 'Opcional';
 
   const zoningSummary = [
     params.layoutType,
     params.zoningLayout,
     params.planSpaces.length > 0 ? `${params.planSpaces.length} ambientes extra` : '',
-  ].filter(Boolean).join(' · ') || 'Sin definir';
+  ].filter(Boolean).join(' · ') || 'Opcional';
 
   const styleSummary = [
-    params.floorPlanStyle || 'Planta Humanizada 2D',
+    params.floorPlanStyle,
     params.projectType,
     params.architecturalStyles.join(', '),
-  ].filter(Boolean).join(' · ') || 'Sin definir';
-
-  const mediaSummary = [
-    floorPlanFile ? 'Boceto guía' : '',
-    lotFile ? 'Terreno' : '',
   ].filter(Boolean).join(' · ') || 'Opcional';
 
   return (
     <div className="space-y-0" role="form" aria-label="Módulo de Planta Arquitectónica">
-      {/* ── FASE 1: PROGRAMA ARQUITECTÓNICO Y METRAJE ─────────────────── */}
+      {/* ── FASE 1: LOTE, PROGRAMA ARQUITECTÓNICO Y METRAJE (TODO OPCIONAL) ─── */}
       <Section
         title="Fase 1: Programa y Dimensiones"
         number="02"
@@ -115,12 +117,39 @@ export default function PlantaForm({
         summary={programSummary}
       >
         <SectionDescription>
-          Define los metros cuadrados, dimensiones del terreno, niveles, habitaciones, baños y ambientes que debe resolver la planta antes de levantar la casa. Todo este programa se conserva al pasar a Exterior o Interior.
+          Nada es obligatorio: todos los campos son opcionales. Puedes subir una foto del lote (y ahí mismo, si quieres, seleccionar la zona donde quieres crear la planta), indicar solo los parámetros que desees (metros, cuartos, baños…) o dejar el resto en blanco para que la IA proponga la división espacial.
         </SectionDescription>
 
         <div className="space-y-8">
           <div>
-            <Subtitle>Superficie, Huella y Niveles</Subtitle>
+            <Subtitle>Foto del Lote y Zona de la Planta (Opcional)</Subtitle>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+              <LotUploader
+                file={lotFile}
+                onFileChange={onLotFileChange}
+                enableZoneSelection={true}
+                zonePolygons={lotZonePolygons}
+                onZoneChange={onLotZoneChange}
+                zoneButtonLabel="Seleccionar zona para la planta"
+                title="Foto del Lote / Terreno"
+                description="Sube la foto del lote y ahí mismo, si quieres, selecciona la zona donde quieres crear la planta."
+              />
+              <FloorPlanUploader
+                file={floorPlanFile}
+                onFileChange={onFloorPlanFileChange}
+                title="Slot de Planta o Boceto Base"
+                description="Opcional: si subes una planta o boceto, fija los límites espaciales pero sigue aplicando todos los parámetros que pidas."
+              />
+            </div>
+          </div>
+
+          <div>
+            <Subtitle>Dirección Creativa y Exclusiones (Opcional · Máxima Fuerza)</Subtitle>
+            <CreativeFields params={params} onChange={handleChange} disabled={disabled} />
+          </div>
+
+          <div>
+            <Subtitle>Superficie, Huella y Niveles (Opcional)</Subtitle>
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
               <div className="flex flex-col gap-2">
                 <label htmlFor="field-planta-size" className="text-xs font-bold uppercase tracking-widest text-muted-foreground">
@@ -133,7 +162,7 @@ export default function PlantaForm({
                     min={15}
                     max={5000}
                     value={params.size || ''}
-                    placeholder="Ej: 180"
+                    placeholder="Auto (ej: 180)"
                     onChange={(val) => handleChange('size', val)}
                     disabled={disabled}
                     className="pl-4 pr-12"
@@ -152,7 +181,7 @@ export default function PlantaForm({
                   min={1}
                   max={10}
                   value={params.levels || ''}
-                  placeholder="Ej: 1"
+                  placeholder="Auto (ej: 1)"
                   onChange={(val) => handleChange('levels', parseInt(val) || 0)}
                   disabled={disabled}
                 />
@@ -169,7 +198,7 @@ export default function PlantaForm({
                     min={3}
                     max={500}
                     value={params.lotWidthM || ''}
-                    placeholder="Ej: 12"
+                    placeholder="Auto (ej: 12)"
                     onChange={(val) => handleChange('lotWidthM', parseInt(val) || 0)}
                     disabled={disabled}
                     className="pl-4 pr-10"
@@ -189,7 +218,7 @@ export default function PlantaForm({
                     min={3}
                     max={500}
                     value={params.lotDepthM || ''}
-                    placeholder="Ej: 25"
+                    placeholder="Auto (ej: 25)"
                     onChange={(val) => handleChange('lotDepthM', parseInt(val) || 0)}
                     disabled={disabled}
                     className="pl-4 pr-10"
@@ -201,7 +230,7 @@ export default function PlantaForm({
           </div>
 
           <div>
-            <Subtitle>Habitaciones, Baños y Núcleo Social</Subtitle>
+            <Subtitle>Habitaciones, Baños y Núcleo Social (Opcional)</Subtitle>
             <div className="space-y-5">
               <HomeProgramFields params={params} onChange={handleChange} disabled={disabled} />
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
@@ -224,17 +253,17 @@ export default function PlantaForm({
           </div>
 
           <div>
-            <Subtitle>Ambientes Complementarios y Servicios</Subtitle>
+            <Subtitle>Ambientes Complementarios y Servicios (Opcional)</Subtitle>
             {renderChipsGroup(
               'Espacios Adicionales de la Planta',
               'planSpaces',
               PC.PLAN_SPACES,
-              'Selecciona los cuartos y áreas que deben incluirse en la división espacial.',
+              'Opcional: selecciona cuartos o áreas adicionales que quieras incluir en la división espacial.',
             )}
           </div>
 
           <div>
-            <Subtitle>Estacionamiento y Áreas Exteriores en Planta</Subtitle>
+            <Subtitle>Estacionamiento y Áreas Exteriores en Planta (Opcional)</Subtitle>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
               <div className="flex flex-col gap-5">
                 <Select
@@ -264,7 +293,7 @@ export default function PlantaForm({
                 'Áreas Sociales Exteriores',
                 'socialAreas',
                 EC.SOCIAL_AREAS,
-                'Terrazas, piscina o zonas exteriores articuladas con la planta.',
+                'Opcional: terrazas, piscina o zonas exteriores articuladas con la planta.',
                 true,
               )}
             </div>
@@ -282,7 +311,7 @@ export default function PlantaForm({
         summary={zoningSummary}
       >
         <SectionDescription>
-          Define cómo se organizan las zonas social, privada y de servicios dentro de la huella, la orientación solar y el sistema estructural que modula los muros.
+          Opcional. Define cómo se organizan las zonas social, privada y de servicios dentro de la huella, la orientación solar y el sistema estructural que modula los muros.
         </SectionDescription>
 
         <div className="space-y-8">
@@ -331,7 +360,7 @@ export default function PlantaForm({
             'Estrategias Pasivas y Bioclimáticas en Planta',
             'passiveStrategies',
             EC.PASSIVE_STRATEGIES,
-            'Ventilación cruzada, patios de luz, captación solar o aleros expresados en la planta.',
+            'Opcional: ventilación cruzada, patios de luz, captación solar o aleros expresados en la planta.',
             true,
           )}
         </div>
@@ -347,12 +376,12 @@ export default function PlantaForm({
         summary={styleSummary}
       >
         <SectionDescription>
-          Elige el estilo de representación del plano (técnico CAD, planta humanizada a color, corte 3D sin techo o diagrama de zonificación), las cotas/anotaciones y la identidad arquitectónica.
+          Opcional. Elige el estilo de representación del plano (si no eliges ninguno, se generará una Planta Humanizada 2D), las cotas/anotaciones y la identidad arquitectónica.
         </SectionDescription>
 
         <div className="space-y-8">
           <div>
-            <Subtitle>Tipo de Representación de la Planta</Subtitle>
+            <Subtitle>Tipo de Representación de la Planta (Opcional)</Subtitle>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-4">
               {PC.FLOOR_PLAN_STYLES.map((styleOpt) => {
                 const selected = params.floorPlanStyle === styleOpt;
@@ -380,87 +409,56 @@ export default function PlantaForm({
               'Anotaciones y Elementos Gráficos del Plano',
               'floorPlanAnnotations',
               PC.FLOOR_PLAN_ANNOTATIONS,
-              'Qué información técnica y gráfica debe dibujarse sobre la planta.',
+              'Opcional: qué información técnica y gráfica debe dibujarse sobre la planta.',
             )}
           </div>
 
           <div>
-            <Subtitle>Esencia y Lenguaje Arquitectónico</Subtitle>
+            <Subtitle>Esencia y Lenguaje Arquitectónico (Opcional)</Subtitle>
             <EssenceFields
               params={params}
               onChange={handleChange}
               disabled={disabled}
               projectTypeLabel="Tipología del Proyecto"
-              projectTypeHelp="Define la escala y vocación del edificio (casa unifamiliar, cabaña, apartamento, finca…)."
+              projectTypeHelp="Opcional: define la escala y vocación del edificio (casa unifamiliar, cabaña, apartamento, finca…)."
             />
           </div>
 
           <div>
-            <Subtitle>Texturas de Piso y Paleta de la Lámina</Subtitle>
+            <Subtitle>Texturas de Piso y Paleta de la Lámina (Opcional)</Subtitle>
             <div className="space-y-6">
               {renderChipsGroup(
                 'Materiales Expresados en Planta',
                 'materials',
                 EC.MATERIALS,
-                'Materiales para muros, pisos y terrazas en plantas humanizadas o 3D.',
+                'Opcional: materiales para muros, pisos y terrazas en plantas humanizadas o 3D.',
                 true,
               )}
               {renderChipsGroup(
                 'Paleta Cromática',
                 'colorPalette',
                 SC.COLORS,
-                'Tonos dominantes de la representación gráfica.',
+                'Opcional: tonos dominantes de la representación gráfica.',
               )}
             </div>
           </div>
         </div>
       </Section>
 
-      {/* ── FASE 4: BOCETO O TERRENO DE REFERENCIA (OPCIONAL) ────────── */}
+      {/* ── FASE 4: FORMATO Y METADATOS DE SALIDA ─────────────────────── */}
       <Section
-        title="Fase 4: Croquis o Lote de Referencia (Opcional)"
+        title="Fase 4: Formato de Salida"
         number="05"
-        icon={<ImageIcon className="w-5 h-5" />}
-        isOpen={activeSection === 'media'}
-        onToggle={() => onSectionChange('media')}
-        summary={mediaSummary}
-      >
-        <SectionDescription>
-          Opcional: si ya tienes un dibujo a mano en servilleta/papel o una foto del terreno, súbelo para que la planta adapte su distribución a esa geometría.
-        </SectionDescription>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-          <FloorPlanUploader
-            file={floorPlanFile}
-            onFileChange={onFloorPlanFileChange}
-            title="Boceto o Croquis a Mano"
-            description="Sube un boceto rápido o esquema previo. La IA lo convertirá en una planta arquitectónica bien proporcionada."
-          />
-          <LotUploader
-            file={lotFile}
-            onFileChange={onLotFileChange}
-            title="Foto o Polígono del Terreno"
-            description="Sube una imagen del lote para emplazar la distribución según el terreno."
-          />
-        </div>
-      </Section>
-
-      {/* ── FASE 5: FORMATO Y DIRECCIÓN CREATIVA ─────────────────────── */}
-      <Section
-        title="Fase 5: Formato y Dirección Creativa"
-        number="06"
         icon={<Sparkles className="w-5 h-5" />}
         isOpen={activeSection === 'render'}
         onToggle={() => onSectionChange('render')}
         summary={`${params.renderAspectRatio} · ${params.renderOutputResolution}`}
       >
         <SectionDescription>
-          Elige la proporción de la lámina y añade indicaciones específicas sobre relaciones espaciales (ej. «la habitación principal debe mirar al jardín posterior y tener baño y vestier integrados»).
+          Opcional. Configura si deseas conservar los parámetros incrustados dentro del archivo de imagen descargado.
         </SectionDescription>
-        <div className="space-y-8">
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
-            <OutputOptions params={params} onChange={handleChange} disabled={disabled} />
-          </div>
-          <CreativeFields params={params} onChange={handleChange} disabled={disabled} />
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
+          <OutputOptions params={params} onChange={handleChange} disabled={disabled} />
         </div>
       </Section>
     </div>

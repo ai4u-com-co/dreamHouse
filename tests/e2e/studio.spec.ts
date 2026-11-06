@@ -135,12 +135,40 @@ test.describe('DreamHouse Studio E2E MVP', () => {
     await expect(page.getByText('Render generated successfully!')).toBeVisible();
   });
 
-  test('Planta Workflow: Program, Responsive (375/768/1024/1440) and Lift to Exterior', async ({ page }) => {
+  test('Planta Workflow: Optional fields, Lot Photo + Zone Selection, Responsive (375/768/1024/1440) and Lift to Exterior', async ({ page }) => {
     // Switch to Planta module
     await page.getByRole('button', { name: 'Planta', exact: true }).click();
     await expect(page.getByText('Fase 1: Programa y Dimensiones')).toBeVisible();
+    await expect(page.getByText(/Nada es obligatorio: todos los campos son opcionales/i)).toBeVisible();
 
-    // Fill spatial division program
+    // Verify lot photo uploader is immediately visible in Fase 1 and allows uploading + selecting zone
+    const lotInput = page.getByLabel('Subir foto del lote');
+    await expect(lotInput).toBeAttached();
+    const tinyPng = Buffer.from(
+      'iVBORw0KGgoAAAANSUhEUgAAAAoAAAAKCAYAAACNMs+9AAAAFUlEQVR42mNk+M9Qz0AEYBxVSF+FAAhKDveksOjmAAAAAElFTkSuQmCC',
+      'base64',
+    );
+    await lotInput.setInputFiles({ name: 'mi-lote.png', mimeType: 'image/png', buffer: tinyPng });
+
+    const selectZoneBtn = page.getByRole('button', { name: 'Seleccionar zona para la planta' });
+    await expect(selectZoneBtn).toBeVisible();
+    await selectZoneBtn.click();
+
+    // PolygonZoneModal opens: place 3 points and apply zone
+    const dialog = page.getByRole('dialog', { name: 'Seleccionar zona por puntos' });
+    await expect(dialog).toBeVisible();
+    const canvas = dialog.locator('canvas');
+    const box = await canvas.boundingBox();
+    expect(box).not.toBeNull();
+    if (box) {
+      await page.mouse.click(box.x + box.width * 0.2, box.y + box.height * 0.2);
+      await page.mouse.click(box.x + box.width * 0.8, box.y + box.height * 0.2);
+      await page.mouse.click(box.x + box.width * 0.5, box.y + box.height * 0.8);
+    }
+    await dialog.getByRole('button', { name: 'Aplicar zona' }).click();
+    await expect(page.getByText('Zona marcada (1)')).toBeVisible();
+
+    // Fill spatial division program (optional fields)
     await page.getByLabel('Área Construida (m²)').fill('220');
     await page.getByLabel('Niveles / Pisos').fill('2');
     await page.getByLabel('Frente del Lote (m)').fill('12');
@@ -166,6 +194,7 @@ test.describe('DreamHouse Studio E2E MVP', () => {
     await liftBtn.click();
 
     await expect(page.getByText('Planta cargada como Plano Residencial en Arquitectura Exterior con todo tu programa espacial.')).toBeVisible();
+    await expect(page.getByText('Slot de Planta activo: límites geométricos fijados')).toBeVisible();
     await expect(page.getByRole('button', { name: 'Generate exterior render' })).toBeVisible();
     // Design Spec shows the loaded PLANO file and preserved size/bedrooms
     await expect(page.locator('span:text-is("PLANO")')).toBeVisible();

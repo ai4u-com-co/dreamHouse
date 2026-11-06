@@ -42,6 +42,21 @@ test('planta: todos los estilos de plano y criterios de zonificación tienen des
   for (const z of ZONING_LAYOUTS) assert.ok(ZONING_LAYOUT_MAP[z], `sin descripción en ZONING_LAYOUT_MAP: ${z}`);
 });
 
+test('planta: cuando se selecciona zona sobre el lote (hasLotZone), el prompt indica adaptar la planta al polígono marcado', () => {
+  for (const model of [OPENAI, GEMINI]) {
+    const out = buildPlantaPrompt(p({ mode: 'planta', hasLotZone: true, aiModel: model }), model, true);
+    assert.match(out, /highlighted polygon zone marked on the terrain image/);
+  }
+});
+
+test('exterior: cuando se adjunta foto de la planta (hasFloorPlanReference), el prompt impone restricción geométrica dura (HARD GEOMETRIC CONSTRAINT)', () => {
+  for (const model of [OPENAI, GEMINI]) {
+    const out = buildExteriorPrompt(p({ mode: 'exterior', aiModel: model }), false, model, true);
+    assert.match(out, /HARD GEOMETRIC CONSTRAINT/);
+    assert.match(out, /1:1/);
+  }
+});
+
 test('con materiales pero sin nivel de acabado no queda "finished to a  standard"', () => {
   for (const model of [OPENAI, GEMINI]) {
     const out = buildExteriorPrompt(p({ materials: ['Madera'], finishLevel: '' }), false, model);

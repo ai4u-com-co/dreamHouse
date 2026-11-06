@@ -48,6 +48,7 @@ const NOT_RESTORED = {
   mode: 'se conserva el módulo actual de la persona',
   selectedVistas: 'es una selección de la tanda, no un diseño',
   hasExteriorReference: 'depende de un archivo que no se guarda',
+  hasLotZone: 'depende de un archivo que no se guarda',
   sourceRender: 'es la genealogía, no un parámetro del formulario',
   renderCustomSize: 'opción de costo de la salida',
   renderFormat: 'opción de costo de la salida',
