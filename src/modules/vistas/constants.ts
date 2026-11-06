@@ -17,6 +17,7 @@ export const ARCHITECTURAL_VISTAS = [
   "Vista Gran Angular",
   // — Aéreas —
   "Vista Aérea (Drone)",
+  "Vista Isométrica",
   "Vista de Cubierta",
   // — Acceso y entorno —
   "Vista de Acceso",
@@ -45,6 +46,7 @@ export const VISTA_SHORT_DESC: Record<string, string> = {
   "Vista Contrapicada": "Ángulo bajo mirando hacia arriba",
   "Vista Gran Angular": "Ultra-wide, casa en contexto",
   "Vista Aérea (Drone)": "Desde arriba, cubierta y entorno",
+  "Vista Isométrica": "Isométrica de toda la casa, sin perspectiva",
   "Vista de Cubierta": "Plano cenital sobre la cubierta",
   "Vista de Acceso": "Desde la calle hacia la puerta",
   "Vista desde Jardín": "Desde el patio trasero",
@@ -69,6 +71,7 @@ export const VISTA_DESCRIPTIONS: Record<string, string> = {
   "Vista Contrapicada": "A low camera angle looking upward at the building, emphasizing height, cantilevers, and structural drama.",
   "Vista Gran Angular": "An ultra-wide shot that places the building within its full site and landscape context.",
   "Vista Aérea (Drone)": "A high-angle bird's eye view showing the building's roofscape and its relationship with the site.",
+  "Vista Isométrica": "A true isometric view of the whole building (camera about 35 degrees above the horizon, rotated 45 degrees, parallel lines with no perspective convergence), presenting the house as a clean three-dimensional object with its roof and two facades visible, on a simple neutral ground.",
   "Vista de Cubierta": "A top-down or near-top-down view focusing on the roof geometry, skylights, and rooftop elements.",
   "Vista de Acceso": "A pedestrian approach shot from the street moving toward the main entrance, capturing the arrival sequence.",
   "Vista desde Jardín": "View from the rear garden or private patio looking back at the house, showing indoor-outdoor flow.",
@@ -102,6 +105,7 @@ export const VISTA_KINDS: Record<string, VistaKind> = {
   "Vista Contrapicada": 'seen',
   "Vista Gran Angular": 'seen',
   "Vista Aérea (Drone)": 'unseen',
+  "Vista Isométrica": 'unseen',
   "Vista de Cubierta": 'unseen',
   "Vista de Acceso": 'seen',
   "Vista desde Jardín": 'unseen',
@@ -112,3 +116,14 @@ export const VISTA_KINDS: Record<string, VistaKind> = {
   "Corte Perspectivado 3D": 'diagram',
   "Isométrica Explotada": 'diagram',
 };
+
+/**
+ * Las vistas básicas de un portafolio: las que casi siempre se piden y que ya vienen marcadas al entrar al módulo.
+ * La persona puede quitarlas o sumar otras; «Restablecer básicas» las devuelve.
+ */
+export const DEFAULT_VISTAS: string[] = [
+  "Perspectiva Principal (Hero Shot)",
+  "Fachada Frontal (Elevación)",
+  "Vista Aérea (Drone)",
+  "Vista Isométrica",
+];

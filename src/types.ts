@@ -1,3 +1,5 @@
+import { DEFAULT_VISTAS } from '@/modules/vistas/constants';
+
 export type GenerationMode = "exterior" | "interior" | "edit" | "vistas";
 
 /** Render del que se deriva esta generación (vistas, ediciones): sus parámetros se usan para mantener fidelidad */
@@ -202,7 +204,7 @@ export const DEFAULT_PARAMS: DreamHouseParams = {
   wallFinish: "",
 
   // Vistas
-  selectedVistas: [],
+  selectedVistas: [...DEFAULT_VISTAS],
 
   // Edición
   editChangeType: "",

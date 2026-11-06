@@ -38,12 +38,14 @@ export default function VistasForm({ params, onChange, disabled, activeSection, 
     handleChange('selectedVistas', next);
   };
 
+  const isBasicSet = selected.length === VC.DEFAULT_VISTAS.length && VC.DEFAULT_VISTAS.every((v) => selected.includes(v));
+
   return (
     <div className="space-y-0" role="form" aria-label="Módulo de Generación de Vistas">
 
       {/* ── 01 SELECCIÓN DE VISTAS ────────────────────────────────── */}
       <Section title="Portafolio de Vistas" number="05" icon={<LayoutGrid className="w-5 h-5" />} isOpen={activeSection === 'vistasSelection'} onToggle={() => onSectionChange('vistasSelection')}>
-        <SectionDescription>Selecciona las vistas arquitectónicas que deseas generar para tu portafolio basado en la foto subida.</SectionDescription>
+        <SectionDescription>Ya vienen marcadas las vistas básicas de un portafolio (principal, frontal, aérea e isométrica). Quita las que no necesites o suma otras, por ejemplo la nocturna o la crepuscular. Cada vista se cobra por separado.</SectionDescription>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 max-h-[420px] overflow-y-auto custom-scrollbar pr-1">
           {VC.ARCHITECTURAL_VISTAS.map(vista => {
             const isSelected = selected.includes(vista);
@@ -78,11 +80,23 @@ export default function VistasForm({ params, onChange, disabled, activeSection, 
             );
           })}
         </div>
-        {selected.length > 0 && (
-          <p className="mt-3 text-xs text-muted-foreground font-mono opacity-60">
-            {selected.length} vista{selected.length > 1 ? 's' : ''} seleccionada{selected.length > 1 ? 's' : ''}
+        <div className="mt-3 flex flex-wrap items-center justify-between gap-3">
+          <p className="text-xs text-muted-foreground font-mono opacity-70" aria-live="polite">
+            {selected.length > 0
+              ? `${selected.length} vista${selected.length > 1 ? 's' : ''} seleccionada${selected.length > 1 ? 's' : ''}`
+              : 'Ninguna vista seleccionada'}
           </p>
-        )}
+          {!isBasicSet && (
+            <button
+              type="button"
+              disabled={disabled}
+              onClick={() => handleChange('selectedVistas', [...VC.DEFAULT_VISTAS])}
+              className="inline-flex items-center justify-center min-h-[44px] px-4 border border-border text-xs font-bold uppercase tracking-widest text-muted-foreground hover:border-primary/60 hover:text-foreground transition-colors disabled:opacity-40"
+            >
+              Restablecer básicas
+            </button>
+          )}
+        </div>
       </Section>
 
       {/* ── 02 PROCESO ─────────────────────────────────────────── */}
