@@ -49,10 +49,12 @@ test('planta: cuando se selecciona zona sobre el lote (hasLotZone), el prompt in
   }
 });
 
-test('exterior: cuando se adjunta foto de la planta (hasFloorPlanReference), el prompt impone restricción geométrica dura (HARD GEOMETRIC CONSTRAINT)', () => {
+test('exterior: cuando se adjunta foto de la planta (hasFloorPlanReference), el prompt impone render exterior puro sin detalles internos y forma exterior general de referencia', () => {
   for (const model of [OPENAI, GEMINI]) {
     const out = buildExteriorPrompt(p({ mode: 'exterior', aiModel: model }), false, model, true);
-    assert.match(out, /HARD GEOMETRIC CONSTRAINT/);
+    assert.match(out, /HARD CONSTRAINT/);
+    assert.match(out, /EXTERIOR/i);
+    assert.match(out, /furniture|room layouts|cutaway/i);
     assert.match(out, /1:1/);
     assert.match(out, /PROMPT/i);
   }
