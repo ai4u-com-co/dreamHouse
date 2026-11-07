@@ -100,6 +100,12 @@ export function buildInteriorPrompt(params: DreamHouseParams, targetModel?: stri
     ? `Redesign the existing space shown in the reference photo: keep its architectural shell (walls, openings, ceiling height) and its camera viewpoint, and change only the design, furnishings, finishes and lighting. Apply ${remodelDirection} to the redesign of every surface, piece and light source.`
     : "";
 
+  const customSlotsBlock = params.customSlotLabels && params.customSlotLabels.length > 0
+    ? `\nINTERIOR CRAFTSMANSHIP & CUSTOM DETAIL SLOTS:
+- Faithful Detail Integration: Specific interior detail references have been provided for: ${params.customSlotLabels.join(', ')}.
+- Faithfully incorporate the exact design, styling, profile, materials, craftsmanship, texture, color, and finish from each provided detail image into the corresponding elements (${params.customSlotLabels.join(', ')}) in the interior space.\n`
+    : "";
+
   if (isOpenAI) {
     const prompt = `
 [INTENDED USE: Professional Architectural Interior Design Visualization]
@@ -110,7 +116,7 @@ SCENE & CONTEXT:
 ${spaceNote ? `- Existing space: ${spaceNote}\n` : ""}
 ARCHITECTURAL & DESIGN SPECIFICATION:
 - Style: ${styleDesc} character${architectDesc ? `, shaped by the design principles of ${architectDesc}` : ""}
-${furnitureDesc ? `- Furniture: Curated pieces of ${furnitureDesc}. Each piece sits with physical weight, showing natural material texture and subtle wear at contact points.\n` : ""}${params.flooringMaterial ? `- Flooring: ${params.flooringMaterial}, rendered with convincing grain and joint lines\n` : ""}${params.ceilingDetail ? `- Ceiling: ${params.ceilingDetail}, confirmed by subtle shadow and texture\n` : ""}${materialList ? `- Materials: ${materialList} elements throughout the space. Each material must show honest texture, grain direction, and micro-imperfections.\n` : ""}${colorDesc ? `- Color Palette: ${colorDesc}, colors shifting naturally across surfaces based on light angle\n` : ""}${bulletSection('ADDITIONAL DESIGN SPECIFICATION', detailLines)}
+${furnitureDesc ? `- Furniture: Curated pieces of ${furnitureDesc}. Each piece sits with physical weight, showing natural material texture and subtle wear at contact points.\n` : ""}${params.flooringMaterial ? `- Flooring: ${params.flooringMaterial}, rendered with convincing grain and joint lines\n` : ""}${params.ceilingDetail ? `- Ceiling: ${params.ceilingDetail}, confirmed by subtle shadow and texture\n` : ""}${materialList ? `- Materials: ${materialList} elements throughout the space. Each material must show honest texture, grain direction, and micro-imperfections.\n` : ""}${colorDesc ? `- Color Palette: ${colorDesc}, colors shifting naturally across surfaces based on light angle\n` : ""}${customSlotsBlock}${bulletSection('ADDITIONAL DESIGN SPECIFICATION', detailLines)}
 ${style.photographic ? 'PHOTOGRAPHY & LIGHTING' : 'VISUAL TREATMENT & LIGHTING'}:
 ${camera ? `- Camera Config: ${camera}\n` : ""}${style.photographic ? `- Depth of Field: ${params.depthOfField || "Natural depth of field separating foreground from background"}\n` : ""}${lightingDesc ? `- Lighting: Illuminated by ${lightingDesc}. Light falls with natural gradient and fall-off from bright source to soft shadow.\n` : ""}
 CONSTRAINTS & QUALITY:
@@ -159,6 +165,10 @@ ${creativeDirectionBlock(params) ? `\n${creativeDirectionBlock(params)}\n` : ""}
   }
 
   prompt += narrativeSentence(detailLines);
+
+  if (params.customSlotLabels && params.customSlotLabels.length > 0) {
+    prompt += `Faithfully incorporate the exact design, styling, profile, materials and craftsmanship from the provided interior detail reference images into the corresponding elements (${params.customSlotLabels.join(', ')}) in the space. `;
+  }
 
   // Camera integrated naturally into the scene
   if (camera) {

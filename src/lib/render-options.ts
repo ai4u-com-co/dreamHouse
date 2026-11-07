@@ -82,13 +82,24 @@ export function quoteRender(
  */
 export function pickOpenAIInputs<T>(
   mode: DreamHouseParams['mode'],
-  c: { lot?: T | null; exteriorRef?: T | null; floorPlan?: T | null; references: T[]; objects: T[]; editImage?: T | null },
+  c: {
+    lot?: T | null;
+    exteriorRef?: T | null;
+    floorPlan?: T | null;
+    references: T[];
+    objects: T[];
+    editImage?: T | null;
+    customSlots?: T[];
+  },
 ): T[] {
   if (mode === 'edit') return c.editImage ? [c.editImage] : [];
   if (mode === 'vistas') return c.lot ? [c.lot] : [];
   if (mode === 'planta') return [c.floorPlan, c.lot].filter((x): x is T => !!x);
   const objects = mode === 'interior' ? c.objects.slice(0, 13) : [];
   const base = [mode === 'exterior' ? c.exteriorRef : null, c.floorPlan, c.lot].filter((x): x is T => !!x);
-  const room = Math.max(0, OPENAI_MAX_INPUT_IMAGES - base.length - objects.length);
-  return [...base, ...c.references.slice(0, room), ...objects];
+  const custom = (mode === 'exterior' || mode === 'interior') ? (c.customSlots ?? []) : [];
+  const roomAfterBaseAndObjects = Math.max(0, OPENAI_MAX_INPUT_IMAGES - base.length - objects.length);
+  const customToInclude = custom.slice(0, roomAfterBaseAndObjects);
+  const roomForRefs = Math.max(0, roomAfterBaseAndObjects - customToInclude.length);
+  return [...base, ...c.references.slice(0, roomForRefs), ...objects, ...customToInclude];
 }

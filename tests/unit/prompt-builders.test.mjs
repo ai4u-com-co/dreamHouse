@@ -198,3 +198,15 @@ test('vistas: todas tienen descripción y clasificación', () => {
     assert.ok(VISTA_KINDS[view], `sin clasificación: ${view}`);
   }
 });
+
+test('exterior e interior: slots de detalles personalizados (customSlotLabels) se integran con fuerza al prompt', () => {
+  const customSlotLabels = ['Puerta principal de teca', 'Ventanales de piso a techo'];
+  const extPrompt = buildExteriorPrompt(p({ mode: 'exterior', customSlotLabels }), false, OPENAI);
+  assert.match(extPrompt, /ARCHITECTURAL & CRAFTSMANSHIP DETAIL SLOTS/);
+  assert.match(extPrompt, /Puerta principal de teca/);
+  assert.match(extPrompt, /Ventanales de piso a techo/);
+
+  const intPrompt = buildInteriorPrompt(p({ mode: 'interior', customSlotLabels: ['Lámpara colgante de cobre'] }), OPENAI);
+  assert.match(intPrompt, /INTERIOR CRAFTSMANSHIP & CUSTOM DETAIL SLOTS/);
+  assert.match(intPrompt, /Lámpara colgante de cobre/);
+});

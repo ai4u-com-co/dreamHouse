@@ -179,6 +179,7 @@ export default function PromptPreview({ params, loadedFiles = [] }: PromptPrevie
         { label: 'MUROS', value: params.wallFinish, key: 'wallFinish' },
         { label: 'ABERTURAS', value: params.windowType, key: 'windowType' },
         { label: 'DETALLES', value: params.architecturalDetails, key: 'architecturalDetails' },
+        { label: 'SLOTS DETALLE', value: params.customSlotLabels ?? [], modes: ['exterior', 'interior'] },
       ],
     },
     {

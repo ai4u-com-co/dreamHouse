@@ -159,13 +159,14 @@ async function imagePixels(file: File): Promise<number | undefined> {
 }
 
 // Helper function to calculate total payload size
-function calculatePayloadSize(files: File[], lotImage: File | null, exteriorReferenceImage: File | null, floorPlanImage: File | null, editCompositeFile: File | null, paramsJson: string): number {
+function calculatePayloadSize(files: File[], lotImage: File | null, exteriorReferenceImage: File | null, floorPlanImage: File | null, editCompositeFile: File | null, paramsJson: string, customSlotFiles: File[] = []): number {
   let totalSize = paramsJson.length;
   files.forEach(file => totalSize += file.size);
   if (lotImage) totalSize += lotImage.size;
   if (exteriorReferenceImage) totalSize += exteriorReferenceImage.size;
   if (floorPlanImage) totalSize += floorPlanImage.size;
   if (editCompositeFile) totalSize += editCompositeFile.size;
+  customSlotFiles.forEach(file => totalSize += file.size);
   return totalSize;
 }
 
@@ -213,6 +214,9 @@ export async function POST(req: NextRequest) {
     const objectImages = modeInputs.objects ? (formData.getAll('objectImages') as File[]) : [];
     const editBaseFile = formData.get('editBaseFile') as File | null;
     const editMaskFile = formData.get('editMaskFile') as File | null;
+    const rawCustomFiles = (formData.getAll('customSlotFiles') as File[]) || [];
+    const customSlotFiles = rawCustomFiles.filter(f => f && f.size > 0);
+    const customSlotLabels = ((formData.getAll('customSlotLabels') as string[]) || []).map(s => (s || '').trim());
 
     // Validate number of reference images
     if (files.length > MAX_REFERENCE_IMAGES) {
@@ -280,8 +284,20 @@ export async function POST(req: NextRequest) {
       }
     }
 
+    if (customSlotFiles.length > 10) {
+      return NextResponse.json({ message: 'Maximum 10 custom detail slots allowed.' }, { status: 400 });
+    }
+    for (let i = 0; i < customSlotFiles.length; i++) {
+      const file = customSlotFiles[i];
+      const label = customSlotLabels[i] || 'Detalle personalizado';
+      const validation = validateImageSize(file, `Slot de detalle (${label})`);
+      if (!validation.valid) {
+        return NextResponse.json({ message: validation.error }, { status: 400 });
+      }
+    }
+
     // Validate total payload size
-    const totalPayloadSize = calculatePayloadSize(files, lotImage, exteriorReferenceImage, floorPlanImage, editCompositeFile, paramsJson);
+    const totalPayloadSize = calculatePayloadSize(files, lotImage, exteriorReferenceImage, floorPlanImage, editCompositeFile, paramsJson, customSlotFiles);
     if (!isEditMode && totalPayloadSize > MAX_TOTAL_PAYLOAD_SIZE) {
       return NextResponse.json(
         {
@@ -350,8 +366,23 @@ export async function POST(req: NextRequest) {
         if ((params.mode === 'exterior' || params.mode === 'planta') && lotImage) {
           openaiInputs.push({ file: lotImage, role: lotRole });
         }
+        // Slots de detalles personalizados (puertas, ventanas, acabados, mobiliario o detalles arquitectónicos específicos)
+        const isExteriorOrInterior = params.mode === 'exterior' || params.mode === 'interior';
+        const customSlotsToInclude = isExteriorOrInterior
+          ? customSlotFiles.slice(0, Math.max(0, OPENAI_MAX_INPUT_IMAGES - openaiInputs.length - objectImages.length))
+          : [];
+
+        for (let i = 0; i < customSlotsToInclude.length; i++) {
+          const file = customSlotsToInclude[i];
+          const label = customSlotLabels[i] || 'architectural detail';
+          const role = params.mode === 'exterior'
+            ? `a specific exterior architectural detail reference for "${label}": faithfully incorporate this exact design, style, material, pattern, profile and detailing into the ${label} on the exterior facade/structure`
+            : `a specific interior design detail reference for "${label}": faithfully incorporate this exact style, design, material, texture and detailing into the ${label} in the interior space`;
+          openaiInputs.push({ file, role });
+        }
+
         // Interior puede sumar objetos (hasta 13) + espacio + plano + referencias: las referencias de estilo
-        // ceden el sitio antes que las piezas, que "deben aparecer" en el resultado.
+        // ceden el sitio antes que las piezas y detalles, que "deben aparecer" en el resultado.
         const roomForReferences = Math.max(0, OPENAI_MAX_INPUT_IMAGES - openaiInputs.length - objectImages.length);
         const referenceRole = params.mode === 'interior'
           ? "a conceptual style reference (take mood, material palette, atmosphere and spatial feeling; do not copy specific rooms, furniture or compositions)"
@@ -397,6 +428,9 @@ export async function POST(req: NextRequest) {
             : '',
           lotImage ? '- Redesign the existing space from the reference photo; keep its architectural shell and viewpoint.' : '',
           floorPlanImage ? '- Preserve the exact layout, proportions and perspective of the floor plan or sketch; do not add new elements or text.' : '',
+          customSlotFiles.length > 0 && customSlotLabels.filter(Boolean).length > 0
+            ? `- Faithfully incorporate the exact design, materials and styling of the provided detail references (${customSlotLabels.filter(Boolean).join(', ')}) into the interior space.`
+            : '',
         ].filter(Boolean).join('\n');
       } else if (params.mode === "exterior") {
         const structureLines = [
@@ -405,6 +439,9 @@ export async function POST(req: NextRequest) {
             : "",
           floorPlanImage
             ? "HARD CONSTRAINT — PURE EXTERIOR RENDERING (FLOOR PLAN = EXTERIOR SHAPE REFERENCE ONLY): The final output MUST strictly be an exterior architectural rendering or photograph of the complete building seen from the outside (solid exterior facades, weather-tight opaque roof, realistic exterior window glass). Do NOT render internal room layouts, floor divisions seen from above, furniture (beds, sofas, tables, sanitary fixtures) or cutaway/dollhouse views. The floor plan is strictly a general 1:1 reference for the house's exterior footprint shape and volumetric massing, while the prompt governs ALL exterior parameters (materials, architectural style, roof, levels, landscaping, lighting and Creative Direction); do not draw flat 2D plan lines or text labels."
+            : "",
+          customSlotFiles.length > 0 && customSlotLabels.filter(Boolean).length > 0
+            ? `Faithfully incorporate the exact design, materials, profile and craftsmanship from the provided detail reference images into the corresponding elements (${customSlotLabels.filter(Boolean).join(', ')}) on the exterior facade.`
             : "",
           !exteriorReferenceImage && !floorPlanImage
             ? "Compose the building from the written specification only."
