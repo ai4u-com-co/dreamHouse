@@ -18,6 +18,13 @@ export type RenderQuality = "Borrador" | "Estándar" | "Alta" | "Muy alta" | "M�
 export type RenderFormat = "jpeg" | "webp" | "png";
 export type RenderBackground = "auto" | "opaque" | "transparent";
 
+/** Slot personalizado para cargar imágenes de referencia de detalles (puertas, ventanas, acabados, mobiliario, etc.) */
+export interface CustomDetailSlot {
+  id: string;
+  label: string;
+  file: File | null;
+}
+
 export interface SharedParams {
   mode: GenerationMode;
   
@@ -69,6 +76,8 @@ export interface SharedParams {
   negativePrompt: string;
   editPrompt: string;
   aiModel: string;
+  /** Nombres de los slots personalizados de detalle con imagen activa */
+  customSlotLabels?: string[];
 }
 
 export interface ExteriorSpecificParams {
@@ -181,6 +190,7 @@ export const DEFAULT_PARAMS: DreamHouseParams = {
   negativePrompt: "",
   editPrompt: "",
   aiModel: "GPT Image 2.5 Sunburst (OpenAI)",
+  customSlotLabels: [],
 
   // Exterior
   projectType: "",

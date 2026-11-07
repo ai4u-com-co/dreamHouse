@@ -146,6 +146,12 @@ export function buildExteriorPrompt(
 - 2D-to-3D Extrusion: Extrude the exterior massing directly from the floor plan's footprint shape, dressing that geometry completely according to the prompt parameters (never render flat 2D drafting lines, dimension text or annotations on the ground).\n`
     : "";
 
+  const customSlotsBlock = params.customSlotLabels && params.customSlotLabels.length > 0
+    ? `\nARCHITECTURAL & CRAFTSMANSHIP DETAIL SLOTS:
+- Faithful Detail Integration: Specific architectural detail references have been provided for: ${params.customSlotLabels.join(', ')}.
+- Faithfully incorporate the exact design, profile, materials, craftsmanship, texture, color, and finish from each provided detail image into the corresponding elements (${params.customSlotLabels.join(', ')}) on the exterior facade and building envelope.\n`
+    : "";
+
   if (isOpenAI) {
     const subjectDesc = hasStructuralReference && hasFloorPlanReference
       ? `reimagined version of the ${projectType} from reference image, strictly obeying the footprint and spatial layout of the provided floor plan`
@@ -166,7 +172,7 @@ ARCHITECTURAL SPECIFICATION:
 - Style: ${styleDesc} character${architectDesc ? `, drawing from the language of ${architectDesc}` : ""}
 ${params.layoutType ? `- Layout: Organized with a ${lookup(FORM_ORGANIZATION_MAP, params.layoutType) || params.layoutType} configuration\n` : ""}${params.levels > 0 ? `- Levels: Distributed across exactly ${params.levels} floors\n` : ""}- Materials: ${materialDesc || "traditional architectural facade materials"}
 - Material Detail: Honest textures with physical thickness, weathering at base, and clear joint shadow lines. No digital smoothness or plastic sheen.
-${bulletSection('ADDITIONAL DESIGN SPECIFICATION', detailLines)}
+${customSlotsBlock}${bulletSection('ADDITIONAL DESIGN SPECIFICATION', detailLines)}
 ${style.photographic ? 'PHOTOGRAPHY & LIGHTING' : 'VISUAL TREATMENT & LIGHTING'}:
 ${camera ? `- Camera Config: ${camera}\n` : ""}${style.photographic && params.depthOfField ? `- Depth of Field: ${params.depthOfField}\n` : ""}- Lighting: ${lightingPhys}
 
@@ -214,6 +220,10 @@ ${creativeDirectionBlock(params) ? `\n${creativeDirectionBlock(params)}\n` : ""}
   }
 
   prompt += narrativeSentence(detailLines);
+
+  if (params.customSlotLabels && params.customSlotLabels.length > 0) {
+    prompt += `Faithfully incorporate the exact design, profile, materials and craftsmanship from the provided architectural detail reference images into the corresponding elements (${params.customSlotLabels.join(', ')}) on the exterior facade. `;
+  }
 
   // Physics-based lighting description derived from time of day
   prompt += `${lightingPhys} `;

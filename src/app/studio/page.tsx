@@ -12,7 +12,7 @@ import VistasForm from '@/modules/vistas/components/VistasForm';
 import PlantaForm from '@/modules/planta/components/PlantaForm';
 import ResultDisplay from '@/components/ResultDisplay';
 import PromptPreview, { type LoadedFile } from '@/components/PromptPreview';
-import { DreamHouseParams, DEFAULT_PARAMS } from '@/types';
+import { DreamHouseParams, DEFAULT_PARAMS, CustomDetailSlot } from '@/types';
 import { Wand2, AlertCircle, RotateCcw, Dices, CheckCircle2, Home, Armchair, Maximize2, Camera, PenLine, Wand, ImageIcon, LayoutGrid } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { Section } from '@/components/ui/Section';
@@ -75,6 +75,7 @@ function StudioContent() {
   const [editCompositeFile, setEditCompositeFile] = useState<File | null>(null);
   const [editMask, setEditMask] = useState<EditMaskPayload | null>(null);
   const [objectFiles, setObjectFiles] = useState<File[]>([]);
+  const [customDetailSlots, setCustomDetailSlots] = useState<CustomDetailSlot[]>([]);
   const [params, setParams] = useState<DreamHouseParams>(DEFAULT_PARAMS);
   const [imageUrl, setImageUrl] = useState<string | null>(null);
   const [houseName, setHouseName] = useState<string | null>(null);
@@ -91,11 +92,16 @@ function StudioContent() {
 
   // Costo ANTES de generar: mismo núcleo que el servidor, con los píxeles reales de las imágenes que se enviarán
   const effectiveLotForMode = params.mode === 'planta' && lotZoneFile ? lotZoneFile : lotFile;
+  const activeCustomSlotFiles = useMemo(() =>
+    customDetailSlots.map(s => s.file).filter((f): f is File => !!f),
+    [customDetailSlots]
+  );
   const inputFiles = useMemo(() => pickOpenAIInputs<File>(params.mode, {
     lot: effectiveLotForMode, exteriorRef: exteriorReferenceFile, floorPlan: floorPlanFile, references: files, objects: objectFiles,
     editImage: editMask?.base ?? editCompositeFile ?? lotFile,
+    customSlots: activeCustomSlotFiles,
   }).concat(params.mode === 'edit' && editMask ? [editMask.mask] : []),
-  [params.mode, effectiveLotForMode, lotFile, exteriorReferenceFile, floorPlanFile, files, objectFiles, editMask, editCompositeFile]);
+  [params.mode, effectiveLotForMode, lotFile, exteriorReferenceFile, floorPlanFile, files, objectFiles, editMask, editCompositeFile, activeCustomSlotFiles]);
   const inputPixels = useFilePixels(inputFiles);
   const quote: QuoteState = useMemo(() => {
     const q = quoteRender(params as unknown as Record<string, unknown>, { inputImagePixels: inputPixels, isAdmin, estimate: true });
@@ -257,6 +263,13 @@ function StudioContent() {
     if (floorPlanFile) list.push({ label: m === 'planta' ? 'BOCETO' : 'PLANO', name: floorPlanFile.name, used: m === 'planta' || m === 'exterior' || m === 'interior' });
     if (files.length) list.push({ label: 'REFERENC.', name: `${files.length} imagen${files.length > 1 ? 'es' : ''}`, used: m === 'exterior' || m === 'interior' });
     if (objectFiles.length) list.push({ label: 'OBJETOS', name: `${objectFiles.length} pieza${objectFiles.length > 1 ? 's' : ''}`, used: m === 'interior' });
+    customDetailSlots.filter(s => s.file !== null).forEach(s => {
+      list.push({
+        label: 'DETALLE',
+        name: `${s.label || 'Detalle'}: ${s.file?.name}`,
+        used: m === 'exterior' || m === 'interior',
+      });
+    });
     if (m === 'edit' && editMask) list.push({ label: 'MÁSCARA', name: 'zona pintada', used: true });
     return list;
   };
@@ -279,6 +292,8 @@ function StudioContent() {
     setEditCompositeFile(null);
     setEditMask(null);
     setObjectFiles([]);
+    setCustomDetailSlots([]);
+    setCustomDetailSlots([]);
     setHouseName(null);
     setImageUrl(null);
     setError(null);
@@ -487,11 +502,22 @@ function StudioContent() {
         if (params.mode === 'interior') {
           objectFiles.forEach((file) => formData.append('objectImages', file));
         }
+
+        const slotsWithFile = customDetailSlots.filter(s => s.file !== null);
+        if (params.mode === 'exterior' || params.mode === 'interior') {
+          slotsWithFile.forEach((s) => {
+            if (s.file) {
+              formData.append('customSlotFiles', s.file);
+              formData.append('customSlotLabels', s.label || 'architectural detail');
+            }
+          });
+        }
         
         const finalParams = {
           ...params,
           hasExteriorReference: !!exteriorReferenceFile,
           hasLotZone: params.mode === 'planta' && lotZonePolygons.length > 0,
+          customSlotLabels: slotsWithFile.map(s => s.label || 'architectural detail'),
         };
         formData.append('params', JSON.stringify(finalParams));
 
@@ -577,6 +603,7 @@ function StudioContent() {
     setEditCompositeFile(null);
     setEditMask(null);
     setObjectFiles([]);
+    setCustomDetailSlots([]);
     
     showToast(`Cargado diseño ${record.mode} de ${new Date(record.timestamp).toLocaleDateString()}. Los archivos subidos no se guardan en el historial: vuelve a cargarlos si quieres regenerar.${fullImage ? '' : ' Este registro es anterior y solo conserva una miniatura de baja resolución.'}`);
     
@@ -835,6 +862,8 @@ function StudioContent() {
               onExteriorReferenceFileChange={setExteriorReferenceFile}
               floorPlanFile={floorPlanFile}
               onFloorPlanFileChange={setFloorPlanFile}
+              customSlots={customDetailSlots}
+              onCustomSlotsChange={setCustomDetailSlots}
             />
           ) : params.mode === 'interior' ? (
             <InteriorForm
@@ -846,6 +875,8 @@ function StudioContent() {
               onSectionChange={toggleSection}
               objectFiles={objectFiles}
               onObjectFilesChange={setObjectFiles}
+              customSlots={customDetailSlots}
+              onCustomSlotsChange={setCustomDetailSlots}
             />
           ) : params.mode === 'edit' ? (
             <EditForm

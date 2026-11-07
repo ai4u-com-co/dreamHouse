@@ -11,6 +11,8 @@ import { ChipsField, EssenceFields, SiteFields, HomeProgramFields } from '@/comp
 import { AmbienceSelects, CameraFields, CreativeFields } from '@/components/FormExtras';
 import ObjectUploader from '@/components/ObjectUploader';
 import { DebouncedInput } from '@/components/ui/DebouncedInput';
+import CustomSlotsManager from '@/components/CustomSlotsManager';
+import { CustomDetailSlot } from '@/types';
 
 interface InteriorFormProps {
   params: DreamHouseParams;
@@ -21,6 +23,8 @@ interface InteriorFormProps {
   onSectionChange: (id: string) => void;
   objectFiles: File[];
   onObjectFilesChange: (files: File[]) => void;
+  customSlots?: CustomDetailSlot[];
+  onCustomSlotsChange?: (slots: CustomDetailSlot[]) => void;
 }
 
 function SectionDescription({ children }: { children: React.ReactNode }) {
@@ -31,7 +35,18 @@ function SectionDescription({ children }: { children: React.ReactNode }) {
   );
 }
 
-export default function InteriorForm({ params, onChange, disabled, activeSection, openSections, onSectionChange, objectFiles, onObjectFilesChange }: InteriorFormProps) {
+export default function InteriorForm({
+  params,
+  onChange,
+  disabled,
+  activeSection,
+  openSections,
+  onSectionChange,
+  objectFiles,
+  onObjectFilesChange,
+  customSlots,
+  onCustomSlotsChange,
+}: InteriorFormProps) {
   const isSectionOpen = (id: string) => openSections ? openSections.has(id) : activeSection === id;
   const handleChange = <K extends keyof DreamHouseParams>(key: K, value: DreamHouseParams[K]) => {
     onChange({ ...params, [key]: value });
@@ -184,7 +199,19 @@ export default function InteriorForm({ params, onChange, disabled, activeSection
         summary={objectsSummary}
       >
         <SectionDescription>Sube fotos de muebles u objetos específicos que quieres incluir: sillas, camas, lámparas, mesas… Gemini los integrará fielmente en la escena.</SectionDescription>
-        <ObjectUploader files={objectFiles} onFilesChange={onObjectFilesChange} disabled={disabled} />
+        <div className="space-y-8">
+          <ObjectUploader files={objectFiles} onFilesChange={onObjectFilesChange} disabled={disabled} />
+          {onCustomSlotsChange && (
+            <div className="pt-4 border-t border-border/50">
+              <CustomSlotsManager
+                mode="interior"
+                slots={customSlots ?? []}
+                onSlotsChange={onCustomSlotsChange}
+                disabled={disabled}
+              />
+            </div>
+          )}
+        </div>
       </Section>
 
       {/* ── 04 PROGRAMA ─────────────────────────────────────────── */}

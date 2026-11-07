@@ -74,4 +74,9 @@ test('pickOpenAIInputs: vistas solo la casa; planta boceto y lote; interior suma
   assert.deepEqual(pickOpenAIInputs('interior', { lot: 'L', floorPlan: 'P', references: ['r'], objects: ['o'] }), ['P', 'L', 'r', 'o']);
   const refs = Array.from({ length: 20 }, (_, i) => `r${i}`);
   assert.equal(pickOpenAIInputs('exterior', { lot: 'L', exteriorRef: 'E', floorPlan: 'P', references: refs, objects: [] }).length, 17);
+  // customSlots en exterior e interior
+  const extWithSlots = pickOpenAIInputs('exterior', { lot: 'L', exteriorRef: 'E', floorPlan: 'P', references: ['r1', 'r2'], objects: [], customSlots: ['slot-puerta', 'slot-ventana'] });
+  assert.deepEqual(extWithSlots, ['E', 'P', 'L', 'r1', 'r2', 'slot-puerta', 'slot-ventana']);
+  const intWithSlots = pickOpenAIInputs('interior', { lot: 'L', floorPlan: 'P', references: ['r1'], objects: ['sofa'], customSlots: ['slot-lampara'] });
+  assert.deepEqual(intWithSlots, ['P', 'L', 'r1', 'sofa', 'slot-lampara']);
 });

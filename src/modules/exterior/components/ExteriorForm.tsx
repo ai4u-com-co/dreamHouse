@@ -11,6 +11,8 @@ import ReferenceUploader from '@/components/ReferenceUploader';
 import LotUploader from '@/components/LotUploader';
 import FloorPlanUploader from '@/components/FloorPlanUploader';
 import { DebouncedInput } from '@/components/ui/DebouncedInput';
+import CustomSlotsManager from '@/components/CustomSlotsManager';
+import { CustomDetailSlot } from '@/types';
 
 interface ExteriorFormProps {
   params: DreamHouseParams;
@@ -29,6 +31,8 @@ interface ExteriorFormProps {
   onExteriorReferenceFileChange: (file: File | null) => void;
   floorPlanFile: File | null;
   onFloorPlanFileChange: (file: File | null) => void;
+  customSlots?: CustomDetailSlot[];
+  onCustomSlotsChange?: (slots: CustomDetailSlot[]) => void;
 }
 
 function SectionDescription({ children }: { children: React.ReactNode }) {
@@ -61,7 +65,9 @@ export default function ExteriorForm({
   exteriorReferenceFile,
   onExteriorReferenceFileChange,
   floorPlanFile,
-  onFloorPlanFileChange
+  onFloorPlanFileChange,
+  customSlots,
+  onCustomSlotsChange
 }: ExteriorFormProps) {
   const isSectionOpen = (id: string) => openSections ? openSections.has(id) : activeSection === id;
 
@@ -176,6 +182,18 @@ export default function ExteriorForm({
             <Subtitle>Referencias Visuales / Inspiración (Máx. 5)</Subtitle>
             <ReferenceUploader files={files} onFilesChange={onFilesChange} />
           </div>
+
+          {onCustomSlotsChange && (
+            <div>
+              <Subtitle>Detalles Específicos de la Fachada</Subtitle>
+              <CustomSlotsManager
+                mode="exterior"
+                slots={customSlots ?? []}
+                onSlotsChange={onCustomSlotsChange}
+                disabled={disabled}
+              />
+            </div>
+          )}
         </div>
       </Section>
 
