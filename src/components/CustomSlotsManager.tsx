@@ -9,6 +9,8 @@ import { validateImageFiles } from '@/lib/image-validation';
 import { compressImage } from '@/lib/image-compression';
 import { useLightbox } from '@/context/LightboxContext';
 import { useObjectUrl } from '@/lib/hooks/useObjectUrl';
+import SlotInputActions from './SlotInputActions';
+import { extractImageFilesFromClipboardEvent } from '@/lib/clipboard';
 
 interface CustomSlotsManagerProps {
   mode: 'exterior' | 'interior';
@@ -100,8 +102,20 @@ function SlotCard({
     e.target.value = '';
   }, [processFile]);
 
+  const handlePaste = useCallback((e: React.ClipboardEvent) => {
+    const images = extractImageFilesFromClipboardEvent(e);
+    if (images.length > 0) {
+      e.preventDefault();
+      void processFile(images[0]);
+    }
+  }, [processFile]);
+
   return (
-    <div className="border border-border/70 bg-card/60 rounded-lg p-3 sm:p-4 space-y-3 transition-colors hover:border-primary/40">
+    <div
+      className="border border-border/70 bg-card/60 rounded-lg p-3 sm:p-4 space-y-3 transition-colors hover:border-primary/40 outline-none"
+      tabIndex={0}
+      onPaste={handlePaste}
+    >
       {/* Cabecera del Slot: etiqueta editable y botón de eliminar */}
       <div className="flex items-center justify-between gap-2">
         <div className="flex items-center gap-2 flex-1 min-w-0">
@@ -159,7 +173,7 @@ function SlotCard({
             <p className="text-[11px] text-muted-foreground font-mono">
               {(slot.file.size / 1024).toFixed(0)} KB
             </p>
-            <div className="flex items-center gap-2 pt-1">
+            <div className="flex items-center gap-2 pt-1 flex-wrap">
               <button
                 type="button"
                 onClick={() => fileInputRef.current?.click()}
@@ -169,6 +183,17 @@ function SlotCard({
                 <RefreshCw className="w-3 h-3" />
                 Cambiar foto
               </button>
+              <span className="text-muted-foreground/40">•</span>
+              <SlotInputActions
+                compact
+                onFileSelected={processFile}
+                onError={(err) => setError(err)}
+                disabled={disabled || isProcessing}
+                isProcessing={isProcessing}
+                modalTitle={`Cambiar foto - ${slot.label || 'Detalle'}`}
+                pasteLabel="Pegar"
+                cameraLabel="Cámara"
+              />
               <span className="text-muted-foreground/40">•</span>
               <button
                 type="button"
@@ -210,8 +235,23 @@ function SlotCard({
                 Subir foto de referencia para <span className="text-primary font-semibold">{slot.label || 'este detalle'}</span>
               </p>
               <p className="text-[11px] text-muted-foreground">
-                Arrastra o haz clic para seleccionar (JPEG, PNG, WebP)
+                Arrastra, haz clic, pega con <kbd className="px-1 py-0.5 rounded bg-muted border border-border text-[10px] font-mono">Ctrl+V</kbd> o usa tu cámara
               </p>
+
+              <div className="mt-2" onClick={(e) => e.stopPropagation()}>
+                <SlotInputActions
+                  compact
+                  onFileSelected={processFile}
+                  onError={(err) => setError(err)}
+                  onUploadClick={() => fileInputRef.current?.click()}
+                  disabled={disabled || isProcessing}
+                  isProcessing={isProcessing}
+                  modalTitle={`Tomar foto - ${slot.label || 'Detalle'}`}
+                  uploadLabel="Subir"
+                  pasteLabel="Pegar"
+                  cameraLabel="Cámara"
+                />
+              </div>
             </>
           )}
         </div>
@@ -261,102 +301,97 @@ export default function CustomSlotsManager({
     onSlotsChange(slots.filter(s => s.id !== id));
   }, [slots, onSlotsChange]);
 
-  const handleAddFromInput = (e: React.FormEvent) => {
+  const handleCreateCustom = (e: React.FormEvent) => {
     e.preventDefault();
     if (!customInputText.trim()) return;
-    handleAddSlot(customInputText.trim());
+    handleAddSlot(customInputText);
     setCustomInputText('');
   };
 
-  const activeFilesCount = slots.filter(s => s.file !== null).length;
+  const filledCount = slots.filter(s => s.file !== null).length;
 
   return (
-    <div className="space-y-4" role="region" aria-label="Slots de detalles personalizados">
-      {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-1 border-b border-border/50">
-        <div className="flex items-center gap-2.5">
-          <div className="p-2 bg-primary/10 border border-primary/20 rounded-md text-primary">
-            <Layers className="w-4 h-4" />
+    <div
+      className="space-y-4 p-5 sm:p-6"
+      role="region"
+      aria-label="Slots de detalles personalizados"
+    >
+      {/* Cabecera */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+        <div className="flex items-center gap-3">
+          <div className="p-2.5 bg-gradient-to-br from-primary/20 to-primary/5 rounded-xl border border-primary/20">
+            <Layers className="w-5 h-5 text-primary" />
           </div>
           <div>
-            <div className="flex items-center gap-2">
-              <h4 className="text-sm font-semibold text-foreground">Slots de Detalles Personalizados</h4>
-              <span className="px-1.5 py-0.5 text-[10px] font-mono font-medium bg-primary/10 text-primary border border-primary/20 rounded">
-                Nuevo
+            <h3 className="text-base sm:text-lg font-semibold text-foreground flex items-center gap-2">
+              Slots de Detalles Personalizados
+              <span className="text-xs font-normal text-muted-foreground border border-border px-2 py-0.5 rounded-full">
+                Opcional
               </span>
-            </div>
-            <p className="text-xs text-muted-foreground mt-0.5">
-              Sube fotos de puertas, ventanas, celosías, lámparas o acabados específicos que la IA integrará fielmente.
+            </h3>
+            <p className="text-xs sm:text-sm text-muted-foreground mt-0.5">
+              Sube fotos o referencias de elementos específicos (puertas, ventanas, acabados) que quieras ver en la vista.
             </p>
           </div>
         </div>
 
-        <div className="flex items-center gap-2 self-start sm:self-auto font-mono text-xs">
-          <span className="text-muted-foreground">Slots con foto:</span>
-          <span className={clsx(
-            "px-2 py-0.5 rounded font-bold border",
-            activeFilesCount > 0
-              ? "bg-primary/15 text-primary border-primary/30"
-              : "bg-muted text-muted-foreground border-border"
-          )}>
-            {activeFilesCount} / {slots.length}
+        <div className="flex items-center gap-2 self-start sm:self-auto">
+          <span className="text-xs font-mono font-medium px-2.5 py-1 rounded bg-muted border border-border text-foreground">
+            {filledCount} / {slots.length} listos
           </span>
         </div>
       </div>
 
-      {/* Sugerencias rápidas (Chips) */}
-      <div className="space-y-1.5">
-        <p className="text-xs font-medium text-muted-foreground flex items-center gap-1.5">
-          <Sparkles className="w-3.5 h-3.5 text-primary" />
-          <span>Sugerencias rápidas para añadir un slot:</span>
-        </p>
-        <div className="flex flex-wrap gap-1.5">
-          {suggestions.map((suggestion) => {
-            const alreadyAdded = slots.some(s => s.label.toLowerCase() === suggestion.toLowerCase());
-            return (
-              <button
-                key={suggestion}
-                type="button"
-                disabled={disabled || slots.length >= MAX_CUSTOM_SLOTS || alreadyAdded}
-                onClick={() => handleAddSlot(suggestion)}
-                className={clsx(
-                  "text-xs px-2.5 py-1 rounded-full border transition-all text-left flex items-center gap-1",
-                  alreadyAdded
-                    ? "opacity-40 border-border bg-muted/40 text-muted-foreground cursor-default"
-                    : "border-border hover:border-primary/60 hover:bg-primary/5 text-foreground bg-card active:scale-95"
-                )}
-              >
-                <Plus className="w-3 h-3 text-primary opacity-80" />
-                <span>{suggestion}</span>
-              </button>
-            );
-          })}
+      {/* Sugerencias rápidas tipo chip */}
+      {slots.length < MAX_CUSTOM_SLOTS && (
+        <div className="space-y-2 pt-1">
+          <p className="text-xs font-mono text-muted-foreground">
+            Añadir slot rápido:
+          </p>
+          <div className="flex flex-wrap gap-1.5">
+            {suggestions
+              .filter(sug => !slots.some(s => s.label.toLowerCase() === sug.toLowerCase()))
+              .map(sug => (
+                <button
+                  key={sug}
+                  type="button"
+                  onClick={() => handleAddSlot(sug)}
+                  disabled={disabled}
+                  className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs bg-muted/60 hover:bg-primary/10 hover:text-primary hover:border-primary/40 border border-border transition-colors disabled:opacity-50"
+                >
+                  <Plus className="w-3 h-3" />
+                  <span>{sug}</span>
+                </button>
+              ))}
+          </div>
         </div>
-      </div>
+      )}
 
-      {/* Input de texto para slot con nombre libre */}
-      <form onSubmit={handleAddFromInput} className="flex gap-2">
-        <input
-          type="text"
-          value={customInputText}
-          onChange={(e) => setCustomInputText(e.target.value)}
-          placeholder="Nombre de otro detalle (ej: Portón metálico microperforado)..."
-          disabled={disabled || slots.length >= MAX_CUSTOM_SLOTS}
-          className="flex-1 px-3 py-1.5 text-xs sm:text-sm bg-background border border-border rounded-md focus:outline-none focus:border-primary text-foreground placeholder:text-muted-foreground/60"
-        />
-        <button
-          type="submit"
-          disabled={disabled || !customInputText.trim() || slots.length >= MAX_CUSTOM_SLOTS}
-          className="px-3.5 py-1.5 bg-primary text-primary-foreground font-medium text-xs sm:text-sm rounded-md hover:opacity-90 disabled:opacity-40 disabled:cursor-not-allowed transition-all flex items-center gap-1.5 shrink-0"
-        >
-          <Plus className="w-3.5 h-3.5" />
-          <span>Añadir slot</span>
-        </button>
-      </form>
+      {/* Formulario para añadir detalle con nombre libre */}
+      {slots.length < MAX_CUSTOM_SLOTS && (
+        <form onSubmit={handleCreateCustom} className="flex gap-2">
+          <input
+            type="text"
+            value={customInputText}
+            onChange={(e) => setCustomInputText(e.target.value)}
+            placeholder="Nombre de otro detalle (ej: baranda de vidrio, chimenea)..."
+            disabled={disabled}
+            className="flex-1 min-w-0 px-3 py-1.5 text-xs sm:text-sm bg-background border border-border rounded-lg focus:outline-none focus:border-primary text-foreground placeholder:text-muted-foreground/60 transition-colors"
+          />
+          <button
+            type="submit"
+            disabled={disabled || !customInputText.trim()}
+            className="inline-flex items-center gap-1.5 px-3 sm:px-4 py-1.5 text-xs sm:text-sm font-semibold rounded-lg bg-primary text-primary-foreground hover:opacity-90 disabled:opacity-40 transition-opacity shrink-0"
+          >
+            <Plus className="w-4 h-4" />
+            <span>Añadir slot</span>
+          </button>
+        </form>
+      )}
 
-      {/* Lista de slots activos */}
+      {/* Lista de slots creados */}
       {slots.length > 0 ? (
-        <div className="space-y-2.5 pt-1">
+        <div className="space-y-3 pt-2">
           {slots.map((slot, index) => (
             <SlotCard
               key={slot.id}
@@ -370,9 +405,13 @@ export default function CustomSlotsManager({
           ))}
         </div>
       ) : (
-        <div className="p-4 border border-dashed border-border/80 rounded-lg text-center bg-card/30">
-          <p className="text-xs text-muted-foreground">
-            No has agregado ningún slot de detalle aún. Haz clic en las sugerencias arriba o escribe un nombre para comenzar.
+        <div className="text-center py-6 px-4 border border-dashed border-border/80 rounded-lg bg-background/30">
+          <Sparkles className="w-6 h-6 text-muted-foreground/60 mx-auto mb-2" />
+          <p className="text-xs sm:text-sm font-medium text-foreground">
+            No has agregado detalles personalizados todavía
+          </p>
+          <p className="text-xs text-muted-foreground mt-1 max-w-md mx-auto">
+            Puedes hacer clic en cualquiera de las sugerencias arriba para definir exactamente la puerta, ventana o acabado que quieras incorporar.
           </p>
         </div>
       )}
