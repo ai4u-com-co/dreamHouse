@@ -16,7 +16,8 @@ interface InteriorFormProps {
   params: DreamHouseParams;
   onChange: (params: DreamHouseParams) => void;
   disabled?: boolean;
-  activeSection: string | null;
+  activeSection?: string | null;
+  openSections?: Set<string>;
   onSectionChange: (id: string) => void;
   objectFiles: File[];
   onObjectFilesChange: (files: File[]) => void;
@@ -30,7 +31,8 @@ function SectionDescription({ children }: { children: React.ReactNode }) {
   );
 }
 
-export default function InteriorForm({ params, onChange, disabled, activeSection, onSectionChange, objectFiles, onObjectFilesChange }: InteriorFormProps) {
+export default function InteriorForm({ params, onChange, disabled, activeSection, openSections, onSectionChange, objectFiles, onObjectFilesChange }: InteriorFormProps) {
+  const isSectionOpen = (id: string) => openSections ? openSections.has(id) : activeSection === id;
   const handleChange = <K extends keyof DreamHouseParams>(key: K, value: DreamHouseParams[K]) => {
     onChange({ ...params, [key]: value });
   };
@@ -99,7 +101,7 @@ export default function InteriorForm({ params, onChange, disabled, activeSection
         title="Espacio y Propósito" 
         number="05" 
         icon={<Sparkles className="w-5 h-5" />} 
-        isOpen={activeSection === 'identity'} 
+        isOpen={isSectionOpen('identity')} 
         onToggle={() => onSectionChange('identity')}
         summary={identitySummary}
       >
@@ -145,7 +147,7 @@ export default function InteriorForm({ params, onChange, disabled, activeSection
         title="Sitio y Luz Natural"
         number="06"
         icon={<MapPin className="w-5 h-5" />}
-        isOpen={activeSection === 'site'}
+        isOpen={isSectionOpen('site')}
         onToggle={() => onSectionChange('site')}
         summary={siteSummary}
       >
@@ -161,7 +163,7 @@ export default function InteriorForm({ params, onChange, disabled, activeSection
         title="Equipamiento y Luz" 
         number="07" 
         icon={<Armchair className="w-5 h-5" />} 
-        isOpen={activeSection === 'interior-design'} 
+        isOpen={isSectionOpen('interior-design')} 
         onToggle={() => onSectionChange('interior-design')}
         summary={designSummary}
       >
@@ -177,7 +179,7 @@ export default function InteriorForm({ params, onChange, disabled, activeSection
         title="Piezas & Objetos" 
         number="08" 
         icon={<ScanSearch className="w-5 h-5" />} 
-        isOpen={activeSection === 'interior-objects'} 
+        isOpen={isSectionOpen('interior-objects')} 
         onToggle={() => onSectionChange('interior-objects')}
         summary={objectsSummary}
       >
@@ -190,7 +192,7 @@ export default function InteriorForm({ params, onChange, disabled, activeSection
         title="Detalle Funcional" 
         number="09" 
         icon={<LayoutGrid className="w-5 h-5" />} 
-        isOpen={activeSection === 'program'} 
+        isOpen={isSectionOpen('program')} 
         onToggle={() => onSectionChange('program')}
         summary={programSummary}
       >
@@ -208,7 +210,7 @@ export default function InteriorForm({ params, onChange, disabled, activeSection
         title="Materialidad y Superficies" 
         number="10" 
         icon={<Layers className="w-5 h-5" />} 
-        isOpen={activeSection === 'materials'} 
+        isOpen={isSectionOpen('materials')} 
         onToggle={() => onSectionChange('materials')}
         summary={finishesSummary}
       >
@@ -229,7 +231,7 @@ export default function InteriorForm({ params, onChange, disabled, activeSection
         title="Paleta de Color" 
         number="11" 
         icon={<Palette className="w-5 h-5" />} 
-        isOpen={activeSection === 'landscape'} 
+        isOpen={isSectionOpen('landscape')} 
         onToggle={() => onSectionChange('landscape')}
         summary={colorSummary}
       >
@@ -241,7 +243,7 @@ export default function InteriorForm({ params, onChange, disabled, activeSection
         title="Configuración de Cámara" 
         number="12" 
         icon={<Camera className="w-5 h-5" />} 
-        isOpen={activeSection === 'photography'} 
+        isOpen={isSectionOpen('photography')} 
         onToggle={() => onSectionChange('photography')}
         summary={cameraSummary}
       >
@@ -253,7 +255,7 @@ export default function InteriorForm({ params, onChange, disabled, activeSection
         title="Output Final" 
         number="13" 
         icon={<ImageIcon className="w-5 h-5" />} 
-        isOpen={activeSection === 'output'} 
+        isOpen={isSectionOpen('output')} 
         onToggle={() => onSectionChange('output')}
         summary={outputSummary}
       >
@@ -266,7 +268,7 @@ export default function InteriorForm({ params, onChange, disabled, activeSection
       </Section>
 
       {/* ── 09 DIRECCIÓN ───────────────────────────────────────── */}
-      <Section title="Dirección Creativa" number="14" icon={<PenLine className="w-5 h-5" />} isOpen={activeSection === 'creative'} onToggle={() => onSectionChange('creative')}>
+      <Section title="Dirección Creativa" number="14" icon={<PenLine className="w-5 h-5" />} isOpen={isSectionOpen('creative')} onToggle={() => onSectionChange('creative')}>
         <CreativeFields params={params} onChange={handleChange} disabled={disabled} />
       </Section>
     </div>

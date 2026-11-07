@@ -12,7 +12,8 @@ interface VistasFormProps {
   params: DreamHouseParams;
   onChange: (params: DreamHouseParams) => void;
   disabled?: boolean;
-  activeSection: string | null;
+  activeSection?: string | null;
+  openSections?: Set<string>;
   onSectionChange: (id: string) => void;
 }
 
@@ -24,7 +25,8 @@ function SectionDescription({ children }: { children: React.ReactNode }) {
   );
 }
 
-export default function VistasForm({ params, onChange, disabled, activeSection, onSectionChange }: VistasFormProps) {
+export default function VistasForm({ params, onChange, disabled, activeSection, openSections, onSectionChange }: VistasFormProps) {
+  const isSectionOpen = (id: string) => openSections ? openSections.has(id) : activeSection === id;
   const handleChange = <K extends keyof DreamHouseParams>(key: K, value: DreamHouseParams[K]) => {
     onChange({ ...params, [key]: value });
   };
@@ -44,7 +46,7 @@ export default function VistasForm({ params, onChange, disabled, activeSection, 
     <div className="space-y-0" role="form" aria-label="Módulo de Generación de Vistas">
 
       {/* ── 01 SELECCIÓN DE VISTAS ────────────────────────────────── */}
-      <Section title="Portafolio de Vistas" number="05" icon={<LayoutGrid className="w-5 h-5" />} isOpen={activeSection === 'vistasSelection'} onToggle={() => onSectionChange('vistasSelection')}>
+      <Section title="Portafolio de Vistas" number="05" icon={<LayoutGrid className="w-5 h-5" />} isOpen={isSectionOpen('vistasSelection')} onToggle={() => onSectionChange('vistasSelection')}>
         <SectionDescription>Ya vienen marcadas las vistas básicas de un portafolio (principal, frontal, aérea e isométrica). Quita las que no necesites o suma otras, por ejemplo la nocturna o la crepuscular. Cada vista se cobra por separado.</SectionDescription>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 max-h-[420px] overflow-y-auto custom-scrollbar pr-1">
           {VC.ARCHITECTURAL_VISTAS.map(vista => {
@@ -100,7 +102,7 @@ export default function VistasForm({ params, onChange, disabled, activeSection, 
       </Section>
 
       {/* ── 02 PROCESO ─────────────────────────────────────────── */}
-      <Section title="Configuración de Salida" number="06" icon={<ImageIcon className="w-5 h-5" />} isOpen={activeSection === 'output'} onToggle={() => onSectionChange('output')}>
+      <Section title="Configuración de Salida" number="06" icon={<ImageIcon className="w-5 h-5" />} isOpen={isSectionOpen('output')} onToggle={() => onSectionChange('output')}>
         <div className="mb-8">
           <AmbienceSelects
             params={params}

@@ -21,7 +21,8 @@ interface PlantaFormProps {
   params: DreamHouseParams;
   onChange: (params: DreamHouseParams) => void;
   disabled?: boolean;
-  activeSection: string | null;
+  activeSection?: string | null;
+  openSections?: Set<string>;
   onSectionChange: (id: string) => void;
   floorPlanFile: File | null;
   onFloorPlanFileChange: (file: File | null) => void;
@@ -52,6 +53,7 @@ export default function PlantaForm({
   onChange,
   disabled,
   activeSection,
+  openSections,
   onSectionChange,
   floorPlanFile,
   onFloorPlanFileChange,
@@ -60,6 +62,8 @@ export default function PlantaForm({
   lotZonePolygons,
   onLotZoneChange,
 }: PlantaFormProps) {
+  const isSectionOpen = (id: string) => openSections ? openSections.has(id) : activeSection === id;
+
   const handleChange = <K extends keyof DreamHouseParams>(key: K, value: DreamHouseParams[K]) => {
     onChange({ ...params, [key]: value });
   };
@@ -112,7 +116,7 @@ export default function PlantaForm({
         title="Fase 1: Programa y Dimensiones"
         number="02"
         icon={<LayoutGrid className="w-5 h-5" />}
-        isOpen={activeSection === 'program'}
+        isOpen={isSectionOpen('program')}
         onToggle={() => onSectionChange('program')}
         summary={programSummary}
       >
@@ -306,7 +310,7 @@ export default function PlantaForm({
         title="Fase 2: División Espacial y Zonificación"
         number="03"
         icon={<Compass className="w-5 h-5" />}
-        isOpen={activeSection === 'zoning'}
+        isOpen={isSectionOpen('zoning')}
         onToggle={() => onSectionChange('zoning')}
         summary={zoningSummary}
       >
@@ -371,7 +375,7 @@ export default function PlantaForm({
         title="Fase 3: Tipo de Plano y Lenguaje Arquitectónico"
         number="04"
         icon={<Layers className="w-5 h-5" />}
-        isOpen={activeSection === 'style'}
+        isOpen={isSectionOpen('style')}
         onToggle={() => onSectionChange('style')}
         summary={styleSummary}
       >
@@ -450,7 +454,7 @@ export default function PlantaForm({
         title="Fase 4: Formato de Salida"
         number="05"
         icon={<Sparkles className="w-5 h-5" />}
-        isOpen={activeSection === 'render'}
+        isOpen={isSectionOpen('render')}
         onToggle={() => onSectionChange('render')}
         summary={`${params.renderAspectRatio} · ${params.renderOutputResolution}`}
       >
