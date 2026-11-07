@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { Plus, Minus } from 'lucide-react';
 import { twMerge } from 'tailwind-merge';
 
@@ -31,9 +31,31 @@ export function Section({
   summary,
 }: SectionProps) {
   const [internalIsOpen, setInternalIsOpen] = useState(defaultOpen);
-
   const isControlled = controlledIsOpen !== undefined;
   const isOpen = isControlled ? controlledIsOpen : internalIsOpen;
+
+  const sectionRef = useRef<HTMLDivElement>(null);
+  const prevOpenRef = useRef<boolean>(isOpen);
+
+  useEffect(() => {
+    // Al expandir una sección, asegurar que su cabecera quede anclada cómodamente en pantalla
+    // sin brincos extraños hacia abajo ni perder de vista el formulario recién desplegado
+    if (!prevOpenRef.current && isOpen && sectionRef.current) {
+      requestAnimationFrame(() => {
+        if (!sectionRef.current) return;
+        const rect = sectionRef.current.getBoundingClientRect();
+        const topOffset = 88; // Margen para la barra de navegación superior (sticky header)
+        if (rect.top < topOffset - 10 || rect.top > window.innerHeight * 0.45) {
+          const targetScrollY = window.scrollY + rect.top - topOffset;
+          window.scrollTo({
+            top: Math.max(0, targetScrollY),
+            behavior: 'smooth',
+          });
+        }
+      });
+    }
+    prevOpenRef.current = isOpen;
+  }, [isOpen]);
 
   const handleToggle = () => {
     if (isControlled && controlledOnToggle) {
@@ -45,6 +67,7 @@ export function Section({
 
   return (
     <div
+      ref={sectionRef}
       className={twMerge(
         'group border-b border-border transition-all duration-300',
         isOpen ? 'pb-8' : '',

@@ -17,7 +17,8 @@ interface EditFormProps {
   params: DreamHouseParams;
   onChange: (params: DreamHouseParams) => void;
   disabled?: boolean;
-  activeSection: string | null;
+  activeSection?: string | null;
+  openSections?: Set<string>;
   onSectionChange: (id: string) => void;
   baseImage: File | null;
   onBaseImageUpdate: (file: File | null) => void;
@@ -43,6 +44,7 @@ export default function EditForm({
   onChange, 
   disabled, 
   activeSection, 
+  openSections,
   onSectionChange,
   baseImage,
   onBaseImageUpdate,
@@ -50,6 +52,7 @@ export default function EditForm({
   onCompositeImageUpdate,
   onMaskUpdate
 }: EditFormProps) {
+  const isSectionOpen = (id: string) => openSections ? openSections.has(id) : activeSection === id;
   const handleChange = <K extends keyof DreamHouseParams>(key: K, value: DreamHouseParams[K]) => {
     onChange({ ...params, [key]: value });
   };
@@ -81,7 +84,7 @@ export default function EditForm({
     <div className="space-y-0" role="form" aria-label="Módulo de Edición de Imagen">
 
       {/* ── 04 SKETCH CANVAS ─────────────────────────────────────── */}
-      <Section title="Modo Sketch / Edición Visual" number="02" icon={<PenLine className="w-5 h-5" />} isOpen={activeSection === 'sketch'} onToggle={() => onSectionChange('sketch')}>
+      <Section title="Modo Sketch / Edición Visual" number="02" icon={<PenLine className="w-5 h-5" />} isOpen={isSectionOpen('sketch')} onToggle={() => onSectionChange('sketch')}>
         <SectionDescription>Marca las zonas que deseas modificar —pintando con el pincel o con «Zona por puntos», tocando punto por punto como en un mapa— y escribe tu instrucción de edición.</SectionDescription>
         
         <div className="space-y-8">
@@ -124,7 +127,7 @@ export default function EditForm({
       </Section>
 
       {/* ── 03 TIPO DE CAMBIO ──────────────────────────────────── */}
-      <Section title="Tipo de Cambio" number="03" icon={<SlidersHorizontal className="w-5 h-5" />} isOpen={activeSection === 'edit-change'} onToggle={() => onSectionChange('edit-change')} summary={changeSummary}>
+      <Section title="Tipo de Cambio" number="03" icon={<SlidersHorizontal className="w-5 h-5" />} isOpen={isSectionOpen('edit-change')} onToggle={() => onSectionChange('edit-change')} summary={changeSummary}>
         <SectionDescription>Opcional. Orienta a la IA sobre qué clase de cambio es, cuánto puede transformar la zona y qué debe quedar idéntico.</SectionDescription>
         <div className="space-y-8">
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
@@ -136,7 +139,7 @@ export default function EditForm({
       </Section>
 
       {/* ── 04 ESPACIO Y DIRECCIÓN DE DISEÑO (mismos campos que interior/exterior) ── */}
-      <Section title="Espacio y Dirección de Diseño" number="04" icon={<Sparkles className="w-5 h-5" />} isOpen={activeSection === 'edit-design'} onToggle={() => onSectionChange('edit-design')} summary={designSummary}>
+      <Section title="Espacio y Dirección de Diseño" number="04" icon={<Sparkles className="w-5 h-5" />} isOpen={isSectionOpen('edit-design')} onToggle={() => onSectionChange('edit-design')} summary={designSummary}>
         <SectionDescription>Opcional. Dile a la IA qué tipo de espacio es y bajo qué estilo o maestro rediseñarlo. Se aplica solo a lo que editas. Son los mismos datos de Exterior e Interior: si los cambias aquí, también cambian allá.</SectionDescription>
         <EssenceFields
           params={params}
@@ -154,7 +157,7 @@ export default function EditForm({
       </Section>
 
       {/* ── 05 MATERIALES, COLOR Y MOBILIARIO ─────────────────── */}
-      <Section title="Materiales, Color y Mobiliario" number="05" icon={<Layers className="w-5 h-5" />} isOpen={activeSection === 'edit-finishes'} onToggle={() => onSectionChange('edit-finishes')} summary={finishesSummary}>
+      <Section title="Materiales, Color y Mobiliario" number="05" icon={<Layers className="w-5 h-5" />} isOpen={isSectionOpen('edit-finishes')} onToggle={() => onSectionChange('edit-finishes')} summary={finishesSummary}>
         <SectionDescription>Opcional. Qué materiales, colores y piezas debe usar el cambio.</SectionDescription>
         <div className="space-y-8">
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
@@ -172,7 +175,7 @@ export default function EditForm({
       </Section>
 
       {/* ── 05 PROCESO ─────────────────────────────────────────── */}
-      <Section title="Configuración de Salida" number="06" icon={<ImageIcon className="w-5 h-5" />} isOpen={activeSection === 'output'} onToggle={() => onSectionChange('output')}>
+      <Section title="Configuración de Salida" number="06" icon={<ImageIcon className="w-5 h-5" />} isOpen={isSectionOpen('output')} onToggle={() => onSectionChange('output')}>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-5 mb-5">
           <OutputOptions params={params} onChange={handleChange} disabled={disabled} />
         </div>

@@ -200,5 +200,36 @@ test.describe('DreamHouse Studio E2E MVP', () => {
     await expect(page.locator('span:text-is("PLANO")')).toBeVisible();
     await expect(page.locator('span:text-is("220")')).toBeVisible();
   });
+
+  test('Module Sections: expanding sections operates independently with stable scroll anchoring (no downwards jump)', async ({ page }) => {
+    // 1. Abrir Fase 1: Concepto Central
+    const sec2Btn = page.getByRole('button', { name: /Fase 1: Concepto Central/i });
+    await sec2Btn.click();
+    await page.waitForTimeout(300);
+
+    // 2. Localizar Fase 4: Diseño Físico y Programa
+    const sec4Btn = page.getByRole('button', { name: /Fase 4: Diseño Físico y Programa/i });
+    await sec4Btn.scrollIntoViewIfNeeded();
+    await page.waitForTimeout(200);
+
+    const rectBefore = await sec4Btn.boundingBox();
+    expect(rectBefore).not.toBeNull();
+
+    // 3. Hacer click en Fase 4 para expandirla
+    await sec4Btn.click();
+    await page.waitForTimeout(400);
+
+    // 4. Verificar que Fase 4 permanece visible en la pantalla (sin salto hacia abajo ni desaparecer arriba)
+    const rectAfter = await sec4Btn.boundingBox();
+    expect(rectAfter).not.toBeNull();
+    expect(rectAfter!.y).toBeGreaterThanOrEqual(70);
+    expect(rectAfter!.y).toBeLessThan(700);
+
+    // 5. Verificar que el contenido de Fase 4 está efectivamente expandido
+    await expect(page.getByText('Volumetría y Estructura')).toBeVisible();
+
+    // 6. Verificar que Fase 1 no fue forzada a cerrarse (despliegue independiente)
+    await expect(page.getByText('Define la esencia y el carácter arquitectónico del edificio exterior.')).toBeVisible();
+  });
 });
 

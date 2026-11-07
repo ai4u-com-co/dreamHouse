@@ -109,8 +109,10 @@ function StudioContent() {
 
 
 
-  // Accordion state - 'mode' open by default to guide new users
-  const [activeSection, setActiveSection] = useState<string | null>('mode');
+  // Secciones desplegables independientes: abrir una sección no colapsa abruptamente las demás
+  // evitando desplazamientos no deseados hacia abajo y permitiendo interactuar con varios bloques a la vez
+  const [openSections, setOpenSections] = useState<Set<string>>(() => new Set(['mode']));
+  const activeSection = Array.from(openSections).pop() ?? null;
 
   const showToast = (message: string) => {
     setToastMessage(message);
@@ -118,7 +120,15 @@ function StudioContent() {
   };
 
   const toggleSection = (id: string) => {
-    setActiveSection(prev => prev === id ? null : id);
+    setOpenSections(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) {
+        next.delete(id);
+      } else {
+        next.add(id);
+      }
+      return next;
+    });
   };
 
   // El mismo archivo "principal" (lotFile) significa cosas distintas en cada módulo
@@ -136,7 +146,7 @@ function StudioContent() {
   const switchMode = (mode: DreamHouseParams['mode']) => {
     if (mode === params.mode) return;
     setParams(prev => ({ ...prev, mode }));
-    setActiveSection(FIRST_SECTION[mode]);
+    setOpenSections(new Set([FIRST_SECTION[mode]]));
     // Un solo estado para todos los módulos: lo compartido se conserva y lo exclusivo queda guardado por si se vuelve
     const shared = mode === 'planta' || mode === 'exterior' || mode === 'interior'
       ? 'Se conservan tu programa (m², pisos, cuartos, baños), la esencia y el sitio: lo que cambies aquí también queda listo en los demás módulos.'
@@ -208,14 +218,14 @@ function StudioContent() {
       if (target === 'exterior') {
         setFloorPlanFile(file);
         setParams(prev => ({ ...prev, mode: 'exterior', sourceRender: source }));
-        setActiveSection('media');
+        setOpenSections(new Set(['media']));
         showToast('Planta cargada como Plano Residencial en Arquitectura Exterior con todo tu programa espacial.');
       } else {
         setLotFile(file);
         setEditCompositeFile(null);
         setEditMask(null);
         setParams(prev => ({ ...prev, mode: target, sourceRender: source }));
-        setActiveSection(FIRST_SECTION[target]);
+        setOpenSections(new Set([FIRST_SECTION[target]]));
         showToast(source
           ? `Render cargado como base de ${MODE_NAMES[target]} con sus parámetros originales.`
           : `Render cargado como base de ${MODE_NAMES[target]}.`);
@@ -550,7 +560,7 @@ function StudioContent() {
     // Registros anteriores a las opciones nuevas (o con valores que ya no existen): se normalizan a lo válido y barato
     setParams(normalizeRenderSettings({ ...DEFAULT_PARAMS, ...record.params }));
     setVariants([]);
-    setActiveSection(FIRST_SECTION[record.mode] ?? 'mode');
+    setOpenSections(new Set([FIRST_SECTION[record.mode] ?? 'mode']));
     setVistasResults([]);
     // El panel de resultado (vista, descarga y «usar como base») debe tener el render COMPLETO: `record.imageUrl` es solo la
     // miniatura de la grilla. Los registros muy antiguos no guardaron el original: ahí solo queda la miniatura y se avisa.
@@ -597,11 +607,11 @@ function StudioContent() {
                   setParams(prev => ({ ...prev, ...safe }));
                   if (dropped.length) showToast(`El asistente propuso ${dropped.length} valor(es) que el formulario no ofrece; se ignoraron.`);
                   if (params.mode === 'planta') {
-                    setActiveSection('program');
+                    setOpenSections(prev => new Set([...prev, 'program']));
                   } else if (params.mode === 'exterior') {
-                    setActiveSection('concept');
+                    setOpenSections(prev => new Set([...prev, 'concept']));
                   } else if (params.mode === 'interior') {
-                    setActiveSection('identity');
+                    setOpenSections(prev => new Set([...prev, 'identity']));
                   }
                 }}
                 onError={setError}
@@ -653,7 +663,7 @@ function StudioContent() {
             number="01"
             icon={<PenLine className="w-5 h-5" />}
             badge="MODO"
-            isOpen={activeSection === 'mode'}
+            isOpen={openSections.has('mode')}
             onToggle={() => toggleSection('mode')}
             summary={
               params.mode === 'planta' ? "Planta Arquitectónica" :
@@ -725,7 +735,7 @@ function StudioContent() {
             number="02"
             icon={<Maximize2 className="w-5 h-5" />}
             badge="INSPIRACIÓN"
-            isOpen={activeSection === 'references'}
+            isOpen={openSections.has('references')}
             onToggle={() => toggleSection('references')}
           >
             <ReferenceUploader files={files} onFilesChange={setFiles} />
@@ -742,7 +752,7 @@ function StudioContent() {
             number="03"
             icon={<Camera className="w-5 h-5" />}
             badge="BASE"
-            isOpen={activeSection === 'context'}
+            isOpen={openSections.has('context')}
             onToggle={() => toggleSection('context')}
           >
           <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
@@ -781,7 +791,7 @@ function StudioContent() {
             number="04"
             icon={<Maximize2 className="w-5 h-5" />}
             badge="GUÍA"
-            isOpen={activeSection === 'structure'}
+            isOpen={openSections.has('structure')}
             onToggle={() => toggleSection('structure')}
           >
             <FloorPlanUploader 
@@ -800,6 +810,7 @@ function StudioContent() {
               onChange={setParams}
               disabled={isLoading}
               activeSection={activeSection}
+              openSections={openSections}
               onSectionChange={toggleSection}
               floorPlanFile={floorPlanFile}
               onFloorPlanFileChange={setFloorPlanFile}
@@ -814,6 +825,7 @@ function StudioContent() {
               onChange={setParams}
               disabled={isLoading}
               activeSection={activeSection}
+              openSections={openSections}
               onSectionChange={toggleSection}
               files={files}
               onFilesChange={setFiles}
@@ -830,6 +842,7 @@ function StudioContent() {
               onChange={setParams}
               disabled={isLoading}
               activeSection={activeSection}
+              openSections={openSections}
               onSectionChange={toggleSection}
               objectFiles={objectFiles}
               onObjectFilesChange={setObjectFiles}
@@ -840,6 +853,7 @@ function StudioContent() {
               onChange={setParams}
               disabled={isLoading}
               activeSection={activeSection}
+              openSections={openSections}
               onSectionChange={toggleSection}
               baseImage={lotFile}
               onBaseImageUpdate={handleEditBaseChange}
@@ -853,6 +867,7 @@ function StudioContent() {
               onChange={setParams}
               disabled={isLoading}
               activeSection={activeSection}
+              openSections={openSections}
               onSectionChange={toggleSection}
             />
           )}

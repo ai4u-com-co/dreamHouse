@@ -16,7 +16,8 @@ interface ExteriorFormProps {
   params: DreamHouseParams;
   onChange: (params: DreamHouseParams) => void;
   disabled?: boolean;
-  activeSection: string | null;
+  activeSection?: string | null;
+  openSections?: Set<string>;
   onSectionChange: (id: string) => void;
 
   // File Upload State & Handlers
@@ -51,6 +52,7 @@ export default function ExteriorForm({
   onChange,
   disabled,
   activeSection,
+  openSections,
   onSectionChange,
   files,
   onFilesChange,
@@ -61,6 +63,8 @@ export default function ExteriorForm({
   floorPlanFile,
   onFloorPlanFileChange
 }: ExteriorFormProps) {
+  const isSectionOpen = (id: string) => openSections ? openSections.has(id) : activeSection === id;
+
   const handleChange = <K extends keyof DreamHouseParams>(key: K, value: DreamHouseParams[K]) => {
     onChange({ ...params, [key]: value });
   };
@@ -109,7 +113,7 @@ export default function ExteriorForm({
         title="Fase 1: Concepto Central" 
         number="02" 
         icon={<Sparkles className="w-5 h-5" />} 
-        isOpen={activeSection === 'concept'} 
+        isOpen={isSectionOpen('concept')} 
         onToggle={() => onSectionChange('concept')}
         summary={conceptSummary}
       >
@@ -122,7 +126,7 @@ export default function ExteriorForm({
         title="Fase 2: Geometría e Imagen Base" 
         number="03" 
         icon={<ImageIcon className="w-5 h-5" />} 
-        isOpen={activeSection === 'media'} 
+        isOpen={isSectionOpen('media')} 
         onToggle={() => onSectionChange('media')}
         summary={mediaSummary}
       >
@@ -180,7 +184,7 @@ export default function ExteriorForm({
         title="Fase 3: Sitio y Clima" 
         number="04" 
         icon={<MapPin className="w-5 h-5" />} 
-        isOpen={activeSection === 'site'} 
+        isOpen={isSectionOpen('site')} 
         onToggle={() => onSectionChange('site')}
         summary={siteSummary}
       >
@@ -199,7 +203,7 @@ export default function ExteriorForm({
         title="Fase 4: Diseño Físico y Programa" 
         number="05" 
         icon={<Box className="w-5 h-5" />} 
-        isOpen={activeSection === 'design'} 
+        isOpen={isSectionOpen('design')} 
         onToggle={() => onSectionChange('design')}
         summary={designSummary}
       >
@@ -293,7 +297,7 @@ export default function ExteriorForm({
         title="Fase 5: Captura y Render" 
         number="06" 
         icon={<Camera className="w-5 h-5" />} 
-        isOpen={activeSection === 'render'} 
+        isOpen={isSectionOpen('render')} 
         onToggle={() => onSectionChange('render')}
         summary={renderSummary}
       >
