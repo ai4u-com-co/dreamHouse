@@ -9,6 +9,8 @@ import { compressImage } from '@/lib/image-compression';
 import { useLightbox } from '@/context/LightboxContext';
 import { useObjectUrls } from '@/lib/hooks/useObjectUrl';
 import { Loader2 } from 'lucide-react';
+import SlotInputActions from './SlotInputActions';
+import { extractImageFilesFromClipboardEvent } from '@/lib/clipboard';
 
 interface ReferenceUploaderProps {
   files: File[];
@@ -21,8 +23,41 @@ export default function ReferenceUploader({ files, onFilesChange }: ReferenceUpl
   const [error, setError] = useState<string | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
   const dropZoneRef = useRef<HTMLDivElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const { openLightbox } = useLightbox();
   const previewUrls = useObjectUrls(files);
+
+  const processIncomingFiles = useCallback(async (incomingFiles: File[]) => {
+    if (incomingFiles.length === 0) return;
+    const remainingSlots = Math.max(0, 5 - files.length);
+    if (remainingSlots === 0) {
+      setError('Ya has alcanzado el máximo de 5 imágenes de referencia.');
+      return;
+    }
+
+    setIsProcessing(true);
+    setError(null);
+    try {
+      const filesToProcess = incomingFiles.slice(0, remainingSlots);
+      const compressedFiles = await Promise.all(
+        filesToProcess.map((file) => compressImage(file))
+      );
+
+      const validation = validateImageFiles(compressedFiles, 'Imagen de referencia');
+      if (!validation.valid) {
+        setError(validation.error || 'Error al validar imágenes');
+        return;
+      }
+
+      const newFiles = [...files, ...compressedFiles].slice(0, 5);
+      onFilesChange(newFiles);
+    } catch (err) {
+      console.error("Compression error:", err);
+      setError("Error al procesar las imágenes.");
+    } finally {
+      setIsProcessing(false);
+    }
+  }, [files, onFilesChange]);
 
   const handleDragOver = useCallback((e: React.DragEvent) => {
     e.preventDefault();
@@ -44,34 +79,9 @@ export default function ReferenceUploader({ files, onFilesChange }: ReferenceUpl
     );
     
     if (droppedFiles.length > 0) {
-      const processFiles = async () => {
-        setIsProcessing(true);
-        setError(null);
-        try {
-          // Compress all dropped images in parallel
-          const compressedFiles = await Promise.all(
-            droppedFiles.map(file => compressImage(file))
-          );
-
-          // Validate the compressed files
-          const validation = validateImageFiles(compressedFiles, 'Imagen de referencia');
-          if (!validation.valid) {
-            setError(validation.error || 'Error al validar imágenes');
-            return;
-          }
-          
-          const newFiles = [...files, ...compressedFiles].slice(0, 5);
-          onFilesChange(newFiles);
-        } catch (err) {
-          console.error("Compression error:", err);
-          setError("Error al procesar las imágenes.");
-        } finally {
-          setIsProcessing(false);
-        }
-      };
-      processFiles();
+      void processIncomingFiles(droppedFiles);
     }
-  }, [files, onFilesChange]);
+  }, [processIncomingFiles]);
 
   const handleFileInput = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     setError(null);
@@ -79,36 +89,20 @@ export default function ReferenceUploader({ files, onFilesChange }: ReferenceUpl
       const selectedFiles = Array.from(e.target.files).filter(file => 
         file.type.startsWith('image/')
       );
-      
       if (selectedFiles.length > 0) {
-        const processFiles = async () => {
-          setIsProcessing(true);
-          setError(null);
-          try {
-            // Compress all selected images
-            const compressedFiles = await Promise.all(
-              selectedFiles.map(file => compressImage(file))
-            );
-
-            const validation = validateImageFiles(compressedFiles, 'Imagen de referencia');
-            if (!validation.valid) {
-              setError(validation.error || 'Error al validar imágenes');
-              return;
-            }
-            
-            const newFiles = [...files, ...compressedFiles].slice(0, 5);
-            onFilesChange(newFiles);
-          } catch (err) {
-            console.error("Compression error:", err);
-            setError("Error al procesar las imágenes.");
-          } finally {
-            setIsProcessing(false);
-          }
-        };
-        processFiles();
+        void processIncomingFiles(selectedFiles);
       }
     }
-  }, [files, onFilesChange]);
+    e.target.value = '';
+  }, [processIncomingFiles]);
+
+  const handlePaste = useCallback((e: React.ClipboardEvent) => {
+    const images = extractImageFilesFromClipboardEvent(e);
+    if (images.length > 0) {
+      e.preventDefault();
+      void processIncomingFiles(images);
+    }
+  }, [processIncomingFiles]);
 
   const removeFile = useCallback((index: number) => {
     const newFiles = files.filter((_, i) => i !== index);
@@ -116,15 +110,31 @@ export default function ReferenceUploader({ files, onFilesChange }: ReferenceUpl
   }, [files, onFilesChange]);
 
   return (
-    <div className="space-y-6 p-5 sm:p-6" role="region" aria-labelledby="uploader-title">
+    <div
+      className="space-y-6 p-5 sm:p-6 outline-none"
+      role="region"
+      aria-labelledby="uploader-title"
+      tabIndex={0}
+      onPaste={handlePaste}
+    >
+      {/* Hidden file input */}
+      <input
+        ref={fileInputRef}
+        type="file"
+        multiple
+        accept="image/*"
+        className="sr-only"
+        onChange={handleFileInput}
+        aria-label="Subir imágenes de referencia (máximo 5 archivos)"
+      />
+
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div className="flex items-center gap-4">
           <div className="relative" aria-hidden="true">
             <div className="p-3 bg-gradient-to-br from-primary/20 to-primary/5 rounded-xl border border-primary/20">
               <ImageIcon className="w-5 h-5 text-primary" />
             </div>
-            {/* Pulse ring */}
             {files.length === 0 && (
               <div className="absolute inset-0 rounded-xl border-2 border-primary/30 animate-[pulse-ring_2s_ease-out_infinite]" />
             )}
@@ -137,65 +147,75 @@ export default function ReferenceUploader({ files, onFilesChange }: ReferenceUpl
               )}
             </h3>
             <p className="text-sm text-muted-foreground mt-0.5">
-              Sube imágenes de casas o estilos que te inspiren. La IA las usará como referencia visual para tu diseño.
+              Sube imágenes de casas o estilos que te inspiren. La IA las usará como referencia visual.
             </p>
           </div>
         </div>
         
-        {/* Counter */}
-        <div className={clsx(
-          "relative px-4 py-2 rounded-full border text-sm font-mono font-medium transition-all duration-300",
-          files.length === 5 
-            ? "bg-primary/10 border-primary/30 text-primary" 
-            : "bg-card-elevated border-border text-muted-foreground"
-        )}>
-          <span className="text-foreground font-bold">{files.length}</span>
-          <span className="text-muted-foreground">/5</span>
-          {files.length === 5 && (
-            <div className="absolute inset-0 rounded-full bg-primary/20 blur-md -z-10" />
+        {/* Counter & Quick Actions */}
+        <div className="flex items-center gap-3 self-start sm:self-auto flex-wrap">
+          <div className={clsx(
+            "relative px-4 py-2 rounded-full border text-sm font-mono font-medium transition-all duration-300",
+            files.length === 5 
+              ? "bg-primary/10 border-primary/30 text-primary" 
+              : "bg-card-elevated border-border text-muted-foreground"
+          )}>
+            <span className="text-foreground font-bold">{files.length}</span>
+            <span className="text-muted-foreground">/5</span>
+          </div>
+
+          {files.length < 5 && (
+            <SlotInputActions
+              compact
+              onFileSelected={(file) => void processIncomingFiles([file])}
+              onError={(msg) => setError(msg)}
+              onUploadClick={() => fileInputRef.current?.click()}
+              disabled={isProcessing}
+              isProcessing={isProcessing}
+              modalTitle="Tomar foto de referencia"
+              uploadLabel="Subir"
+              pasteLabel="Pegar"
+              cameraLabel="Cámara"
+            />
           )}
         </div>
       </div>
       
       {/* Upload Grid */}
       <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-4">
-        {/* Uploaded Files */}
-        {files.map((_, index) => (
-          <div 
-            key={index} 
-            className={clsx(
-              "relative group aspect-square rounded-2xl overflow-hidden border-2 transition-all duration-500 cursor-pointer",
-              "bg-card hover:border-primary/50",
-              hoveredIndex === index ? "border-primary scale-[1.02] shadow-lg shadow-primary/10" : "border-border"
-            )}
+        {files.map((file, index) => (
+          <div
+            key={index}
+            className="group relative aspect-square rounded-2xl overflow-hidden border border-border bg-card-elevated transition-all duration-300 hover:border-primary/50 hover:shadow-xl hover:shadow-primary/10 cursor-zoom-in"
             onMouseEnter={() => setHoveredIndex(index)}
             onMouseLeave={() => setHoveredIndex(null)}
-            style={{ 
-              animationDelay: `${index * 80}ms`,
-              animation: 'fade-in-up 0.5s ease-out forwards'
-            }}
             onClick={() => {
-              const imageUrls = previewUrls.map((url, i) => ({ url, type: `Referencia ${i + 1}` }));
-              openLightbox(imageUrls, index);
+              const items = previewUrls.map((url, i) => ({
+                url,
+                type: `Referencia ${i + 1}`,
+              }));
+              openLightbox(items, index);
             }}
           >
-            <Image
-              src={previewUrls[index] ?? ''}
-              alt={`Referencia ${index + 1}`}
-              fill
-              className="object-cover transition-all duration-700 group-hover:scale-110"
-              unoptimized
-            />
+            {previewUrls[index] && (
+              <Image
+                src={previewUrls[index]}
+                alt={`Referencia ${index + 1}`}
+                fill
+                className="object-cover transition-transform duration-500 group-hover:scale-110"
+                unoptimized
+              />
+            )}
             
-            {/* Gradient overlay */}
-            <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/40 to-transparent opacity-0 group-hover:opacity-100 transition-all duration-300" />
-            
-            {/* Actions */}
-            <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all duration-300">
+            {/* Overlay on hover */}
+            <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex items-center justify-center p-2">
               <button
-                onClick={() => removeFile(index)}
-                className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-white bg-destructive/80 backdrop-blur-sm rounded-full hover:bg-destructive transition-all transform hover:scale-105 active:scale-95"
-                aria-label={`Eliminar imagen de referencia ${index + 1}`}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  removeFile(index);
+                }}
+                className="flex items-center gap-1.5 px-3 py-1.5 bg-destructive text-white rounded-full text-xs font-medium transform translate-y-2 group-hover:translate-y-0 transition-all duration-300 hover:scale-105 shadow-lg"
+                title="Eliminar esta imagen"
               >
                 <Trash2 className="w-4 h-4" aria-hidden="true" />
                 Eliminar
@@ -211,11 +231,6 @@ export default function ReferenceUploader({ files, onFilesChange }: ReferenceUpl
             )}>
               {index + 1}
             </div>
-
-            {/* Corner glow */}
-            {hoveredIndex === index && (
-              <div className="absolute -top-10 -right-10 w-20 h-20 bg-primary/30 rounded-full blur-2xl" />
-            )}
           </div>
         ))}
         
@@ -226,65 +241,41 @@ export default function ReferenceUploader({ files, onFilesChange }: ReferenceUpl
             onDragOver={handleDragOver}
             onDragLeave={handleDragLeave}
             onDrop={handleDrop}
+            onClick={() => fileInputRef.current?.click()}
             className={clsx(
-              "relative aspect-square rounded-2xl border-2 border-dashed transition-all duration-300 flex flex-col items-center justify-center text-center overflow-hidden group cursor-pointer",
+              "relative aspect-square rounded-2xl border-2 border-dashed transition-all duration-300 flex flex-col items-center justify-center text-center p-3 overflow-hidden group cursor-pointer",
               isDragging 
                 ? "border-primary bg-primary/10 scale-[1.02] shadow-lg shadow-primary/20" 
                 : "border-border hover:border-primary/50 hover:bg-card-elevated"
             )}
           >
-            <input
-              type="file"
-              multiple
-              accept="image/*"
-              className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10"
-              onChange={handleFileInput}
-              aria-label="Subir imágenes de referencia (máximo 5 archivos)"
-              title="Arrastra imágenes o haz clic para seleccionar"
-            />
-            
-            {/* Animated background pattern */}
-            <div className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-500">
-              <div className="absolute inset-0" style={{
-                backgroundImage: `radial-gradient(circle at 2px 2px, var(--border) 1px, transparent 0)`,
-                backgroundSize: '20px 20px',
-              }} />
-            </div>
-            
             {/* Icon */}
             <div className={clsx(
-              "relative p-4 rounded-2xl mb-3 transition-all duration-300",
+              "relative p-3 rounded-2xl mb-2 transition-all duration-300",
               isDragging || isProcessing
                 ? "bg-primary/20 scale-110" 
                 : "bg-card group-hover:bg-primary/10 group-hover:scale-105"
             )}>
               {isProcessing ? (
-                <Loader2 className="w-6 h-6 text-primary animate-spin" />
+                <Loader2 className="w-5 h-5 text-primary animate-spin" />
               ) : isDragging ? (
-                <Plus className="w-6 h-6 text-primary animate-pulse" />
+                <Plus className="w-5 h-5 text-primary animate-pulse" />
               ) : (
-                <Upload className="w-6 h-6 text-muted-foreground group-hover:text-primary transition-colors" />
-              )}
-              
-              {/* Glow */}
-              {(isDragging || isProcessing) && (
-                <div className="absolute inset-0 rounded-2xl bg-primary/30 blur-xl -z-10" />
+                <Upload className="w-5 h-5 text-muted-foreground group-hover:text-primary transition-colors" />
               )}
             </div>
             
-            {/* Text */}
             <span className={clsx(
-              "relative text-sm font-medium transition-colors",
+              "text-xs font-medium transition-colors",
               isDragging || isProcessing
                 ? "text-primary" 
                 : "text-muted-foreground group-hover:text-foreground"
             )}>
-              {isProcessing ? 'Procesando...' : isDragging ? 'Suelta aquí' : 'Añadir imagen'}
+              {isProcessing ? 'Procesando...' : isDragging ? 'Suelta aquí' : 'Añadir referencia'}
             </span>
             
-            {/* Subtle hint */}
-            <span className="text-xs text-muted mt-1 opacity-0 group-hover:opacity-100 transition-opacity">
-              Optimización automática aplicada
+            <span className="text-[10px] text-muted-foreground mt-1">
+              Subir, pegar (Ctrl+V) o cámara
             </span>
           </div>
         )}
@@ -305,7 +296,7 @@ export default function ReferenceUploader({ files, onFilesChange }: ReferenceUpl
             <Sparkles className="w-4 h-4 text-primary" />
           </div>
           <p className="text-sm text-muted-foreground">
-            <span className="text-foreground font-medium">Pro tip:</span> Sube fotos de casas, fachadas o interiores que te inspiren. La IA analizará colores, formas y estilos para crear algo similar.
+            <span className="text-foreground font-medium">Tip:</span> Puedes subir fotos de tu equipo, pegarlas con <kbd className="px-1 py-0.5 rounded bg-muted border border-border text-[11px] font-mono">Ctrl+V</kbd> o tomar fotos directamente con tu cámara.
           </p>
         </div>
       )}

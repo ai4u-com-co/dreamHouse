@@ -9,6 +9,8 @@ import { compressImage } from '@/lib/image-compression';
 import { useLightbox } from '@/context/LightboxContext';
 import { useObjectUrls } from '@/lib/hooks/useObjectUrl';
 import { Loader2 } from 'lucide-react';
+import SlotInputActions from './SlotInputActions';
+import { extractImageFilesFromClipboardEvent } from '@/lib/clipboard';
 
 const MAX_OBJECTS = 13;
 
@@ -24,8 +26,39 @@ export default function ObjectUploader({ files, onFilesChange, disabled }: Objec
   const [error, setError] = useState<string | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
   const dropZoneRef = useRef<HTMLDivElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const { openLightbox } = useLightbox();
   const previewUrls = useObjectUrls(files);
+
+  const processIncomingFiles = useCallback(async (incomingFiles: File[]) => {
+    if (incomingFiles.length === 0 || disabled) return;
+    const remainingSlots = Math.max(0, MAX_OBJECTS - files.length);
+    if (remainingSlots === 0) {
+      setError(`Ya has alcanzado el máximo de ${MAX_OBJECTS} objetos.`);
+      return;
+    }
+
+    setIsProcessing(true);
+    setError(null);
+    try {
+      const filesToProcess = incomingFiles.slice(0, remainingSlots);
+      const compressedFiles = await Promise.all(
+        filesToProcess.map((file) => compressImage(file))
+      );
+
+      const validation = validateImageFiles(compressedFiles, 'Imagen de objeto');
+      if (!validation.valid) {
+        setError(validation.error || 'Error al validar imágenes');
+        return;
+      }
+      onFilesChange([...files, ...compressedFiles].slice(0, MAX_OBJECTS));
+    } catch (err) {
+      console.error("Compression error:", err);
+      setError("Error al procesar los objetos.");
+    } finally {
+      setIsProcessing(false);
+    }
+  }, [disabled, files, onFilesChange]);
 
   const handleDragOver = useCallback((e: React.DragEvent) => {
     e.preventDefault();
@@ -42,72 +75,55 @@ export default function ObjectUploader({ files, onFilesChange, disabled }: Objec
     setIsDragging(false);
     setError(null);
     const droppedFiles = Array.from(e.dataTransfer.files).filter(f => f.type.startsWith('image/'));
-    if (droppedFiles.length === 0) return;
-    if (droppedFiles.length === 0) return;
-    
-    const processFiles = async () => {
-      setIsProcessing(true);
-      setError(null);
-      try {
-        const compressedFiles = await Promise.all(
-          droppedFiles.map(file => compressImage(file))
-        );
-
-        const validation = validateImageFiles(compressedFiles, 'Imagen de objeto');
-        if (!validation.valid) {
-          setError(validation.error || 'Error al validar imágenes');
-          return;
-        }
-        onFilesChange([...files, ...compressedFiles].slice(0, MAX_OBJECTS));
-      } catch (err) {
-        console.error("Compression error:", err);
-        setError("Error al procesar los objetos.");
-      } finally {
-        setIsProcessing(false);
-      }
-    };
-    processFiles();
-  }, [files, onFilesChange]);
+    if (droppedFiles.length > 0) {
+      void processIncomingFiles(droppedFiles);
+    }
+  }, [processIncomingFiles]);
 
   const handleFileInput = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     setError(null);
     if (!e.target.files) return;
     const selectedFiles = Array.from(e.target.files).filter(f => f.type.startsWith('image/'));
     if (selectedFiles.length > 0) {
-      const processFiles = async () => {
-        setIsProcessing(true);
-        setError(null);
-        try {
-          const compressedFiles = await Promise.all(
-            selectedFiles.map(file => compressImage(file))
-          );
-
-          const validation = validateImageFiles(compressedFiles, 'Imagen de objeto');
-          if (!validation.valid) {
-            setError(validation.error || 'Error al validar imágenes');
-            return;
-          }
-          onFilesChange([...files, ...compressedFiles].slice(0, MAX_OBJECTS));
-        } catch (err) {
-          console.error("Compression error:", err);
-          setError("Error al procesar los objetos.");
-        } finally {
-          setIsProcessing(false);
-        }
-      };
-      processFiles();
+      void processIncomingFiles(selectedFiles);
     }
     e.target.value = '';
-  }, [files, onFilesChange]);
+  }, [processIncomingFiles]);
+
+  const handlePaste = useCallback((e: React.ClipboardEvent) => {
+    const images = extractImageFilesFromClipboardEvent(e);
+    if (images.length > 0) {
+      e.preventDefault();
+      void processIncomingFiles(images);
+    }
+  }, [processIncomingFiles]);
 
   const removeFile = useCallback((index: number) => {
     onFilesChange(files.filter((_, i) => i !== index));
   }, [files, onFilesChange]);
 
   return (
-    <div className="space-y-5" role="region" aria-labelledby="object-uploader-title">
+    <div
+      className="space-y-5 outline-none"
+      role="region"
+      aria-labelledby="object-uploader-title"
+      tabIndex={0}
+      onPaste={handlePaste}
+    >
+      {/* Hidden file input */}
+      <input
+        ref={fileInputRef}
+        type="file"
+        multiple
+        accept="image/*"
+        className="sr-only"
+        onChange={handleFileInput}
+        disabled={disabled}
+        aria-label="Subir imágenes de objetos"
+      />
+
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div className="flex items-center gap-3">
           <div className="p-2.5 bg-gradient-to-br from-primary/20 to-primary/5 border border-primary/20">
             <Armchair className="w-4 h-4 text-primary" />
@@ -119,14 +135,32 @@ export default function ObjectUploader({ files, onFilesChange, disabled }: Objec
             </p>
           </div>
         </div>
-        <div className={clsx(
-          "px-3 py-1.5 border text-xs font-mono font-medium transition-all",
-          files.length === MAX_OBJECTS
-            ? "bg-primary/10 border-primary/30 text-primary"
-            : "bg-card border-border text-muted-foreground"
-        )}>
-          <span className="text-foreground font-bold">{files.length}</span>
-          <span className="opacity-60">/{MAX_OBJECTS}</span>
+
+        <div className="flex items-center gap-3 self-start sm:self-auto flex-wrap">
+          <div className={clsx(
+            "px-3 py-1.5 border text-xs font-mono font-medium transition-all",
+            files.length === MAX_OBJECTS
+              ? "bg-primary/10 border-primary/30 text-primary"
+              : "bg-card border-border text-muted-foreground"
+          )}>
+            <span className="text-foreground font-bold">{files.length}</span>
+            <span className="opacity-60">/{MAX_OBJECTS}</span>
+          </div>
+
+          {files.length < MAX_OBJECTS && (
+            <SlotInputActions
+              compact
+              onFileSelected={(file) => void processIncomingFiles([file])}
+              onError={(msg) => setError(msg)}
+              onUploadClick={() => fileInputRef.current?.click()}
+              disabled={disabled || isProcessing}
+              isProcessing={isProcessing}
+              modalTitle="Tomar foto de objeto"
+              uploadLabel="Subir"
+              pasteLabel="Pegar"
+              cameraLabel="Cámara"
+            />
+          )}
         </div>
       </div>
 
@@ -185,6 +219,7 @@ export default function ObjectUploader({ files, onFilesChange, disabled }: Objec
             onDragOver={handleDragOver}
             onDragLeave={handleDragLeave}
             onDrop={handleDrop}
+            onClick={() => fileInputRef.current?.click()}
             className={clsx(
               "relative aspect-square border-2 border-dashed transition-all duration-300 flex flex-col items-center justify-center overflow-hidden group cursor-pointer",
               disabled && "opacity-40 pointer-events-none",
@@ -193,15 +228,6 @@ export default function ObjectUploader({ files, onFilesChange, disabled }: Objec
                 : "border-border hover:border-primary/50 hover:bg-card/60"
             )}
           >
-            <input
-              type="file"
-              multiple
-              accept="image/*"
-              className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10"
-              onChange={handleFileInput}
-              disabled={disabled}
-              aria-label="Subir imágenes de objetos"
-            />
             <div className={clsx(
               "p-2 transition-all",
               (isDragging || isProcessing) ? "scale-110" : "group-hover:scale-105"
@@ -218,10 +244,10 @@ export default function ObjectUploader({ files, onFilesChange, disabled }: Objec
               "text-xs font-medium mt-0.5 transition-colors",
               (isDragging || isProcessing) ? "text-primary" : "text-muted-foreground group-hover:text-foreground"
             )}>
-              {isProcessing ? 'Bajando...' : isDragging ? 'Suelta' : 'Agregar'}
+              {isProcessing ? 'Procesando...' : isDragging ? 'Suelta' : 'Agregar'}
             </span>
-            <span className="text-[8px] text-muted opacity-0 group-hover:opacity-60 transition-opacity mt-0.5">
-              Optimización automática
+            <span className="text-[9px] text-muted-foreground opacity-70 group-hover:opacity-100 transition-opacity mt-0.5">
+              Subir, pegar o cámara
             </span>
           </div>
         )}
@@ -238,7 +264,7 @@ export default function ObjectUploader({ files, onFilesChange, disabled }: Objec
       {/* Tip */}
       {files.length === 0 && (
         <p className="text-xs text-muted-foreground/60 text-center font-mono tracking-tight">
-          Hasta {MAX_OBJECTS} piezas · La IA las colocará en el espacio según el layout.
+          Hasta {MAX_OBJECTS} piezas · Puedes subir fotos, pegarlas con Ctrl+V o capturarlas con la cámara.
         </p>
       )}
     </div>

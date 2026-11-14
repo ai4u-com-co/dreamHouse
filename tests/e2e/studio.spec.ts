@@ -300,5 +300,60 @@ test.describe('DreamHouse Studio E2E MVP', () => {
 
     await expect(page.locator('input[value="Ventanales acústicos"]')).toHaveCount(0);
   });
+
+  test('Universal Image Slots: Subir, Pegar y Tomar foto (Cámara) disponibles en los slots de la aplicación', async ({ page }) => {
+    // 1. Abrir Fase 2 en Exterior para mostrar los uploaders de geometría y lote
+    await page.getByRole('button', { name: /Fase 2: Geometría e Imagen Base/i }).click({ force: true });
+
+    // Verificar botones universales en el uploader de foto del lote
+    const lotRegion = page.locator('div[role="region"][aria-labelledby="lot-uploader-title"]').first();
+    await expect(lotRegion).toBeVisible();
+
+    const uploadBtn = lotRegion.getByRole('button', { name: /Subir archivo/i });
+    const pasteBtn = lotRegion.getByRole('button', { name: /Pegar foto/i });
+    const cameraBtn = lotRegion.getByRole('button', { name: /Tomar foto/i });
+
+    await expect(uploadBtn).toBeVisible();
+    await expect(pasteBtn).toBeVisible();
+    await expect(cameraBtn).toBeVisible();
+
+    // 2. Abrir modal de cámara desde el botón universal
+    await cameraBtn.click({ force: true });
+    const cameraModal = page.getByRole('dialog', { name: /Tomar foto/i });
+    await expect(cameraModal).toBeVisible();
+    await expect(cameraModal.getByText(/Apunta y dispara|Acceso a cámara|Revisa la foto/i)).toBeVisible();
+
+    // Cerrar modal de cámara
+    const closeCameraBtn = cameraModal.getByRole('button', { name: /Cerrar cámara|Cancelar|Cerrar/i }).first();
+    await closeCameraBtn.click({ force: true });
+    await expect(cameraModal).not.toBeVisible();
+
+    // 3. Probar subida de foto tradicional en el slot del lote
+    const lotFileInput = lotRegion.locator('input[type="file"]');
+    const tinyPng = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==', 'base64');
+    await lotFileInput.setInputFiles({
+      name: 'lote-prueba.png',
+      mimeType: 'image/png',
+      buffer: tinyPng,
+    });
+    await expect(lotRegion.getByText('Lote cargado')).toBeVisible();
+
+    // En estado cargado, deben estar disponibles las acciones para cambiar la foto (Subir, Pegar, Cámara)
+    await expect(lotRegion.getByText('Cambiar foto:')).toBeVisible();
+    await expect(lotRegion.getByRole('button', { name: /Pegar/i })).toBeVisible();
+    await expect(lotRegion.getByRole('button', { name: /Cámara/i })).toBeVisible();
+
+    // 4. Verificar acciones universales en Referentes Visuales dentro de Fase 2
+    const refRegion = page.locator('div[role="region"][aria-labelledby="uploader-title"]');
+    await expect(refRegion).toBeVisible();
+    await expect(refRegion.getByRole('button', { name: 'Subir', exact: true })).toBeVisible();
+    await expect(refRegion.getByRole('button', { name: /Pegar/i })).toBeVisible();
+    await expect(refRegion.getByRole('button', { name: /Cámara/i })).toBeVisible();
+
+    // 5. Verificar responsive sin scroll horizontal a 375px
+    await page.setViewportSize({ width: 375, height: 812 });
+    const hasHorizontalOverflow = await page.evaluate(() => document.documentElement.scrollWidth > window.innerWidth);
+    expect(hasHorizontalOverflow, 'No debe existir scroll horizontal a 375px').toBe(false);
+  });
 });
 
