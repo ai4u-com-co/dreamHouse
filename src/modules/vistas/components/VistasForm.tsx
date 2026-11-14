@@ -1,5 +1,6 @@
 import React from 'react';
-import { DreamHouseParams } from '@/types';
+import { DreamHouseParams, CustomDetailSlot } from '@/types';
+import CustomSlotsManager from '@/components/CustomSlotsManager';
 import * as VC from '../constants';
 import clsx from 'clsx';
 import { Check, LayoutGrid, ImageIcon } from 'lucide-react';
@@ -15,6 +16,8 @@ interface VistasFormProps {
   activeSection?: string | null;
   openSections?: Set<string>;
   onSectionChange: (id: string) => void;
+  customSlots?: CustomDetailSlot[];
+  onCustomSlotsChange?: (slots: CustomDetailSlot[]) => void;
 }
 
 function SectionDescription({ children }: { children: React.ReactNode }) {
@@ -25,7 +28,7 @@ function SectionDescription({ children }: { children: React.ReactNode }) {
   );
 }
 
-export default function VistasForm({ params, onChange, disabled, activeSection, openSections, onSectionChange }: VistasFormProps) {
+export default function VistasForm({ params, onChange, disabled, activeSection, openSections, onSectionChange, customSlots, onCustomSlotsChange }: VistasFormProps) {
   const isSectionOpen = (id: string) => openSections ? openSections.has(id) : activeSection === id;
   const handleChange = <K extends keyof DreamHouseParams>(key: K, value: DreamHouseParams[K]) => {
     onChange({ ...params, [key]: value });
@@ -99,6 +102,12 @@ export default function VistasForm({ params, onChange, disabled, activeSection, 
             </button>
           )}
         </div>
+          {onCustomSlotsChange && (
+            <div className="mt-8">
+              <h4 className="text-xs font-mono font-bold text-primary uppercase tracking-widest border-b border-border/40 pb-2 mb-4">Detalles Específicos para las Vistas (Opcional)</h4>
+              <CustomSlotsManager mode="vistas" slots={customSlots ?? []} onSlotsChange={onCustomSlotsChange} disabled={disabled} />
+            </div>
+          )}
       </Section>
 
       {/* ── 02 PROCESO ─────────────────────────────────────────── */}

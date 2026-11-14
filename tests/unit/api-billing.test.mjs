@@ -466,3 +466,26 @@ test('liquidación: los admin no pagan, así que no hay cobro extra aunque el us
   assert.equal(called('/rpc/consume_credits').length, 1);
   assert.equal((await r.json()).remaining, 0);
 });
+
+test('generate: los slots de detalle con nombre libre valen en TODOS los módulos (se envían, se cobran y el cliente los espeja)', async () => {
+  const img = (n) => sharp({ create: { width: 640, height: 640, channels: 3, background: '#888' } }).jpeg().toBuffer().then((b) => new File([b], `${n}.jpg`, { type: 'image/jpeg' }));
+  const [lot, plan, s1, s2] = await Promise.all(['lot', 'plan', 's1', 's2'].map(img));
+  const labels = ['Manija de bronce martillado', 'Celosía de guadua'];
+  for (const mode of ['vistas', 'planta', 'edit', 'exterior', 'interior']) {
+    reset();
+    const form = new FormData();
+    form.append('params', JSON.stringify({ ...DEFAULT_PARAMS, mode, selectedVistas: ['x'], editPrompt: 'cambiar la manija', renderAspectRatio: '1:1', customSlotLabels: labels }));
+    if (mode === 'edit') form.append('editCompositeFile', lot); else form.append('lotImage', lot);
+    if (mode === 'planta') form.append('floorPlanImage', plan);
+    form.append('customSlotFiles', s1); form.append('customSlotLabels', labels[0]);
+    form.append('customSlotFiles', s2); form.append('customSlotLabels', labels[1]);
+    const res = await generate.POST(new NextRequest('http://localhost/api/generate', { method: 'POST', headers: { authorization: 'Bearer jwt-ok' }, body: form }));
+    assert.equal(res.status, 200, mode);
+    const n = pickOpenAIInputs(mode, { lot, editImage: lot, floorPlan: mode === 'planta' ? plan : null, references: [], objects: [], customSlots: [s1, s2] }).length;
+    assert.equal(rpcBody('consume_credits').p_meta.inputs, n, `${mode}: el cliente y el servidor cuentan las mismas imágenes`);
+    assert.ok(n >= 3, `${mode}: base + 2 slots`);
+    const sent = called('api.openai.com/v1/images/edits')[0].init.body;
+    const prompt = String(sent.get('prompt'));
+    for (const l of labels) assert.ok(prompt.includes(`"${l}"`), `${mode}: el nombre libre «${l}» llega al modelo con su imagen`);
+  }
+});
