@@ -2,7 +2,8 @@
 
 import React from 'react';
 import clsx from 'clsx';
-import { DreamHouseParams } from '@/types';
+import { DreamHouseParams, CustomDetailSlot } from '@/types';
+import CustomSlotsManager from '@/components/CustomSlotsManager';
 import * as PC from '../constants';
 import * as EC from '../../exterior/constants';
 import * as IC from '../../interior/constants';
@@ -30,6 +31,8 @@ interface PlantaFormProps {
   onLotFileChange: (file: File | null) => void;
   lotZonePolygons?: Pt[][];
   onLotZoneChange?: (polygons: Pt[][], compositeFile: File | null) => void;
+  customSlots?: CustomDetailSlot[];
+  onCustomSlotsChange?: (slots: CustomDetailSlot[]) => void;
 }
 
 function SectionDescription({ children }: { children: React.ReactNode }) {
@@ -61,6 +64,8 @@ export default function PlantaForm({
   onLotFileChange,
   lotZonePolygons,
   onLotZoneChange,
+  customSlots,
+  onCustomSlotsChange,
 }: PlantaFormProps) {
   const isSectionOpen = (id: string) => openSections ? openSections.has(id) : activeSection === id;
 
@@ -447,6 +452,12 @@ export default function PlantaForm({
             </div>
           </div>
         </div>
+          {onCustomSlotsChange && (
+            <div className="mt-8">
+              <h4 className="text-xs font-mono font-bold text-primary uppercase tracking-widest border-b border-border/40 pb-2 mb-4">Referencias de Estilo y Simbología de la Lámina (Opcional)</h4>
+              <CustomSlotsManager mode="planta" slots={customSlots ?? []} onSlotsChange={onCustomSlotsChange} disabled={disabled} />
+            </div>
+          )}
       </Section>
 
       {/* ── FASE 4: FORMATO Y METADATOS DE SALIDA ─────────────────────── */}

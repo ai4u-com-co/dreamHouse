@@ -267,7 +267,7 @@ function StudioContent() {
       list.push({
         label: 'DETALLE',
         name: `${s.label || 'Detalle'}: ${s.file?.name}`,
-        used: m === 'exterior' || m === 'interior',
+        used: true,
       });
     });
     if (m === 'edit' && editMask) list.push({ label: 'MÁSCARA', name: 'zona pintada', used: true });
@@ -418,9 +418,17 @@ function StudioContent() {
             if (lotFile) formData.append('lotImage', lotFile);
             if (exteriorReferenceFile) formData.append('exteriorReferenceImage', exteriorReferenceFile);
             if (floorPlanFile) formData.append('floorPlanImage', floorPlanFile);
+            // Detalles específicos (puertas, ventanas, acabados…): se envían en cada vista, con su nombre
+            const vistaSlots = customDetailSlots.filter((s) => s.file !== null);
+            vistaSlots.forEach((s) => {
+              if (s.file) {
+                formData.append('customSlotFiles', s.file);
+                formData.append('customSlotLabels', s.label || 'architectural detail');
+              }
+            });
             
             // Add viewType to params for the API
-            const currentParams = { ...params, viewType, hasExteriorReference: !!exteriorReferenceFile };
+            const currentParams = { ...params, viewType, hasExteriorReference: !!exteriorReferenceFile, customSlotLabels: vistaSlots.map((s) => s.label || 'architectural detail') };
             formData.append('params', JSON.stringify(currentParams));
 
             // Con la sesión de Google (el servidor cobra los créditos); `ownerId` = la cuenta que pidió esta vista
@@ -504,14 +512,12 @@ function StudioContent() {
         }
 
         const slotsWithFile = customDetailSlots.filter(s => s.file !== null);
-        if (params.mode === 'exterior' || params.mode === 'interior') {
-          slotsWithFile.forEach((s) => {
-            if (s.file) {
-              formData.append('customSlotFiles', s.file);
-              formData.append('customSlotLabels', s.label || 'architectural detail');
-            }
-          });
-        }
+        slotsWithFile.forEach((s) => {
+          if (s.file) {
+            formData.append('customSlotFiles', s.file);
+            formData.append('customSlotLabels', s.label || 'architectural detail');
+          }
+        });
         
         const finalParams = {
           ...params,
@@ -845,6 +851,8 @@ function StudioContent() {
               onLotFileChange={handleLotFileChange}
               lotZonePolygons={lotZonePolygons}
               onLotZoneChange={handleLotZoneChange}
+              customSlots={customDetailSlots}
+              onCustomSlotsChange={setCustomDetailSlots}
             />
           ) : params.mode === 'exterior' ? (
             <ExteriorForm
@@ -891,6 +899,8 @@ function StudioContent() {
               onBaseOriginalSelected={(original) => void applySourceRender(original)}
               onCompositeImageUpdate={setEditCompositeFile}
               onMaskUpdate={setEditMask}
+              customSlots={customDetailSlots}
+              onCustomSlotsChange={setCustomDetailSlots}
             />
           ) : (
             <VistasForm
@@ -900,6 +910,8 @@ function StudioContent() {
               activeSection={activeSection}
               openSections={openSections}
               onSectionChange={toggleSection}
+              customSlots={customDetailSlots}
+              onCustomSlotsChange={setCustomDetailSlots}
             />
           )}
 

@@ -1,5 +1,6 @@
 import React from 'react';
-import { DreamHouseParams } from '@/types';
+import { DreamHouseParams, CustomDetailSlot } from '@/types';
+import CustomSlotsManager from '@/components/CustomSlotsManager';
 import { OutputOptions, CreativeFields } from '@/components/FormExtras';
 import * as SC from '../../shared/constants';
 import * as EC from '../../exterior/constants';
@@ -26,6 +27,8 @@ interface EditFormProps {
   onBaseOriginalSelected?: (file: File) => void;
   onCompositeImageUpdate: (file: File | null) => void;
   onMaskUpdate: (payload: EditMaskPayload | null) => void;
+  customSlots?: CustomDetailSlot[];
+  onCustomSlotsChange?: (slots: CustomDetailSlot[]) => void;
 }
 
 /** En edición el espacio puede ser un interior o una fachada: ambos catálogos de materiales */
@@ -50,7 +53,9 @@ export default function EditForm({
   onBaseImageUpdate,
   onBaseOriginalSelected,
   onCompositeImageUpdate,
-  onMaskUpdate
+  onMaskUpdate,
+  customSlots,
+  onCustomSlotsChange
 }: EditFormProps) {
   const isSectionOpen = (id: string) => openSections ? openSections.has(id) : activeSection === id;
   const handleChange = <K extends keyof DreamHouseParams>(key: K, value: DreamHouseParams[K]) => {
@@ -172,6 +177,12 @@ export default function EditForm({
           <ChipsField params={params} onChange={handleChange} disabled={disabled} label="Colores Dominantes" field="colorPalette" options={SC.COLORS} helpText="Gama cromática del cambio." />
           <Select label="Nivel de Acabado" value={params.finishLevel} onChange={(e) => handleChange("finishLevel", e.target.value)} options={EC.FINISH_LEVELS} disabled={disabled} />
         </div>
+          {onCustomSlotsChange && (
+            <div className="mt-8">
+              <h4 className="text-xs font-mono font-bold text-primary uppercase tracking-widest border-b border-border/40 pb-2 mb-4">Referencias de Detalle para el Cambio (Opcional)</h4>
+              <CustomSlotsManager mode="edit" slots={customSlots ?? []} onSlotsChange={onCustomSlotsChange} disabled={disabled} />
+            </div>
+          )}
       </Section>
 
       {/* ── 05 PROCESO ─────────────────────────────────────────── */}

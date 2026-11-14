@@ -326,17 +326,41 @@ export async function POST(req: NextRequest) {
     // La primera imagen es la base de la edición; cada una se describe por número en el prompt
     // (la API no recibe etiquetas como Gemini, así que el rol va dentro del texto).
     const openaiInputs: Array<{ file: File; role: string }> = [];
+    // Slots de detalle (puertas, ventanas, acabados, piezas, símbolos…): valen en TODOS los módulos. El nombre es libre (lo escribe la
+    // persona): va entre comillas como dato, y el rol dice cómo usar la imagen según el módulo.
+    const customSlotRole = (label: string): string => {
+      switch (params.mode) {
+        case 'exterior':
+          return `a specific exterior architectural detail reference for "${label}": faithfully incorporate this exact design, style, material, pattern, profile and detailing into the ${label} on the exterior facade/structure`;
+        case 'interior':
+          return `a specific interior design detail reference for "${label}": faithfully incorporate this exact style, design, material, texture and detailing into the ${label} in the interior space`;
+        case 'vistas':
+          return `a specific architectural detail reference for "${label}": wherever the ${label} of the house is visible in this view, render it with this exact design, material and detailing; the rest of the house stays identical to Image 1`;
+        case 'edit':
+          return `a detail reference for "${label}": if the edit instruction involves the ${label}, use this exact design, material and detailing for it; otherwise ignore this image. Nothing outside the edited area changes`;
+        default:
+          return `a reference for "${label}" in the floor plan drawing: follow its graphic style, symbols or layout logic for the ${label}; do not paste it as a photo and do not copy raw text or dimensions from it`;
+      }
+    };
+    const pushCustomSlots = () => {
+      const room = Math.max(0, OPENAI_MAX_INPUT_IMAGES - openaiInputs.length - objectImages.length);
+      customSlotFiles.slice(0, room).forEach((file, i) => {
+        openaiInputs.push({ file, role: customSlotRole(customSlotLabels[i] || 'architectural detail') });
+      });
+    };
     if (useOpenAI) {
       if (params.mode === 'edit' && editBaseFile && editMaskFile) {
         openaiInputs.push({
           file: editBaseFile,
           role: "the original image to edit; the transparent area of the mask is approximately where the change belongs, and it must blend with the architecture around it",
         });
+        pushCustomSlots();
       } else if (params.mode === 'edit' && editCompositeFile) {
         openaiInputs.push({
           file: editCompositeFile,
           role: "the original image with the user's sketch and notes drawn on top; the drawings are edit instructions, not content to keep",
         });
+        pushCustomSlots();
       } else {
         const lotRole = params.mode === 'vistas'
           ? "the house to photograph (reference): the SAME house must appear, identical in form, materials and design; only the camera changes"
@@ -366,20 +390,8 @@ export async function POST(req: NextRequest) {
         if ((params.mode === 'exterior' || params.mode === 'planta') && lotImage) {
           openaiInputs.push({ file: lotImage, role: lotRole });
         }
-        // Slots de detalles personalizados (puertas, ventanas, acabados, mobiliario o detalles arquitectónicos específicos)
-        const isExteriorOrInterior = params.mode === 'exterior' || params.mode === 'interior';
-        const customSlotsToInclude = isExteriorOrInterior
-          ? customSlotFiles.slice(0, Math.max(0, OPENAI_MAX_INPUT_IMAGES - openaiInputs.length - objectImages.length))
-          : [];
-
-        for (let i = 0; i < customSlotsToInclude.length; i++) {
-          const file = customSlotsToInclude[i];
-          const label = customSlotLabels[i] || 'architectural detail';
-          const role = params.mode === 'exterior'
-            ? `a specific exterior architectural detail reference for "${label}": faithfully incorporate this exact design, style, material, pattern, profile and detailing into the ${label} on the exterior facade/structure`
-            : `a specific interior design detail reference for "${label}": faithfully incorporate this exact style, design, material, texture and detailing into the ${label} in the interior space`;
-          openaiInputs.push({ file, role });
-        }
+        // Slots de detalles personalizados (todos los módulos; en exterior/interior van antes de referencias y piezas)
+        pushCustomSlots();
 
         // Interior puede sumar objetos (hasta 13) + espacio + plano + referencias: las referencias de estilo
         // ceden el sitio antes que las piezas y detalles, que "deben aparecer" en el resultado.
@@ -498,6 +510,12 @@ export async function POST(req: NextRequest) {
 - The user's sketch/notes drawn on the image are instructions/guides for what to change and where.
 - Seamlessly integrate the changes, matching the original lighting, style, and perspective.`;
       }
+    }
+
+    // Vistas, planta y edición: una línea de mandato para los detalles (exterior e interior ya la llevan en su propio mandato)
+    if (useOpenAI && customSlotFiles.length > 0 && (params.mode === 'vistas' || params.mode === 'planta' || params.mode === 'edit')) {
+      const names = customSlotLabels.filter(Boolean).slice(0, customSlotFiles.length).map((l) => `"${l}"`).join(', ');
+      mandate += `\n- Detail references are provided${names ? ` for: ${names}` : ''}; each INPUT IMAGE above says exactly where and how to use it. Apply them only to those elements.`;
     }
 
     let fullPrompt = "";

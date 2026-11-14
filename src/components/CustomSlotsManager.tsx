@@ -13,7 +13,7 @@ import SlotInputActions from './SlotInputActions';
 import { extractImageFilesFromClipboardEvent } from '@/lib/clipboard';
 
 interface CustomSlotsManagerProps {
-  mode: 'exterior' | 'interior';
+  mode: 'exterior' | 'interior' | 'vistas' | 'edit' | 'planta';
   slots: CustomDetailSlot[];
   onSlotsChange: (slots: CustomDetailSlot[]) => void;
   disabled?: boolean;
@@ -40,6 +40,12 @@ const INTERIOR_SUGGESTIONS = [
   'Escalera',
   'Mesa / Sillas',
 ];
+
+// Vistas muestra la casa por fuera y por dentro; Edit puede ser cualquier zona; Planta es un dibujo: sugerencias de su propio mundo.
+const VISTAS_SUGGESTIONS = ['Puerta principal', 'Ventanales', 'Fachada / Revestimiento', 'Cubierta / Alero', 'Iluminación exterior', 'Pérgola / Celosía', 'Balcón / Baranda', 'Portón / Acceso'];
+const EDIT_SUGGESTIONS = ['Material / Acabado', 'Pieza o mueble a poner', 'Lámpara / Iluminación', 'Puerta o ventana', 'Revestimiento de muro', 'Piso / Pavimento', 'Grifería', 'Textura de referencia'];
+const PLANTA_SUGGESTIONS = ['Estilo de dibujo', 'Simbología de puertas y ventanas', 'Mobiliario en planta', 'Escalera', 'Textura de pisos', 'Cuadro de áreas', 'Paleta de la lámina', 'Cota y rotulado'];
+const SUGGESTIONS_BY_MODE = { exterior: EXTERIOR_SUGGESTIONS, interior: INTERIOR_SUGGESTIONS, vistas: VISTAS_SUGGESTIONS, edit: EDIT_SUGGESTIONS, planta: PLANTA_SUGGESTIONS } as const;
 
 const MAX_CUSTOM_SLOTS = 10;
 
@@ -276,7 +282,7 @@ export default function CustomSlotsManager({
   disabled,
 }: CustomSlotsManagerProps) {
   const [customInputText, setCustomInputText] = useState('');
-  const suggestions = mode === 'exterior' ? EXTERIOR_SUGGESTIONS : INTERIOR_SUGGESTIONS;
+  const suggestions = SUGGESTIONS_BY_MODE[mode];
 
   const handleAddSlot = useCallback((label: string) => {
     if (slots.length >= MAX_CUSTOM_SLOTS) return;

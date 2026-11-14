@@ -92,12 +92,14 @@ export function pickOpenAIInputs<T>(
     customSlots?: T[];
   },
 ): T[] {
-  if (mode === 'edit') return c.editImage ? [c.editImage] : [];
-  if (mode === 'vistas') return c.lot ? [c.lot] : [];
-  if (mode === 'planta') return [c.floorPlan, c.lot].filter((x): x is T => !!x);
+  // Los slots de detalle valen en TODOS los módulos: van después de la(s) imagen(es) base (en edición la base es la primera: la máscara aplica a ella)
+  const withCustom = (base: T[]): T[] => [...base, ...(c.customSlots ?? []).slice(0, Math.max(0, OPENAI_MAX_INPUT_IMAGES - base.length))];
+  if (mode === 'edit') return withCustom(c.editImage ? [c.editImage] : []);
+  if (mode === 'vistas') return withCustom(c.lot ? [c.lot] : []);
+  if (mode === 'planta') return withCustom([c.floorPlan, c.lot].filter((x): x is T => !!x));
   const objects = mode === 'interior' ? c.objects.slice(0, 13) : [];
   const base = [mode === 'exterior' ? c.exteriorRef : null, c.floorPlan, c.lot].filter((x): x is T => !!x);
-  const custom = (mode === 'exterior' || mode === 'interior') ? (c.customSlots ?? []) : [];
+  const custom = c.customSlots ?? [];
   const roomAfterBaseAndObjects = Math.max(0, OPENAI_MAX_INPUT_IMAGES - base.length - objects.length);
   const customToInclude = custom.slice(0, roomAfterBaseAndObjects);
   const roomForRefs = Math.max(0, roomAfterBaseAndObjects - customToInclude.length);
