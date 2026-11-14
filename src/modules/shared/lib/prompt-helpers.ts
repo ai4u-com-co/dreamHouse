@@ -68,6 +68,38 @@ export function cameraSentence(params: DreamHouseParams): string {
   return parts.length ? `${parts.join(', ')}` : '';
 }
 
+// ---------- preset «Fotografía de revista» ----------
+
+/**
+ * Instrucciones de fotógrafo de arquitectura para una revista (verticales paralelas, perspectiva, exposición equilibrada, puesta en escena).
+ * Solo si la persona encendió el preset Y el estilo es fotográfico: un boceto o una ilustración no se «fotografían». La dirección
+ * creativa manda por encima. Probado con la API real (14-nov-2026): con este bloque + cámara tilt-shift + hora azul, el render sale
+ * con composición y luz editoriales; sin él, la misma casa sale correcta pero genérica.
+ */
+export function magazinePhotoBlock(params: DreamHouseParams, scene: 'exterior' | 'interior' | 'vistas', photographic: boolean): string {
+  if (!params.magazinePhoto || !photographic) return '';
+  const people = present(params.humanContext) ? '' : ', no people';
+  const common = 'Shot as a professional architectural photographer would for a magazine feature: tripod, tilt-shift correction so every vertical line stays perfectly parallel (no converging verticals), level horizon';
+  const lines = scene === 'exterior'
+    ? [
+        `${common}, two-point perspective, the building filling about two thirds of the frame with a deliberate foreground (path, water or planting) leading the eye in.`,
+        'Exposure balanced like a bracketed blend: if the scene is at dusk or night, warm interior lights glow through the glazing against the cooler sky; soft light on the facade, no blown highlights, clean natural color grading, no HDR halos.',
+        `Believable staging: lived-in but tidy, planting with natural irregularity, ground surfaces with subtle reflections consistent with the weather${people}, no cars.`,
+      ]
+    : scene === 'interior'
+      ? [
+          `${common}, camera at about 1.2 m height, one-point or two-point perspective that shows the depth of the room.`,
+          'Window light balanced against the interior exposure: the view outside stays visible, no blown-out windows, soft gradients on walls and ceiling, clean natural color grading, no HDR halos.',
+          `Deliberate styling: tidy but lived-in, a few real objects arranged with intent, surfaces with soft natural reflections${people}.`,
+        ]
+      : [
+          `${common}, composed with intent for this view and with the same lens look in every view of the set.`,
+          'Exposure balanced like a bracketed blend, soft light on the facade, no blown highlights, clean natural color grading, no HDR halos. Keep the lighting of the reference unless the brief says otherwise.',
+          `Believable staging around the house: planting with natural irregularity, ground surfaces with subtle reflections consistent with the weather${people}, no cars.`,
+        ];
+  return `ARCHITECTURAL MAGAZINE PHOTOGRAPHY (editorial standard${creativeDirectionText(params) ? '; the CREATIVE DIRECTION wins any conflict' : ''}):\n${lines.map((l) => `- ${l}`).join('\n')}`;
+}
+
 // ---------- detalles que antes se perdían ----------
 
 /** "3 bedrooms, 2 bathrooms": el programa de la vivienda, válido como contexto en exterior e interior */

@@ -355,5 +355,26 @@ test.describe('DreamHouse Studio E2E MVP', () => {
     const hasHorizontalOverflow = await page.evaluate(() => document.documentElement.scrollWidth > window.innerWidth);
     expect(hasHorizontalOverflow, 'No debe existir scroll horizontal a 375px').toBe(false);
   });
+
+  test('Fotografía de revista: el interruptor ajusta la cámara, se puede apagar y no rompe el móvil', async ({ page }) => {
+    await page.setViewportSize({ width: 375, height: 812 });
+    await page.getByRole('button', { name: /Fase 5: Captura y Render/i }).click({ force: true });
+    const toggle = page.getByTestId('magazine-preset');
+    await expect(toggle).toBeVisible();
+    await expect(toggle).not.toBeChecked(); // apagado por defecto
+
+    const focal = page.getByLabel('Distancia Focal');
+    const before = await focal.inputValue();
+    await toggle.check({ force: true });
+    await expect(focal).toHaveValue('24mm Tilt-Shift');
+    await expect(page.getByLabel('Apertura')).toHaveValue('f/8');
+
+    await toggle.uncheck({ force: true });
+    await expect(focal).toHaveValue(before); // vuelve a lo de fábrica
+    await expect(toggle).not.toBeChecked();
+
+    const overflow = await page.evaluate(() => document.documentElement.scrollWidth > window.innerWidth);
+    expect(overflow, 'No debe existir scroll horizontal a 375px').toBe(false);
+  });
 });
 

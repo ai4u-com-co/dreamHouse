@@ -6,7 +6,7 @@ import clsx from 'clsx';
 import { Check, LayoutGrid, ImageIcon } from 'lucide-react';
 import { Section } from '@/components/ui/Section';
 import { Select } from '@/components/ui/Select';
-import { OutputOptions, AmbienceSelects, CreativeFields } from '@/components/FormExtras';
+import { OutputOptions, AmbienceSelects, CreativeFields, MagazinePresetToggle } from '@/components/FormExtras';
 import * as SC from '../../shared/constants';
 
 interface VistasFormProps {
@@ -112,7 +112,8 @@ export default function VistasForm({ params, onChange, disabled, activeSection, 
 
       {/* ── 02 PROCESO ─────────────────────────────────────────── */}
       <Section title="Configuración de Salida" number="06" icon={<ImageIcon className="w-5 h-5" />} isOpen={isSectionOpen('output')} onToggle={() => onSectionChange('output')}>
-        <div className="mb-8">
+        <div className="mb-8 space-y-5">
+          <MagazinePresetToggle params={params} onPatch={(patch) => onChange({ ...params, ...patch })} disabled={disabled} scene="vistas" />
           <AmbienceSelects
             params={params}
             onChange={handleChange}

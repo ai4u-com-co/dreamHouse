@@ -6,6 +6,7 @@ import { sanitizeSourceParams } from '@/lib/assistant-params';
 import {
   cameraSentence,
   creativeDirectionBlock,
+  magazinePhotoBlock,
   creativeDirectionLead,
   joinList,
   present,
@@ -148,7 +149,7 @@ ${camera ? `- Camera Setting: ${camera}\n` : ""}- Lighting: ${lightingCtx}
 - Mood/Atmosphere: ${moodLine}
 - Materials: ${materialList}, with honest texture, grain and natural color variation.
 - Look: ${style.photographic ? "Photorealistic. Real textures, pores, material thickness, glass reflections, and soft shadows. No digital smoothness." : style.look}
-${creativeDirectionBlock(params, true) ? `\n${creativeDirectionBlock(params, true)}\n` : ""}`.trim();
+${magazinePhotoBlock(params, 'vistas', style.photographic) ? `\n${magazinePhotoBlock(params, 'vistas', style.photographic)}\n` : ""}${creativeDirectionBlock(params, true) ? `\n${creativeDirectionBlock(params, true)}\n` : ""}`.trim();
     return prompt;
   }
 

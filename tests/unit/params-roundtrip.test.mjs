@@ -25,7 +25,7 @@ const FULL = {
   cameraAngle: SC.ANGLES[1], composition: SC.COMPOSITIONS[1], timeOfDay: SC.TIMES_OF_DAY[1], season: SC.SEASONS[1],
   lighting: SC.LIGHTING_TYPES[1], humanContext: SC.HUMAN_CONTEXT[1],
   cameraPreset: 'Canon EOS R5 II', focalLength: SC.FOCAL_LENGTHS[2], aperture: SC.APERTURES[2], filmSimulation: SC.UNIVERSAL_FILM_LOOKS[2],
-  depthOfField: SC.DEPTH_OF_FIELD_OPTIONS[1], renderStyle: SC.RENDER_STYLES[3],
+  depthOfField: SC.DEPTH_OF_FIELD_OPTIONS[1], renderStyle: SC.RENDER_STYLES[3], magazinePhoto: true,
   renderAspectRatio: '3:2', renderOutputResolution: '2K', renderQuality: 'Alta', aiModel: SC.AI_MODELS[1],
   projectType: EC.PROJECT_TYPES[3], city: 'Medellín', climate: EC.CLIMATES[1], environment: EC.ENVIRONMENTS[1],
   waterBody: EC.WATER_BODIES[1], weatherCondition: EC.WEATHER_CONDITIONS[1], size: '250', levels: 3,

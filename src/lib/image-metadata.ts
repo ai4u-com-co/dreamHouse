@@ -45,7 +45,7 @@ export interface DreamHouseImageMetadata {
 export const DESIGN_PARAM_KEYS = [
   'architecturalStyles', 'architect', 'mood', 'materials', 'finishLevel', 'colorPalette',
   'cameraAngle', 'composition', 'timeOfDay', 'season', 'lighting', 'humanContext',
-  'cameraPreset', 'focalLength', 'aperture', 'filmSimulation', 'depthOfField',
+  'cameraPreset', 'focalLength', 'aperture', 'filmSimulation', 'depthOfField', 'magazinePhoto',
   'renderStyle', 'renderAspectRatio', 'renderOutputResolution', 'renderQuality', 'aiModel',
   'projectType', 'climate', 'environment', 'waterBody', 'weatherCondition', 'size', 'levels',
   'roofType', 'layoutType', 'parkingSpots', 'parkingType', 'socialAreas', 'exteriorElements',

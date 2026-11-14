@@ -1,3 +1,5 @@
+import { DEFAULT_PARAMS, type DreamHouseParams } from "@/types";
+
 // ============================================
 // DREAMHOUSE PRO - SHARED CONSTANTS
 // ============================================
@@ -320,6 +322,36 @@ export const APERTURES = [
   "f/5.6",
   "f/8"
 ];
+
+// ── Preset «Fotografía de revista» ──────────────────────────────────────────────────────────
+// Lo que fija el preset al encenderse (por escena). Al apagarse solo se revierte lo que SIGUE valiendo lo que puso el preset:
+// si la persona lo cambió a mano después, se respeta. Vistas no toca hora ni luz (las vistas siguen la luz de la casa original).
+export type MagazineScene = 'exterior' | 'interior' | 'vistas';
+const MAGAZINE_CAMERA = {
+  cameraPreset: "Canon EOS R5 II",
+  focalLength: "24mm Tilt-Shift",
+  aperture: "f/8",
+  filmSimulation: "Neutral / Natural",
+  depthOfField: "Total (f/8–f/11, todo nítido)",
+} as const;
+export const MAGAZINE_PRESET: Record<MagazineScene, Partial<Record<keyof DreamHouseParams, string>>> = {
+  exterior: { ...MAGAZINE_CAMERA, timeOfDay: "Anochecer (Blue Hour)", lighting: "Blue hour fría" },
+  interior: { ...MAGAZINE_CAMERA },
+  vistas: { ...MAGAZINE_CAMERA },
+};
+/** Parámetros al ENCENDER el preset */
+export function applyMagazinePreset(scene: MagazineScene): Partial<DreamHouseParams> {
+  return { ...MAGAZINE_PRESET[scene], magazinePhoto: true } as Partial<DreamHouseParams>;
+}
+/** Parámetros al APAGAR el preset: vuelven al valor de fábrica solo los campos que siguen como los dejó el preset */
+export function revertMagazinePreset(scene: MagazineScene, params: DreamHouseParams): Partial<DreamHouseParams> {
+  const patch: Record<string, unknown> = { magazinePhoto: false };
+  for (const [key, value] of Object.entries(MAGAZINE_PRESET[scene])) {
+    const k = key as keyof DreamHouseParams;
+    if (params[k] === value) patch[key] = DEFAULT_PARAMS[k];
+  }
+  return patch as Partial<DreamHouseParams>;
+}
 
 export const FUJIFILM_FILM_SIMULATIONS = [
   "Acros (B&W High Contrast)",

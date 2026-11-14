@@ -4,6 +4,7 @@ import {
   bulletSection,
   cameraSentence,
   creativeDirectionBlock,
+  magazinePhotoBlock,
   creativeDirectionLead,
   exteriorDetailLines,
   joinList,
@@ -180,7 +181,7 @@ CONSTRAINTS & QUALITY:
 - Look: ${style.look}
 - Composition: The building is the SOLE PROTAGONIST. Neutral background (open sky, landscape, or vegetation).
 - Exclude: No neighboring buildings, no adjacent houses, no other structures, no party walls, no visible neighbors in the background${creativeDirectionBlock(params) ? ' (unless the CREATIVE DIRECTION asks otherwise)' : ''}. No watermarks, no logos.
-${creativeDirectionBlock(params) ? `\n${creativeDirectionBlock(params)}\n` : ""}`.trim();
+${magazinePhotoBlock(params, 'exterior', style.photographic) ? `\n${magazinePhotoBlock(params, 'exterior', style.photographic)}\n` : ""}${creativeDirectionBlock(params) ? `\n${creativeDirectionBlock(params)}\n` : ""}`.trim();
     return prompt;
   }
 

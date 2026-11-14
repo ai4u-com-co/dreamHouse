@@ -8,7 +8,7 @@ import { Sparkles, Armchair, LayoutGrid, Layers, Palette, Camera, ImageIcon, Pen
 import { Section } from '@/components/ui/Section';
 import { Select } from '@/components/ui/Select';
 import { ChipsField, EssenceFields, SiteFields, HomeProgramFields } from '@/components/FormFields';
-import { AmbienceSelects, CameraFields, CreativeFields } from '@/components/FormExtras';
+import { AmbienceSelects, CameraFields, CreativeFields, MagazinePresetToggle } from '@/components/FormExtras';
 import ObjectUploader from '@/components/ObjectUploader';
 import { DebouncedInput } from '@/components/ui/DebouncedInput';
 import CustomSlotsManager from '@/components/CustomSlotsManager';
@@ -274,7 +274,10 @@ export default function InteriorForm({
         onToggle={() => onSectionChange('photography')}
         summary={cameraSummary}
       >
-        <CameraFields params={params} onChange={handleChange} disabled={disabled} scene="interior" />
+        <div className="space-y-5">
+          <MagazinePresetToggle params={params} onPatch={(patch) => onChange({ ...params, ...patch })} disabled={disabled} scene="interior" />
+          <CameraFields params={params} onChange={handleChange} disabled={disabled} scene="interior" />
+        </div>
       </Section>
 
       {/* ── 08 SALIDA ──────────────────────────────────────────── */}
