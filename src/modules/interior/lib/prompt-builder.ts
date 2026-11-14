@@ -6,6 +6,7 @@ import {
   cameraSentence,
   creativeDirectionBlock,
   magazinePhotoBlock,
+  interiorPhotoBlock,
   creativeDirectionLead,
   interiorDetailLines,
   joinList,
@@ -123,7 +124,7 @@ ${camera ? `- Camera Config: ${camera}\n` : ""}${style.photographic ? `- Depth o
 CONSTRAINTS & QUALITY:
 - Look: ${style.photographic ? `${style.look} High tactile presence and physical weight.` : style.look}
 - Exclude: ${style.photographic ? "No digital/CGI smoothness, no plastic surfaces, no over-sharpened edges. " : ""}No watermarks, no logos.
-${magazinePhotoBlock(params, 'interior', style.photographic) ? `\n${magazinePhotoBlock(params, 'interior', style.photographic)}\n` : ""}${creativeDirectionBlock(params) ? `\n${creativeDirectionBlock(params)}\n` : ""}`.trim();
+${interiorPhotoBlock(params, style.photographic) ? `\n${interiorPhotoBlock(params, style.photographic)}\n` : ""}${magazinePhotoBlock(params, 'interior', style.photographic) ? `\n${magazinePhotoBlock(params, 'interior', style.photographic)}\n` : ""}${creativeDirectionBlock(params) ? `\n${creativeDirectionBlock(params)}\n` : ""}`.trim();
     return prompt;
   }
 

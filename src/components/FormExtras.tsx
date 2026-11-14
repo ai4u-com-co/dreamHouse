@@ -110,6 +110,31 @@ export function MagazinePresetToggle({ params, onPatch, disabled, scene }: { par
 }
 
 /**
+ * Preset «Fotografía de interiorismo» (solo Interior): cámara de arquitecto + esquina con capas de profundidad + luz de ventana suave, y en el
+ * prompt el estilismo de un fotógrafo de decoración. Excluyente con «Fotografía de revista». Apagado devuelve a fábrica solo lo del preset.
+ */
+export function InteriorPhotoPresetToggle({ params, onPatch, disabled }: { params: DreamHouseParams; onPatch: (patch: Partial<DreamHouseParams>) => void; disabled?: boolean }) {
+  return (
+    <label className="flex items-start gap-3 min-h-[44px] p-4 cursor-pointer text-sm border border-primary/40 bg-primary/5">
+      <input
+        type="checkbox"
+        className="mt-0.5 h-5 w-5 accent-primary"
+        checked={params.interiorPhoto}
+        onChange={(e) => onPatch(e.target.checked ? SC.applyInteriorPhotoPreset() : SC.revertInteriorPhotoPreset(params))}
+        disabled={disabled}
+        data-testid="interior-photo-preset"
+      />
+      <span>
+        <span className="font-semibold">Fotografía de interiorismo</span>
+        <span className="block text-xs text-muted-foreground">
+          Estilo de revista de decoración: esquina con capas de profundidad, luz de ventana suave con lámparas cálidas, estilismo curado (textiles, libros, flores, cerámica) y materiales con textura real. No se combina con «Fotografía de revista».
+        </span>
+      </span>
+    </label>
+  );
+}
+
+/**
  * Dirección de cámara: preset, lente, diafragma, ángulo, composición, look de película y profundidad de campo.
  * Mismo bloque en exterior e interior; solo cambian las listas de ángulo y composición (un interior no se
  * fotografía desde un dron). El look de película depende de la cámara: las Fujifilm tienen sus simulaciones.
