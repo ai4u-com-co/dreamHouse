@@ -13,14 +13,36 @@ test.describe('DreamHouse Studio E2E MVP', () => {
     await expect(page.getByRole('button', { name: 'Generate exterior' })).toBeVisible();
   });
 
-  test('Global Actions: Surprise Me and Reset', async ({ page }) => {
+  test('Surprise Me con IA: manda el módulo y la ciudad, aplica el diseño coherente y muestra la idea', async ({ page, context }) => {
+    const bodies: Array<Record<string, unknown>> = [];
+    await context.route('**/api/surprise', async (route) => {
+      bodies.push(JSON.parse(route.request().postData() ?? '{}'));
+      await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ params: { mood: 'Acogedor y cálido', levels: 3 }, concept: 'Casa de adobe frente al desierto', dropped: 0, remaining: 8 }) });
+    });
+    await page.getByPlaceholder('Ej: Kyoto, Oslo, Atacama...').fill('Salento');
+    await page.getByLabel('Generar una combinación aleatoria de parámetros para inspiración').click({ force: true });
+    await expect(page.getByText('Idea con IA: Casa de adobe frente al desierto')).toBeVisible();
+    expect(bodies).toHaveLength(1);
+    expect(bodies[0]).toMatchObject({ mode: 'exterior', city: 'Salento' });
+    await expect(page.getByPlaceholder('Ej: Kyoto, Oslo, Atacama...')).toHaveValue('Salento'); // la ciudad de la persona no se pisa
+  });
+
+  test('Surprise Me: si la IA falla cae al aleatorio local y lo avisa', async ({ page, context }) => {
+    await context.route('**/api/surprise', (route) => route.fulfill({ status: 500, contentType: 'application/json', body: JSON.stringify({ code: 'SURPRISE_FAILED', message: 'x' }) }));
+    await page.getByLabel('Generar una combinación aleatoria de parámetros para inspiración').click({ force: true });
+    await expect(page.getByText('Se ha generado un diseño exterior aleatorio.')).toBeVisible();
+    await expect(page.getByText('combinación local')).toBeVisible();
+  });
+
+  test('Global Actions: Surprise Me and Reset', async ({ page, context }) => {
+    await context.route('**/api/surprise', (route) => route.fulfill({ status: 500, contentType: 'application/json', body: JSON.stringify({ code: 'SURPRISE_FAILED', message: 'x' }) }));
     // Initially city should be empty
     const cityInput = page.getByPlaceholder('Ej: Kyoto, Oslo, Atacama...');
     await expect(cityInput).toHaveValue('');
 
     // Click Surprise Me using its aria-label
     await page.getByLabel('Generar una combinación aleatoria de parámetros para inspiración').click({ force: true });
-    
+
     // Toast should appear (Spanish)
     await expect(page.getByText('Se ha generado un diseño exterior aleatorio.')).toBeVisible();
 

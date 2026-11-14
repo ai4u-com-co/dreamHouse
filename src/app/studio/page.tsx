@@ -13,7 +13,7 @@ import PlantaForm from '@/modules/planta/components/PlantaForm';
 import ResultDisplay from '@/components/ResultDisplay';
 import PromptPreview, { type LoadedFile } from '@/components/PromptPreview';
 import { DreamHouseParams, DEFAULT_PARAMS, CustomDetailSlot } from '@/types';
-import { Wand2, AlertCircle, RotateCcw, Dices, CheckCircle2, Home, Armchair, Maximize2, Camera, PenLine, Wand, ImageIcon, LayoutGrid } from 'lucide-react';
+import { Wand2, AlertCircle, RotateCcw, Dices, Loader2, CheckCircle2, Home, Armchair, Maximize2, Camera, PenLine, Wand, ImageIcon, LayoutGrid } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { Section } from '@/components/ui/Section';
 import * as SC from '@/modules/shared/constants';
@@ -80,6 +80,7 @@ function StudioContent() {
   const [imageUrl, setImageUrl] = useState<string | null>(null);
   const [houseName, setHouseName] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
+  const [isSurprising, setIsSurprising] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
   const [vistasResults, setVistasResults] = useState<{ type: string, url: string | null, loading: boolean, variants?: string[] }[]>([]);
@@ -301,7 +302,8 @@ function StudioContent() {
     showToast("Parameters reset to default");
   };
 
-  const handleRandomize = () => {
+  /** Combinación aleatoria LOCAL (sin IA, sin costo): respaldo de «Surprise Me» cuando la IA no responde */
+  const randomizeLocally = (note?: string) => {
     const pick = <T,>(arr: T[]): T => arr[Math.floor(Math.random() * arr.length)];
     const pickMulti = (arr: string[], maxRandom: number = 3): string[] => {
       const count = Math.floor(Math.random() * maxRandom) + 1;
@@ -374,7 +376,36 @@ function StudioContent() {
     };
 
     setParams(randomParams);
-    showToast(`Se ha generado un diseño ${params.mode} aleatorio.`);
+    showToast(`Se ha generado un diseño ${params.mode} aleatorio.${note ? ` ${note}` : ''}`);
+  };
+
+  /**
+   * «Surprise Me»: la IA inventa UN concepto coherente (lugar ↔ clima ↔ materiales, estilo ↔ referente, escala ↔ programa, luz ↔ hora…)
+   * y rellena el módulo activo; el servidor valida cada valor contra los catálogos. Cuesta 1 crédito (los admin no pagan) y se devuelve si falla.
+   * Si la IA no responde se cae al aleatorio local (gratis) y se avisa; solo una sesión vencida se muestra como error.
+   */
+  const handleRandomize = async () => {
+    if (isSurprising) return;
+    setIsSurprising(true);
+    setError(null);
+    try {
+      const { data } = await callApi<{ params: Partial<DreamHouseParams>; concept?: string }>(
+        '/api/surprise',
+        JSON.stringify({ mode: params.mode, city: params.city }),
+      );
+      const { params: safe } = sanitizeAssistantParams(data.params); // el servidor ya filtró; se vuelve a filtrar por defensa
+      setParams((prev) => ({ ...prev, ...safe }));
+      setOpenSections((prev) => new Set([...prev, ...(params.mode === 'planta' ? ['program'] : params.mode === 'exterior' ? ['concept'] : params.mode === 'interior' ? ['identity'] : [])]));
+      showToast(data.concept ? `Idea con IA: ${data.concept}` : 'Diseño coherente generado con IA.');
+    } catch (err) {
+      if (err instanceof ApiError && err.code === 'UNAUTHENTICATED') {
+        setError(err.message);
+      } else {
+        randomizeLocally('(La IA no respondió, así que fue una combinación local.)');
+      }
+    } finally {
+      setIsSurprising(false);
+    }
   };
 
   const handleGenerate = async () => {
@@ -668,14 +699,16 @@ function StudioContent() {
                 <div className="w-px bg-border" aria-hidden="true" />
                 <button
                   type="button"
-                  onClick={handleRandomize}
-                  disabled={isLoading}
+                  onClick={() => void handleRandomize()}
+                  disabled={isLoading || isSurprising}
                   className="group flex items-center gap-2 px-6 py-3 text-sm font-bold uppercase tracking-wider text-foreground hover:bg-primary hover:text-primary-foreground transition-colors"
                   aria-label="Generar una combinación aleatoria de parámetros para inspiración"
-                  title="Generar diseño aleatorio"
+                  title="La IA inventa un diseño coherente (1 crédito)"
                 >
-                  <Dices className="w-4 h-4 group-hover:rotate-180 transition-transform duration-500" aria-hidden="true" />
-                  <span>Surprise Me</span>
+                  {isSurprising
+                    ? <Loader2 className="w-4 h-4 animate-spin" aria-hidden="true" />
+                    : <Dices className="w-4 h-4 group-hover:rotate-180 transition-transform duration-500" aria-hidden="true" />}
+                  <span>{isSurprising ? 'Pensando…' : 'Surprise Me'}</span>
                 </button>
             </div>
           </div>
