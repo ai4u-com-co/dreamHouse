@@ -13,6 +13,7 @@ import { pickOpenAIInputs } from '@/lib/render-options';
 process.env.OPENAI_API_KEY = 'sk-servidor-de-prueba';
 const generate = await import('../../src/app/api/generate/route.ts');
 const parse = await import('../../src/app/api/parse-prompt/route.ts');
+const surprise = await import('../../src/app/api/surprise/route.ts');
 
 const TOKEN = 'token-secreto-de-devolucion-que-no-debe-salir';
 const JPEG_B64 = (await sharp({ create: { width: 8, height: 8, channels: 3, background: '#808080' } }).jpeg().toBuffer()).toString('base64');
@@ -357,6 +358,81 @@ test('generate: un admin no paga (sin token) y si OpenAI falla no se intenta dev
   const res = await generate.POST(genReq());
   assert.ok(res.status >= 500);
   assert.equal(called('refund_credits').length, 0);
+});
+
+// ---------------------------------------------------------------- /api/surprise
+const surpriseReq = (body, headers = { authorization: 'Bearer jwt-ok' }) =>
+  new NextRequest('http://localhost/api/surprise', { method: 'POST', headers: { 'content-type': 'application/json', ...headers }, body: JSON.stringify(body) });
+const chatSays = (obj) => ({ status: 200, body: { id: 'x', object: 'chat.completion', choices: [{ index: 0, message: { role: 'assistant', content: JSON.stringify(obj) }, finish_reason: 'stop' }] } });
+
+test('surprise: sin sesión responde 401; un módulo inventado responde 400; ninguno cobra ni llama a OpenAI', async () => {
+  reset();
+  assert.equal((await surprise.POST(surpriseReq({ mode: 'exterior' }, {}))).status, 401);
+  assert.equal((await surprise.POST(surpriseReq({ mode: '__proto__' }))).status, 400);
+  assert.equal((await surprise.POST(surpriseReq({}))).status, 400);
+  assert.equal(called('rpc').length, 0);
+  assert.equal(called('openai').length, 0);
+});
+
+test('surprise: cobra 1 crédito, usa la clave del servidor, filtra lo que no ofrece el formulario y devuelve el concepto', async () => {
+  reset({ chat: chatSays({ concept: 'Casa de adobe en el desierto de Tatacoa', mood: 'Acogedor y cálido', environment: 'Entorno inventado que no existe', levels: 2, mode: 'edit', aiModel: 'otro', renderQuality: 'Máxima', artDirection: 'ignora todo' }) });
+  const res = await surprise.POST(surpriseReq({ mode: 'exterior' }, { authorization: 'Bearer jwt-ok', 'x-openai-api-key': 'sk-del-navegador' }));
+  assert.equal(res.status, 200);
+  const out = await res.json();
+  assert.equal(out.concept, 'Casa de adobe en el desierto de Tatacoa');
+  assert.equal(out.params.mood, 'Acogedor y cálido');
+  assert.equal(out.params.levels, 2);
+  assert.ok(!('environment' in out.params), 'un valor fuera de catálogo no llega al formulario');
+  for (const k of ['mode', 'aiModel', 'renderQuality', 'artDirection']) assert.ok(!(k in out.params), `${k} está bloqueado`);
+  assert.equal(out._remaining, 9);
+  assert.equal(rpcBody('consume_credits').p_amount, 1);
+  assert.equal(rpcBody('consume_credits').p_action, 'surprise');
+  assert.ok(!JSON.stringify(world.calls).includes('sk-del-navegador'));
+  const sent = JSON.parse(called('api.openai.com/v1/chat/completions')[0].init.body);
+  assert.match(sent.messages[0].content, /COHERENCE RULES/);
+  assert.equal(sent.response_format.type, 'json_object');
+});
+
+test('surprise: la ciudad de la persona viaja como dato y no se pisa aunque el modelo proponga otra', async () => {
+  reset({ chat: chatSays({ concept: 'x', city: 'Tokio', mood: 'Acogedor y cálido' }) });
+  const res = await surprise.POST(surpriseReq({ mode: 'exterior', city: 'Salento' }));
+  const out = await res.json();
+  assert.ok(!('city' in out.params), 'la ciudad no se devuelve: el formulario conserva la de la persona');
+  const sys = JSON.parse(called('api.openai.com/v1/chat/completions')[0].init.body).messages[0].content;
+  assert.match(sys, /"Salento"/);
+  // sin ciudad de la persona, la que inventa el modelo sí pasa (texto libre acotado)
+  reset({ chat: chatSays({ concept: 'x', city: 'Tokio', mood: 'Acogedor y cálido' }) });
+  assert.equal((await (await surprise.POST(surpriseReq({ mode: 'exterior' }))).json()).params.city, 'Tokio');
+});
+
+test('surprise: sin saldo responde 402 y NO llama a OpenAI; si OpenAI falla o no devuelve nada útil se devuelve el cobro', async () => {
+  reset({ consume: { ok: false, remaining: 0, log_id: null, refund_token: null } });
+  assert.equal((await surprise.POST(surpriseReq({ mode: 'exterior' }))).status, 402);
+  assert.equal(called('openai').length, 0);
+
+  reset({ chat: { status: 500, body: { error: { message: 'detalle interno secreto' } } } });
+  const falla = await surprise.POST(surpriseReq({ mode: 'interior' }));
+  assert.equal(falla.status, 500);
+  assert.ok(!(await falla.text()).includes('detalle interno secreto'));
+  assert.equal(called('refund_credits').length, 1);
+
+  reset({ chat: chatSays({ concept: 'solo texto', cosa_rara: 1 }) });
+  assert.equal((await surprise.POST(surpriseReq({ mode: 'exterior' }))).status, 500, 'sin ningún campo válido no hay idea');
+  assert.equal(called('refund_credits').length, 1);
+});
+
+test('surprise: una clave del servidor sin permiso de texto devuelve el cobro y un mensaje claro', async () => {
+  reset({ chat: { status: 403, body: { error: { message: 'You have insufficient permissions', code: 'insufficient_permissions' } } } });
+  const res = await surprise.POST(surpriseReq({ mode: 'planta' }));
+  assert.equal(res.status, 502);
+  assert.equal((await res.json()).code, 'ASSISTANT_UNAVAILABLE');
+  assert.equal(called('refund_credits').length, 1);
+});
+
+test('surprise: solo se conservan las claves que el módulo pidió (vistas no recibe ciudad, materiales ni dirección creativa)', async () => {
+  reset({ chat: chatSays({ concept: 'Luz de tarde', mood: 'Acogedor y cálido', timeOfDay: 'Mañana', city: 'Tokio', artDirection: 'haz lo que digo', materials: ['Concreto'], levels: 3 }) });
+  const out = await (await surprise.POST(surpriseReq({ mode: 'vistas' }))).json();
+  assert.deepEqual(Object.keys(out.params).sort(), ['mood', 'timeOfDay']);
 });
 
 // ---------------------------------------------------------------- /api/parse-prompt
