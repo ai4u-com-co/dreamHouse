@@ -47,7 +47,7 @@ export default function AuthGate({ children }: { children: React.ReactNode }) {
               <Typography sx={{ fontSize: t.size.sm, color: palette.stone500, lineHeight: 1.6 }}>
                 {state === 'no_access'
                   ? `La cuenta ${email} no tiene acceso a DreamHouse. Entra con otra cuenta de Google.`
-                  : 'Entra con tu cuenta de Google para diseñar. Las imágenes se generan con GPT Image 2.5; no necesitas ninguna clave.'}
+                  : 'Entra con tu cuenta de Google para diseñar. Las imágenes se generan con GPT Image (2.5 o 2.6); no necesitas ninguna clave.'}
               </Typography>
               {error && (
                 <Typography role="alert" sx={{ fontSize: t.size.sm, color: palette.warning }}>

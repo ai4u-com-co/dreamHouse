@@ -70,8 +70,8 @@ export function quoteRender(
   const options: ResolvedImageOptions = {
     ...v,
     pixels,
-    credits: creditsFor({ quality: v.quality, width: side, height: side, n: 1, inputPixels: ctx.inputImagePixels, promptChars: ctx.promptChars }),
-    estimatedOutputTokens: estimateOutputTokens(v.quality, side, side),
+    credits: creditsFor({ quality: v.quality, model: v.model, width: side, height: side, n: 1, inputPixels: ctx.inputImagePixels, promptChars: ctx.promptChars }),
+    estimatedOutputTokens: estimateOutputTokens(v.quality, side, side, v.model),
   };
   return { ok: true, value: { apiSize: 'auto', options } };
 }
