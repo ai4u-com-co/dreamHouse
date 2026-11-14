@@ -114,8 +114,12 @@ function sanitizeCore(raw: unknown, { allowedKeys, allowFreeText }: CoreOptions)
       } else {
         dropped.push(key); // sin catálogo y no declarado como texto libre: denegado
       }
+    } else if (typeof reference === 'boolean' && allowedKeys) {
+      // Booleanos de diseño: solo desde metadatos de imagen (lista explícita) y solo verdadero/falso; el asistente nunca los toca
+      if (typeof value === 'boolean') params[key] = value;
+      else dropped.push(key);
     }
-    // booleanos y objetos: no se aceptan
+    // objetos y booleanos fuera de la lista de diseño: no se aceptan
   }
   return { params: params as Partial<DreamHouseParams>, dropped };
 }

@@ -1,7 +1,7 @@
 import React from 'react';
 import { DreamHouseParams } from '@/types';
 import * as EC from '../constants';
-import { OutputOptions, AmbienceSelects, CameraFields, CreativeFields } from '@/components/FormExtras';
+import { OutputOptions, AmbienceSelects, CameraFields, CreativeFields, MagazinePresetToggle } from '@/components/FormExtras';
 import * as SC from '../../shared/constants';
 import { Sparkles, MapPin, Box, Camera, ImageIcon, Home } from 'lucide-react';
 import { Section } from '@/components/ui/Section';
@@ -324,6 +324,7 @@ export default function ExteriorForm({
           <div>
             <Subtitle>Dirección de Cámara</Subtitle>
             <div className="space-y-5">
+              <MagazinePresetToggle params={params} onPatch={(patch) => onChange({ ...params, ...patch })} disabled={disabled} scene="exterior" />
               <CameraFields params={params} onChange={handleChange} disabled={disabled} scene="exterior" />
               <AmbienceSelects params={params} onChange={handleChange} disabled={disabled} people />
             </div>

@@ -68,6 +68,8 @@ export interface SharedParams {
   embedMetadata: boolean;
   /** Incluir además ciudad, notas, textos libres y el prompt completo (más detalle, menos privado) */
   embedDetails: boolean;
+  /** Preset «Fotografía de revista»: cámara de arquitecto (tilt-shift, f/8…) + instrucciones editoriales en el prompt. Apagado por defecto. */
+  magazinePhoto: boolean;
   /** Render original del que se deriva esta generación (lo llena la subida de una imagen con metadatos) */
   sourceRender?: SourceRender;
 
@@ -186,6 +188,7 @@ export const DEFAULT_PARAMS: DreamHouseParams = {
   renderQuality: "Borrador",
   embedMetadata: true,
   embedDetails: false,
+  magazinePhoto: false,
   artDirection: "",
   negativePrompt: "",
   editPrompt: "",

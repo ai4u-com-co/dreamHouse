@@ -80,6 +80,35 @@ export function AmbienceSelects({ params, onChange, disabled, hint, people = fal
   );
 }
 
+const MAGAZINE_HINT: Record<SC.MagazineScene, string> = {
+  exterior: 'Cámara de fotógrafo de arquitectura (24 mm tilt-shift, f/8, verticales paralelas), hora azul con luz interior encendida y puesta en escena editorial. Puedes cambiar cualquier ajuste después.',
+  interior: 'Cámara de fotógrafo de arquitectura (24 mm tilt-shift, f/8, verticales paralelas), luz de ventana equilibrada y estilismo editorial. Puedes cambiar cualquier ajuste después.',
+  vistas: 'Cámara de fotógrafo de arquitectura (24 mm tilt-shift, f/8, verticales paralelas) y puesta en escena editorial en todas las vistas. No cambia la luz de la casa original.',
+};
+
+/**
+ * Preset «Fotografía de revista»: un interruptor que ajusta la cámara (y la luz en exteriores) y agrega al prompt las instrucciones de un
+ * fotógrafo de arquitectura. Solo aplica con estilo fotográfico. Apagado, devuelve a fábrica solo lo que siguen siendo los valores del preset.
+ */
+export function MagazinePresetToggle({ params, onPatch, disabled, scene }: { params: DreamHouseParams; onPatch: (patch: Partial<DreamHouseParams>) => void; disabled?: boolean; scene: SC.MagazineScene }) {
+  return (
+    <label className="flex items-start gap-3 min-h-[44px] p-4 cursor-pointer text-sm border border-primary/40 bg-primary/5">
+      <input
+        type="checkbox"
+        className="mt-0.5 h-5 w-5 accent-primary"
+        checked={params.magazinePhoto}
+        onChange={(e) => onPatch(e.target.checked ? SC.applyMagazinePreset(scene) : SC.revertMagazinePreset(scene, params))}
+        disabled={disabled}
+        data-testid="magazine-preset"
+      />
+      <span>
+        <span className="font-semibold">Fotografía de revista</span>
+        <span className="block text-xs text-muted-foreground">{MAGAZINE_HINT[scene]}</span>
+      </span>
+    </label>
+  );
+}
+
 /**
  * Dirección de cámara: preset, lente, diafragma, ángulo, composición, look de película y profundidad de campo.
  * Mismo bloque en exterior e interior; solo cambian las listas de ángulo y composición (un interior no se
