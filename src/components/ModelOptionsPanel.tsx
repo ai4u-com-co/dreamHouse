@@ -9,7 +9,7 @@ import * as SC from '@/modules/shared/constants';
 import { validateCustomSize } from '@/lib/openai-image-core.ts';
 import type { Quote } from '@/lib/render-options';
 
-// «Opciones avanzadas del modelo»: todo lo que admite GPT Image 2.5, plegado y en lo más económico por defecto.
+// «Opciones avanzadas del modelo»: todo lo que admiten GPT Image 2.5 y 2.6, plegado y en lo más económico por defecto.
 // El costo en créditos se ve SIEMPRE (también con el panel cerrado) y se calcula con el mismo núcleo que usa el servidor.
 
 type OnChange = <K extends keyof DreamHouseParams>(key: K, value: DreamHouseParams[K]) => void;
@@ -18,10 +18,14 @@ export type QuoteState = { ok: true; value: Quote } | { ok: false; message: stri
 
 const MODEL_SUNBURST = SC.AI_MODELS[0];
 const MODEL_FLARE = SC.AI_MODELS[1];
+const MODEL_SUNBURST_26 = SC.AI_MODELS[2];
+const MODEL_FLARE_26 = SC.AI_MODELS[3];
 
 const MODEL_HINT: Record<string, string> = {
   [MODEL_SUNBURST]: 'Sunburst es el más preciso al editar y para la entrega final.',
   [MODEL_FLARE]: 'Flare es más rápido (≈30 % menos de tiempo) con el mismo costo: ideal para explorar ideas.',
+  [MODEL_SUNBURST_26]: 'GPT Image 2.6 es la versión más reciente. En Borrador y Estándar cuesta ~4 y ~3 veces más que la 2.5 (de Alta en adelante cuesta igual): úsala cuando la 2.5 no alcance.',
+  [MODEL_FLARE_26]: 'GPT Image 2.6 Flare: más rápido que Sunburst, con el mismo costo que la 2.6 Sunburst (más caro que la 2.5 en Borrador y Estándar).',
 };
 
 const FORMAT_HINT: Record<string, string> = {
@@ -144,7 +148,7 @@ export default function ModelOptionsPanel({ params, onChange, disabled, isAdmin,
     onChange('renderModeration', DEFAULT_PARAMS.renderModeration);
   };
 
-  const modelShort = params.aiModel === MODEL_FLARE ? 'Flare' : 'Sunburst';
+  const modelShort = `${params.aiModel.includes('2.6') ? '2.6 ' : ''}${params.aiModel.includes('Flare') ? 'Flare' : 'Sunburst'}`;
   const summary = [modelShort, params.renderQuality, isEdit ? 'tamaño de tu imagen' : custom ? params.renderCustomSize : `${params.renderAspectRatio} · ${params.renderOutputResolution}`, isEdit ? null : params.renderFormat.toUpperCase(), !isEdit && params.renderVariants > 1 ? `${params.renderVariants} variantes` : null].filter(Boolean).join(' · ');
 
   return (
@@ -180,8 +184,10 @@ export default function ModelOptionsPanel({ params, onChange, disabled, isAdmin,
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
             <Field label="Modelo" htmlFor="adv-model" hint={MODEL_HINT[params.aiModel]}>
               <select id="adv-model" className={fieldClass} value={params.aiModel} disabled={disabled} onChange={(e) => onChange('aiModel', e.target.value)}>
-                <option value={MODEL_SUNBURST}>Sunburst · Preciso</option>
-                <option value={MODEL_FLARE}>Flare · Rápido</option>
+                <option value={MODEL_SUNBURST}>2.5 Sunburst · Preciso (recomendado)</option>
+                <option value={MODEL_FLARE}>2.5 Flare · Rápido</option>
+                <option value={MODEL_SUNBURST_26}>2.6 Sunburst · Preciso (más caro)</option>
+                <option value={MODEL_FLARE_26}>2.6 Flare · Rápido (más caro)</option>
               </select>
             </Field>
 

@@ -244,7 +244,7 @@ export const HUMAN_CONTEXT = [
 /** 1K ≈ 1 megapíxel; 2K = lado largo 2048 (tope 2560x1440); «Personalizado» pide ancho y alto */
 export const OUTPUT_RESOLUTIONS = ["1K", "2K", "Personalizado"];
 
-/** Formatos que admite GPT Image 2.5 (relación máxima 3:1) */
+/** Formatos que admite GPT Image 2.5 y 2.6 (relación máxima 3:1) */
 export const ASPECT_RATIOS = ["16:9", "1:1", "4:3", "3:2", "4:5", "5:4", "3:4", "2:3", "9:16", "21:9"];
 
 /** Calidad de render (OpenAI): etiqueta de la UI → valor de la API (ver generate/route.ts) */
@@ -274,10 +274,12 @@ export const RENDER_STYLES = [
   "Render artístico / Painterly"
 ];
 
-/** El primero es el predeterminado de la app (ver DEFAULT_PARAMS en types.ts). Gemini se retiró: solo GPT Image 2.5. */
+/** El primero es el predeterminado de la app (ver DEFAULT_PARAMS en types.ts). Gemini se retiró: solo GPT Image (2.5 por defecto; 2.6 opcional, más caro). */
 export const AI_MODELS = [
   "GPT Image 2.5 Sunburst (OpenAI)",
-  "GPT Image 2.5 Flare · borrador rápido (OpenAI)"
+  "GPT Image 2.5 Flare · borrador rápido (OpenAI)",
+  "GPT Image 2.6 Sunburst (OpenAI)",
+  "GPT Image 2.6 Flare · borrador rápido (OpenAI)"
 ];
 
 export interface CameraPreset {

@@ -4,7 +4,7 @@
 import { lookup } from '@/lib/safe-lookup';
 import { IMAGE_MODELS, type ImageModelKey, type ImageQualityKey } from '@/lib/openai-image-core.ts';
 
-/** Modelos de GPT Image 2.5: Sunburst (base, el más preciso editando) y Flare (pequeño y rápido) */
+/** Modelos de GPT Image 2.5 (predeterminado) y 2.6 (opcional, más caro): Sunburst (base, el más preciso editando) y Flare (pequeño y rápido) */
 export type OpenAIImageModel = (typeof IMAGE_MODELS)[ImageModelKey];
 export type OpenAIImageQuality = ImageQualityKey;
 
@@ -22,7 +22,12 @@ export const LOWEST_QUALITY: OpenAIImageQuality = 'low';
 
 /** Modelo del núcleo según el nombre de la interfaz: Flare si el nombre lo dice; cualquier otro valor (incluido
  *  "GPT Image 2 (OpenAI)" de registros antiguos) cae en Sunburst, el predeterminado. */
-export const imageModelKey = (aiModel: unknown): ImageModelKey => (typeof aiModel === 'string' && aiModel.includes('Flare') ? 'flare' : 'sunburst');
+export const imageModelKey = (aiModel: unknown): ImageModelKey => {
+  if (typeof aiModel !== 'string') return 'sunburst';
+  const flare = aiModel.includes('Flare');
+  if (aiModel.includes('2.6')) return flare ? 'flare26' : 'sunburst26';
+  return flare ? 'flare' : 'sunburst';
+};
 
 /**
  * - Modelo: ver imageModelKey.

@@ -15,7 +15,14 @@
 // texto no latino/emoji se cobraban por DEBAJO de lo real. El precio previo es una ESTIMACIÓN; la verdad la fija `creditsFromUsage` al terminar. Los puntos medidos están en `tests/fixtures/` y las pruebas fallan si el cobro
 // vuelve a quedar por debajo de ellos (`tests/pricing.test.mjs`).
 
-export const IMAGE_MODELS = { sunburst: 'gpt-image-2.5-sunburst', flare: 'gpt-image-2.5-flare' } as const;
+export const IMAGE_MODELS = {
+  sunburst: 'gpt-image-2.5-sunburst',
+  flare: 'gpt-image-2.5-flare',
+  // GPT Image 2.6 (medido con la API real el 14-nov-2026): mismas opciones que 2.5 (rechaza input_fidelity; acepta máscara en /edits,
+  // fondo transparente, n, moderation) y MISMOS tokens de entrada, pero la SALIDA cuesta más (ver QUALITY_MULT_26). Es opcional: el predeterminado sigue siendo 2.5.
+  sunburst26: 'gpt-image-2.6-sunburst',
+  flare26: 'gpt-image-2.6-flare',
+} as const;
 export type ImageModelKey = keyof typeof IMAGE_MODELS;
 /** Respaldo si la cuenta no tuviera aún 2.5 (404/model_not_found). */
 export const FALLBACK_MODEL = 'gpt-image-2';
@@ -65,6 +72,15 @@ export const MID_MIN_RATIO = 1.25;
 export const WIDE_MIN_RATIO = 1.6;
 /** Multiplicador sobre low (idéntico en todos los tamaños probados: medium 439/196 y 256/110; high 1756/196 y 987/110; xhigh y max a 1024x640). */
 const QUALITY_MULT: Record<ImageQualityKey, number> = { low: 1, medium: 2.25, high: 8.95, xhigh: 15.9, max: 35.7 };
+/**
+ * Multiplicador de salida del 2.6 SOBRE LA CURVA DE `low` DEL 2.5 (14-nov-2026, llamadas reales; Sunburst y Flare idénticos, y el mismo factor
+ * a 1024x640, 1536x1024, 1024², 1792x1280, 1920x640 y 2560x1440): low 450/107, 664/158, 824/196, 794/189, 273/65 y 861/205 = 4,20–4,21;
+ * medium 789/107 y 1449/196 = 7,37–7,39; high 956 y 1756 = igual que el 2.5 (8,95); xhigh 1700 y max 3824 = igual que el 2.5.
+ * Se redondea hacia ARRIBA (nunca se cobra de menos): la verdad la fija `creditsFromUsage` al terminar.
+ */
+const QUALITY_MULT_26: Record<ImageQualityKey, number> = { low: 4.25, medium: 7.45, high: 9.05, xhigh: 16.1, max: 36.2 };
+/** ¿Es un modelo de la familia 2.6? */
+export const is26 = (m: ImageModelKey): boolean => m === 'sunburst26' || m === 'flare26';
 /** Precios por millón de tokens (US$): salida de imagen 30, entrada de imagen 8, entrada de texto 5. */
 export const USD_PER_TOKEN = { imageOut: 30 / 1e6, imageIn: 8 / 1e6, textIn: 5 / 1e6 } as const;
 /** 1 crédito = US$0,0045 (150 tokens de salida de imagen). */
@@ -186,18 +202,20 @@ function interpolate(table: [number, number][], px: number, belowScale: number):
  * < 1,25 cuadrada (la más cara) · 1,25–1,6 la medida en esa banda · ≥ 1,6 apaisada. Fuera del rango MEDIDO de un tramo se cae a la curva
  * cuadrada, que siempre cobra de más. Todas las curvas son envolventes monótonas: nunca se cobra menos que el máximo medido hasta ese tamaño.
  */
-export function estimateOutputTokens(quality: ImageQualityKey, width: number, height: number): number {
+export function estimateOutputTokens(quality: ImageQualityKey, width: number, height: number, model: ImageModelKey = 'sunburst'): number {
   const px = width * height;
   const ratio = Math.max(width, height) / Math.min(width, height);
   const square = interpolate(LOW_SQUARE, px, 0.5);
   let low = square;
   if (ratio >= WIDE_MIN_RATIO) low = interpolate(WIDE_CURVE, px, 0);
   else if (ratio >= MID_MIN_RATIO && px >= MID_CURVE[0][0] && px <= MID_CURVE[MID_CURVE.length - 1][0]) low = Math.min(square, interpolate(MID_CURVE, px, 0));
-  return Math.round(low * QUALITY_MULT[quality]);
+  return Math.round(low * (is26(model) ? QUALITY_MULT_26 : QUALITY_MULT)[quality]);
 }
 
 export interface CostInput {
   quality: ImageQualityKey;
+  /** modelo (cambia el costo de salida); sin él, 2.5 */
+  model?: ImageModelKey;
   width: number;
   height: number;
   n: number;
@@ -209,7 +227,7 @@ export interface CostInput {
 
 /** Costo en US$ de una generación, con los precios por token de OpenAI (todo ×n: la API cobra la entrada por cada variante). */
 export function estimateUsd(c: CostInput): number {
-  const out = estimateOutputTokens(c.quality, c.width, c.height) * USD_PER_TOKEN.imageOut;
+  const out = estimateOutputTokens(c.quality, c.width, c.height, c.model) * USD_PER_TOKEN.imageOut;
   const inImg = (c.inputPixels ?? []).reduce((sum, px) => sum + inputImageTokens(px), 0) * USD_PER_TOKEN.imageIn;
   const inTxt = textTokens(c.promptChars ?? DEFAULT_PROMPT_CHARS) * USD_PER_TOKEN.textIn;
   return (out + inImg + inTxt) * c.n;
@@ -334,7 +352,7 @@ export function dataUrlDimensions(input: string): { width: number; height: numbe
 /**
  * Valida y normaliza lo que manda el navegador. Todo es opcional y cae en DEFAULTS (lo más económico).
  * Forma aceptada (todas las claves opcionales):
- *   { model: 'sunburst'|'flare', quality, aspectRatio, imageSize: '1K'|'2K'|'custom', size: 'WxH' (con imageSize 'custom'),
+ *   { model: 'sunburst'|'flare'|'sunburst26'|'flare26', quality, aspectRatio, imageSize: '1K'|'2K'|'custom', size: 'WxH' (con imageSize 'custom'),
  *     format, compression, background, n, moderation }
  * ctx: `promptChars` = BYTES UTF-8 del prompt que viaja a OpenAI (el servidor pasa el real y es OBLIGATORIO: sin él falla cerrado);
  * `estimate: true` = solo para el navegador: permite cotizar sin prompt final asumiendo ~1.000 bytes;
@@ -407,7 +425,7 @@ export function resolveImageOptions(raw: unknown, ctx: { inputImagePixels?: numb
   }
 
   const q = quality as ImageQualityKey;
-  const credits = creditsFor({ quality: q, width, height, n, inputPixels, promptChars: ctx.promptChars });
+  const credits = creditsFor({ quality: q, model: model as ImageModelKey, width, height, n, inputPixels, promptChars: ctx.promptChars });
   if (!Number.isInteger(credits) || credits < 1) return fail('bad_cost', 'No se pudo calcular el costo.'); // nunca un cobro NaN/negativo
   return {
     ok: true,
@@ -425,7 +443,7 @@ export function resolveImageOptions(raw: unknown, ctx: { inputImagePixels?: numb
       moderation: moderation as 'auto' | 'low',
       n,
       credits,
-      estimatedOutputTokens: estimateOutputTokens(q, width, height) * n,
+      estimatedOutputTokens: estimateOutputTokens(q, width, height, model as ImageModelKey) * n,
       adminOnly: moderation === 'low',
     },
   };
