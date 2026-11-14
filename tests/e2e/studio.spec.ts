@@ -378,6 +378,40 @@ test.describe('DreamHouse Studio E2E MVP', () => {
     expect(hasHorizontalOverflow, 'No debe existir scroll horizontal a 375px').toBe(false);
   });
 
+  test('Fotografía de interiorismo: ajusta cámara, ángulo y luz, es excluyente con «revista», se apaga y no rompe el móvil', async ({ page }) => {
+    await page.setViewportSize({ width: 375, height: 812 });
+    await page.getByText('Diseño Interior', { exact: true }).click({ force: true });
+    await page.getByText('Configuración de Cámara', { exact: true }).click({ force: true });
+    const interior = page.getByTestId('interior-photo-preset');
+    const magazine = page.getByTestId('magazine-preset');
+    await expect(interior).toBeVisible();
+    await expect(interior).not.toBeChecked(); // apagado por defecto
+
+    const angle = page.getByLabel('Ángulo');
+    const focal = page.getByLabel('Distancia Focal');
+    const before = { angle: await angle.inputValue(), focal: await focal.inputValue() };
+
+    await interior.check({ force: true });
+    await expect(focal).toHaveValue('24mm Tilt-Shift');
+    await expect(angle).toHaveValue('Esquina (gran angular)');
+    await expect(page.getByLabel('Composición')).toHaveValue('Capas de profundidad (primer plano)');
+
+    // excluyente: encender «revista» apaga «interiorismo», y al revés
+    await magazine.check({ force: true });
+    await expect(interior).not.toBeChecked();
+    await expect(magazine).toBeChecked();
+    await interior.check({ force: true });
+    await expect(magazine).not.toBeChecked();
+    await expect(interior).toBeChecked();
+
+    await interior.uncheck({ force: true });
+    await expect(focal).toHaveValue(before.focal);
+    await expect(angle).toHaveValue(before.angle);
+
+    const overflow = await page.evaluate(() => document.documentElement.scrollWidth > window.innerWidth);
+    expect(overflow, 'No debe existir scroll horizontal a 375px').toBe(false);
+  });
+
   test('Fotografía de revista: el interruptor ajusta la cámara, se puede apagar y no rompe el móvil', async ({ page }) => {
     await page.setViewportSize({ width: 375, height: 812 });
     await page.getByRole('button', { name: /Fase 5: Captura y Render/i }).click({ force: true });

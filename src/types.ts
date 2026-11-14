@@ -70,6 +70,8 @@ export interface SharedParams {
   embedDetails: boolean;
   /** Preset «Fotografía de revista»: cámara de arquitecto (tilt-shift, f/8…) + instrucciones editoriales en el prompt. Apagado por defecto. */
   magazinePhoto: boolean;
+  /** Preset «Fotografía de interiorismo» (solo módulo Interior): estilismo editorial, luz en capas y materiales; excluyente con `magazinePhoto`. Apagado por defecto. */
+  interiorPhoto: boolean;
   /** Render original del que se deriva esta generación (lo llena la subida de una imagen con metadatos) */
   sourceRender?: SourceRender;
 
@@ -189,6 +191,7 @@ export const DEFAULT_PARAMS: DreamHouseParams = {
   embedMetadata: true,
   embedDetails: false,
   magazinePhoto: false,
+  interiorPhoto: false,
   artDirection: "",
   negativePrompt: "",
   editPrompt: "",

@@ -339,14 +339,38 @@ export const MAGAZINE_PRESET: Record<MagazineScene, Partial<Record<keyof DreamHo
   interior: { ...MAGAZINE_CAMERA },
   vistas: { ...MAGAZINE_CAMERA },
 };
-/** Parámetros al ENCENDER el preset */
+/** Parámetros al ENCENDER el preset (excluyente con el de interiorismo) */
 export function applyMagazinePreset(scene: MagazineScene): Partial<DreamHouseParams> {
-  return { ...MAGAZINE_PRESET[scene], magazinePhoto: true } as Partial<DreamHouseParams>;
+  return { ...MAGAZINE_PRESET[scene], magazinePhoto: true, interiorPhoto: false } as Partial<DreamHouseParams>;
 }
 /** Parámetros al APAGAR el preset: vuelven al valor de fábrica solo los campos que siguen como los dejó el preset */
 export function revertMagazinePreset(scene: MagazineScene, params: DreamHouseParams): Partial<DreamHouseParams> {
   const patch: Record<string, unknown> = { magazinePhoto: false };
   for (const [key, value] of Object.entries(MAGAZINE_PRESET[scene])) {
+    const k = key as keyof DreamHouseParams;
+    if (params[k] === value) patch[key] = DEFAULT_PARAMS[k];
+  }
+  return patch as Partial<DreamHouseParams>;
+}
+
+// ── Preset «Fotografía de interiorismo» (solo Interior) ─────────────────────────────────────
+// Fotografía editorial de revista de decoración: cámara de arquitectura (verticales paralelas), luz de ventana suave como luz principal,
+// esquina con capas de profundidad. El estilismo (textiles, libros, flores, cerámica) y la luz cálida de lámparas van en el bloque del prompt.
+export const INTERIOR_PHOTO_PRESET: Partial<Record<keyof DreamHouseParams, string>> = {
+  ...MAGAZINE_CAMERA,
+  cameraAngle: "Esquina (gran angular)",
+  composition: "Capas de profundidad (primer plano)",
+  timeOfDay: "Mañana",
+  lighting: "Natural suave",
+};
+/** Parámetros al ENCENDER el preset de interiorismo (apaga el de revista: un solo estilo de fotografía a la vez) */
+export function applyInteriorPhotoPreset(): Partial<DreamHouseParams> {
+  return { ...INTERIOR_PHOTO_PRESET, interiorPhoto: true, magazinePhoto: false } as Partial<DreamHouseParams>;
+}
+/** Parámetros al APAGAR: vuelve a fábrica solo lo que sigue como lo dejó el preset */
+export function revertInteriorPhotoPreset(params: DreamHouseParams): Partial<DreamHouseParams> {
+  const patch: Record<string, unknown> = { interiorPhoto: false };
+  for (const [key, value] of Object.entries(INTERIOR_PHOTO_PRESET)) {
     const k = key as keyof DreamHouseParams;
     if (params[k] === value) patch[key] = DEFAULT_PARAMS[k];
   }

@@ -78,6 +78,7 @@ export function cameraSentence(params: DreamHouseParams): string {
  */
 export function magazinePhotoBlock(params: DreamHouseParams, scene: 'exterior' | 'interior' | 'vistas', photographic: boolean): string {
   if (!params.magazinePhoto || !photographic) return '';
+  if (scene === 'interior' && params.interiorPhoto) return ''; // el preset de interiorismo manda en Interior (nunca dos bloques de fotografía a la vez)
   const people = present(params.humanContext) ? '' : ', no people';
   const common = 'Shot as a professional architectural photographer would for a magazine feature: tripod, tilt-shift correction so every vertical line stays perfectly parallel (no converging verticals), level horizon';
   const lines = scene === 'exterior'
@@ -98,6 +99,22 @@ export function magazinePhotoBlock(params: DreamHouseParams, scene: 'exterior' |
           `Believable staging around the house: planting with natural irregularity, ground surfaces with subtle reflections consistent with the weather${people}, no cars.`,
         ];
   return `ARCHITECTURAL MAGAZINE PHOTOGRAPHY (editorial standard${creativeDirectionText(params) ? '; the CREATIVE DIRECTION wins any conflict' : ''}):\n${lines.map((l) => `- ${l}`).join('\n')}`;
+}
+
+/**
+ * Preset «Fotografía de interiorismo» (solo Interior): lo que hace un fotógrafo de revista de decoración — luz de ventana como principal con
+ * lámparas cálidas encendidas, estilismo curado por capas y materiales con verdad táctil. Solo con estilo fotográfico; la dirección creativa gana.
+ */
+export function interiorPhotoBlock(params: DreamHouseParams, photographic: boolean): string {
+  if (!params.interiorPhoto || !photographic) return '';
+  const people = present(params.humanContext) ? '' : ', no people';
+  const lines = [
+    'Shot as for an interior design magazine feature: tripod, camera at about 1.2 m height, tilt-shift correction so every vertical line stays parallel, a corner or one-point perspective that shows the depth of the room, with a foreground element (chair back, plant, console) that creates layers.',
+    'Layered light: soft window daylight is the key light, balanced against the room so the view outside stays visible and nothing is blown out; add the warm glow of lit table lamps or sconces as secondary light; gentle gradients on walls and ceiling, clean natural color grading, no HDR halos.',
+    `Curated styling in the way a professional stylist would set it: layered textiles (throw, cushions, rug) with natural folds, a few books, branches or flowers in a vase, ceramics and art grouped in odd numbers, deliberate negative space; lived-in but tidy${people}, no readable text or logos on objects.`,
+    'Material truth: visible wood grain, stone veining, linen creases, glass and metal reflections, soft contact shadows under furniture; nothing plastic or over-smoothed.',
+  ];
+  return `INTERIOR DESIGN PHOTOGRAPHY (editorial standard${creativeDirectionText(params) ? '; the CREATIVE DIRECTION wins any conflict' : ''}):\n${lines.map((l) => `- ${l}`).join('\n')}`;
 }
 
 // ---------- detalles que antes se perdían ----------
