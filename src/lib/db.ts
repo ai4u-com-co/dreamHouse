@@ -26,9 +26,24 @@ export const LEGACY_DB_NAME = 'DreamHouseDB';
 const DB_VERSION = 2;
 const STORE_NAME = 'generations';
 const IMAGES_STORE = 'fullImages'; // blobs full-res, keyed por el id de la generación
-// Tope de renders guardados por cuenta. Antes eran 20: una sola tanda de vistas (hasta 20) o 5 renders con 4 variantes vaciaba
-// todo lo anterior sin avisar. Cada render full-res pesa ~1-3 MB; 60 caben de sobra en IndexedDB.
-export const MAX_HISTORY = 60;
+// Tope de renders guardados por cuenta. Antes eran 20 y luego 60: con 60 el historial real de un usuario (medido en producción,
+// 14-nov-2026: 60 de 60, el más antiguo de 8 días antes, solo 39 MB usados de 10 GB de cuota) se llenaba en una semana y el
+// siguiente render borraba el más viejo. Cada render full-res pesa ~0,7-3 MB: 300 son ~200 MB-1 GB, muy por debajo de la cuota.
+export const MAX_HISTORY = 300;
+
+/**
+ * Pide al navegador que NO desaloje el historial (IndexedDB es «best-effort» por defecto: Chrome/Safari lo pueden borrar con poco
+ * disco o por inactividad). Chrome lo concede solo con uso frecuente/instalada; si lo niega no pasa nada: se reintenta en la siguiente carga.
+ */
+export async function requestPersistentStorage(): Promise<boolean> {
+  try {
+    if (typeof navigator === 'undefined' || !navigator.storage?.persist) return false;
+    if (await navigator.storage.persisted()) return true;
+    return await navigator.storage.persist();
+  } catch {
+    return false;
+  }
+}
 
 export class DreamHouseDB {
   private db: IDBDatabase | null = null;

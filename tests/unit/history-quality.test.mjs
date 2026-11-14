@@ -39,3 +39,12 @@ test('el render completo se guarda sin recomprimir (el Blob del original, no el 
   assert.match(hook, /fullImage = await \(await fetch\(record\.imageUrl\)\)\.blob\(\)/);
   assert.match(hook, /saveGeneration\(\{ \.\.\.record, imageUrl: thumbnailUrl \}, fullImage\)/);
 });
+
+// Regresión (14-nov-2026): con tope de 60 el historial real del usuario estaba lleno (60/60, el más viejo de 8 días) y cada render nuevo
+// borraba el más antiguo: «se está perdiendo el historial de fotos».
+test('el historial guarda al menos 300 renders y pide almacenamiento persistente (no desalojable)', async () => {
+  const { MAX_HISTORY, requestPersistentStorage } = await import('@/lib/db');
+  assert.ok(MAX_HISTORY >= 300, `tope de ${MAX_HISTORY}: se llena en una semana de uso`);
+  assert.equal(await requestPersistentStorage(), false, 'sin navegador no rompe');
+  assert.match(src('src/lib/hooks/useHistory.ts'), /requestPersistentStorage\(\)/, 'el hook lo pide al haber sesión');
+});

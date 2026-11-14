@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { dbFor, GenerationRecord } from '../db';
+import { dbFor, GenerationRecord, requestPersistentStorage } from '../db';
 import { createThumbnail, needsThumbnailUpgrade, THUMBNAIL_MAX_SIDE, THUMBNAIL_QUALITY, THUMBNAIL_VERSION } from '../image-thumbnail';
 
 /** Aviso de que el historial de una cuenta cambió por fuera del hook (p. ej. se importó el historial anterior). */
@@ -88,6 +88,11 @@ export function useHistory(ownerId: string | null) {
     setError(null);
     refreshFor(ownerId);
   }, [ownerId, refreshFor]);
+
+  // Con una cuenta activa se pide almacenamiento persistente: sin esto el navegador puede desalojar el historial sin avisar.
+  useEffect(() => {
+    if (ownerId) void requestPersistentStorage();
+  }, [ownerId]);
 
   useEffect(() => {
     const onChanged = () => refreshFor(currentOwner.current);
