@@ -27,6 +27,7 @@ import { GenerationRecord, MAX_HISTORY } from '@/lib/db';
 import RestoreParamsButton from '@/components/RestoreParamsButton';
 import type { RestoreResult } from '@/lib/restore-params';
 import { LightboxProvider } from '@/context/LightboxContext';
+import { RenderLibraryProvider } from '@/context/RenderLibraryContext';
 import MemoryGuard from '@/components/MemoryGuard';
 import type { EditMaskPayload } from '@/components/SketchCanvas';
 import type { Pt } from '@/lib/polygon-zone';
@@ -111,7 +112,7 @@ function StudioContent() {
   const viewsCount = params.mode === 'vistas' ? Math.max(1, params.selectedVistas.length) : 1;
   const totalCost = quote.ok ? quote.value.options.credits * viewsCount : 0;
   const setParam = <K extends keyof DreamHouseParams>(key: K, value: DreamHouseParams[K]) => setParams(prev => ({ ...prev, [key]: value }));
-  const { history, saveToHistory, deleteFromHistory, clearHistory, getFullImageDataUrl, isLoading: isHistoryLoading } = useHistory(userId);
+  const { history, saveToHistory, deleteFromHistory, clearHistory, getFullImageDataUrl, getFullImageBlob, isLoading: isHistoryLoading } = useHistory(userId);
 
 
 
@@ -651,6 +652,7 @@ function StudioContent() {
 
 
   return (
+    <RenderLibraryProvider items={history} getBlob={getFullImageBlob}>
     <div className="min-h-screen bg-background text-foreground transition-colors duration-300">
       <Header />
 
@@ -1082,6 +1084,7 @@ function StudioContent() {
         </div>
       </footer>
     </div>
+    </RenderLibraryProvider>
   );
 }
 

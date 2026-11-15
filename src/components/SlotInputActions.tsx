@@ -1,10 +1,12 @@
 'use client';
 
 import React, { useCallback, useState } from 'react';
-import { Upload, ClipboardPaste, Camera, Loader2 } from 'lucide-react';
+import { Upload, ClipboardPaste, Camera, Loader2, Images } from 'lucide-react';
 import clsx from 'clsx';
 import { readImageFromClipboard } from '@/lib/clipboard';
 import CameraCaptureModal from './CameraCaptureModal';
+import RenderLibraryModal from './RenderLibraryModal';
+import { useRenderLibrary } from '@/context/RenderLibraryContext';
 
 export interface SlotInputActionsProps {
   /** Callback cuando se recibe un archivo de imagen (desde subir, pegar o cámara) */
@@ -29,6 +31,8 @@ export interface SlotInputActionsProps {
   pasteLabel?: string;
   /** Texto personalizado para el botón de cámara */
   cameraLabel?: string;
+  /** Texto personalizado para el botón de renders guardados */
+  libraryLabel?: string;
 }
 
 export default function SlotInputActions({
@@ -43,7 +47,10 @@ export default function SlotInputActions({
   uploadLabel = 'Subir',
   pasteLabel = 'Pegar',
   cameraLabel = 'Tomar foto',
+  libraryLabel = 'Mis renders',
 }: SlotInputActionsProps) {
+  const library = useRenderLibrary();
+  const [isLibraryOpen, setIsLibraryOpen] = useState(false);
   const [isCameraOpen, setIsCameraOpen] = useState(false);
   const [isPasting, setIsPasting] = useState(false);
 
@@ -163,6 +170,30 @@ export default function SlotInputActions({
           />
           <span>{cameraLabel}</span>
         </button>
+
+        {/* Botón Mis renders: reutiliza lo ya generado y guardado en el historial */}
+        {library && library.items.length > 0 && (
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              if (disabled || isProcessing) return;
+              setIsLibraryOpen(true);
+            }}
+            disabled={disabled || isProcessing}
+            title="Elegir una imagen ya generada en DreamHouse (tu historial)"
+            className={clsx(
+              'inline-flex items-center gap-1.5 font-medium rounded-lg transition-colors border',
+              compact
+                ? 'px-2.5 py-1.5 bg-card hover:bg-muted text-foreground border-border'
+                : 'px-3 py-2 bg-card hover:bg-muted text-foreground border-border shadow-sm',
+              'disabled:opacity-50 disabled:cursor-not-allowed'
+            )}
+          >
+            <Images className={compact ? 'w-3.5 h-3.5 text-amber-500' : 'w-4 h-4 text-amber-500'} />
+            <span>{libraryLabel}</span>
+          </button>
+        )}
       </div>
 
       {/* Modal de captura de cámara */}
@@ -171,6 +202,13 @@ export default function SlotInputActions({
         onClose={() => setIsCameraOpen(false)}
         onCapture={onFileSelected}
         title={modalTitle}
+      />
+
+      <RenderLibraryModal
+        isOpen={isLibraryOpen}
+        onClose={() => setIsLibraryOpen(false)}
+        onPick={onFileSelected}
+        onError={onError}
       />
     </>
   );

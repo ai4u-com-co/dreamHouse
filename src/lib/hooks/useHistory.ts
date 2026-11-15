@@ -155,6 +155,17 @@ export function useHistory(ownerId: string | null) {
     }
   };
 
+  /** Render completo como Blob (para reutilizarlo como foto de entrada). null si no existe (registros muy antiguos). */
+  const getFullImageBlob = async (id: string): Promise<Blob | null> => {
+    if (!ownerId) return null;
+    try {
+      return await dbFor(ownerId).getFullImage(id);
+    } catch (err) {
+      console.error('Failed to load full image:', err);
+      return null;
+    }
+  };
+
   const deleteFromHistory = async (id: string) => {
     if (!ownerId) return;
     try {
@@ -186,6 +197,7 @@ export function useHistory(ownerId: string | null) {
     clearHistory,
     refreshHistory,
     getFullImageUrl,
-    getFullImageDataUrl
+    getFullImageDataUrl,
+    getFullImageBlob
   };
 }
