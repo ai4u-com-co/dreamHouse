@@ -141,13 +141,13 @@ function StudioContent() {
 
   // El mismo archivo "principal" (lotFile) significa cosas distintas en cada módulo
   const MODE_NAMES: Record<DreamHouseParams['mode'], string> = {
-    planta: 'Planta Arquitectónica', exterior: 'Arquitectura Exterior', interior: 'Diseño Interior', edit: 'Edición', vistas: 'Vistas',
+    planta: 'Planta Arquitectónica', exterior: 'Arquitectura Exterior', interior: 'Diseño Interior', edit: 'Edición', vistas: 'Vistas', paleta: 'Paleta de colores',
   };
   const LOT_ROLE: Record<DreamHouseParams['mode'], string> = {
-    planta: 'la foto del terreno', exterior: 'la foto del terreno', interior: 'la foto del espacio actual', vistas: 'la casa a fotografiar', edit: 'la imagen base a editar',
+    planta: 'la foto del terreno', exterior: 'la foto del terreno', interior: 'la foto del espacio actual', vistas: 'la casa a fotografiar', edit: 'la imagen base a editar', paleta: 'el espacio a recolorear',
   };
   const FIRST_SECTION: Record<DreamHouseParams['mode'], string> = {
-    planta: 'program', exterior: 'concept', interior: 'context', vistas: 'context', edit: 'sketch',
+    planta: 'program', exterior: 'concept', interior: 'context', vistas: 'context', edit: 'sketch', paleta: 'mode',
   };
 
   /** Cambia de módulo: abre su primera sección y avisa qué se conserva y con qué rol */

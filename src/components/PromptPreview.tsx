@@ -45,6 +45,7 @@ const MODE_LABELS: Record<GenerationMode, string> = {
   interior: 'Interior',
   edit: 'Edición',
   vistas: 'Vistas',
+  paleta: 'Paleta',
 };
 
 function hasValue(val: ParamValue): boolean {

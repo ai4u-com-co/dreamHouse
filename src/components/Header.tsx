@@ -28,6 +28,7 @@ const NAV_LINKS = [
   { label: 'Vision',  href: '/#vision' },
   { label: 'Process', href: '/#process' },
   { label: 'Studio',  href: '/studio' },
+  { label: 'Tools',   href: '/tools' },
   { label: 'Brand',   href: '/brand' },
 ];
 
@@ -108,7 +109,8 @@ export default function Header() {
                     textTransform: 'uppercase',
                     color:
                       (href === '/studio' && pathname === '/studio') ||
-                      (href === '/brand' && pathname === '/brand')
+                      (href === '/brand' && pathname === '/brand') ||
+                      (href === '/tools' && pathname.startsWith('/tools'))
                         ? palette.lime
                         : 'text.secondary',
                     transition: 'color 200ms ease',
@@ -208,7 +210,8 @@ export default function Header() {
                     textTransform: 'uppercase',
                     color:
                       (href === '/studio' && pathname === '/studio') ||
-                      (href === '/brand' && pathname === '/brand')
+                      (href === '/brand' && pathname === '/brand') ||
+                      (href === '/tools' && pathname.startsWith('/tools'))
                         ? palette.lime
                         : 'text.primary',
                     '&:hover': { color: palette.lime },

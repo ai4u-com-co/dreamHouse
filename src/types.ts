@@ -1,6 +1,6 @@
 import { DEFAULT_VISTAS } from '@/modules/vistas/constants';
 
-export type GenerationMode = "planta" | "exterior" | "interior" | "edit" | "vistas";
+export type GenerationMode = "planta" | "exterior" | "interior" | "edit" | "vistas" | "paleta";
 
 /** Render del que se deriva esta generación (vistas, ediciones): sus parámetros se usan para mantener fidelidad */
 export interface SourceRender {

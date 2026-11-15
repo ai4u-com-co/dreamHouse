@@ -113,7 +113,7 @@ export default function ModelOptionsPanel({ params, onChange, disabled, isAdmin,
   defaultOpen?: boolean;
 }) {
   const [open, setOpen] = useState(defaultOpen);
-  const isEdit = params.mode === 'edit';
+  const isEdit = params.mode === 'edit' || params.mode === 'paleta';
   const custom = params.renderOutputResolution === 'Personalizado';
 
   // Tamaño personalizado: dos campos con su propio texto (se confirma al tener ambos números)

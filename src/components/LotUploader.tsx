@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useCallback, useEffect, useState, useRef } from 'react';
+import React, { useCallback, useEffect, useId, useState, useRef } from 'react';
 import { Upload, Map, Trash2, CheckCircle2, AlertCircle, Pentagon } from 'lucide-react';
 import clsx from 'clsx';
 import Image from 'next/image';
@@ -31,6 +31,12 @@ interface LotUploaderProps {
   onZoneChange?: (polygons: Pt[][], compositeFile: File | null) => void;
   /** Etiqueta del botón para abrir el selector de zona */
   zoneButtonLabel?: string;
+  /** Muestra la etiqueta «Opcional» junto al título (por defecto sí) */
+  optional?: boolean;
+  /** Texto de la insignia cuando ya hay imagen (por defecto «Lote cargado») */
+  loadedLabel?: string;
+  /** Texto accesible de la vista previa y del input */
+  altLabel?: string;
 }
 
 const ZONE_EXPORT_MAX_SIDE = 2048;
@@ -78,7 +84,11 @@ export default function LotUploader({
   zonePolygons,
   onZoneChange,
   zoneButtonLabel = "Seleccionar zona para la planta",
+  optional = true,
+  loadedLabel = "Lote cargado",
+  altLabel,
 }: LotUploaderProps) {
+  const titleId = useId();
   const [isDragging, setIsDragging] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
@@ -219,7 +229,7 @@ export default function LotUploader({
     <div
       className="space-y-4 p-5 sm:p-6 outline-none"
       role="region"
-      aria-labelledby="lot-uploader-title"
+      aria-labelledby={titleId}
       tabIndex={0}
       onPaste={handlePaste}
     >
@@ -230,9 +240,9 @@ export default function LotUploader({
           </div>
         </div>
         <div>
-          <h3 id="lot-uploader-title" className="text-lg font-semibold text-foreground flex items-center gap-2 flex-wrap">
+          <h3 id={titleId} className="text-lg font-semibold text-foreground flex items-center gap-2 flex-wrap">
             {title}
-            <span className="text-xs font-normal text-muted-foreground border border-border px-2 py-0.5 rounded-full">Opcional</span>
+            {optional && <span className="text-xs font-normal text-muted-foreground border border-border px-2 py-0.5 rounded-full">Opcional</span>}
           </h3>
           <p className="text-sm text-muted-foreground mt-0.5">
             {description}
@@ -248,7 +258,7 @@ export default function LotUploader({
           accept="image/*"
           className="sr-only"
           onChange={handleFileInput}
-          aria-label="Subir foto del lote"
+          aria-label={altLabel ? `Subir ${altLabel}` : "Subir foto del lote"}
         />
 
         {!file ? (
@@ -314,16 +324,18 @@ export default function LotUploader({
                 }
               }}
             >
-              <Image
-                src={displayUrl ?? ''}
-                alt="Vista previa del lote"
-                fill
-                className={clsx(
-                  "transition-transform duration-700",
-                  enableZoneSelection && activePolygons.length > 0 ? "object-contain bg-black/20" : "object-cover group-hover:scale-105"
-                )}
-                unoptimized
-              />
+              {displayUrl && (
+                <Image
+                  src={displayUrl}
+                  alt={altLabel ? `Vista previa: ${altLabel}` : "Vista previa del lote"}
+                  fill
+                  className={clsx(
+                    "transition-transform duration-700",
+                    enableZoneSelection && activePolygons.length > 0 ? "object-contain bg-black/20" : "object-cover group-hover:scale-105"
+                  )}
+                  unoptimized
+                />
+              )}
               
               <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex items-center justify-center">
                 <button
@@ -345,7 +357,7 @@ export default function LotUploader({
 
               <div className="absolute top-4 right-4 bg-green-500 text-white px-3 py-1 rounded-full text-xs font-bold flex items-center gap-1 shadow-lg">
                 <CheckCircle2 className="w-3 h-3" />
-                Lote cargado
+                {loadedLabel}
               </div>
             </div>
 
