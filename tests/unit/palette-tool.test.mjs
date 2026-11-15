@@ -6,7 +6,7 @@ import { DEFAULT_PARAMS } from '@/types';
 import { buildFullPalettePrompt, PALETTE_PRESERVE_LINES } from '@/modules/tools/paleta/lib/prompt-builder';
 import { pickOpenAIInputs, quoteRender } from '@/lib/render-options';
 import { normalizeRenderSettings } from '@/lib/render-settings';
-import { TOOLS } from '@/modules/tools/registry';
+import { readFileSync } from 'node:fs';
 
 const base = { ...DEFAULT_PARAMS, mode: 'paleta' };
 
@@ -55,8 +55,12 @@ test('las entradas son [espacio, paleta] en ese orden, y sin espacio o sin palet
   assert.deepEqual(pickOpenAIInputs('paleta', { editImage: null, references: [palette, { n: 'extra' }], objects: [] }), [palette]);
 });
 
-test('el registro de Tools lista la paleta y su ruta existe', () => {
-  const t = TOOLS.find((x) => x.id === 'paleta');
-  assert.ok(t);
-  assert.equal(t.href, '/tools/paleta');
+test('Tools vive dentro del Módulo de Trabajo del Studio (no como página aparte)', () => {
+  const studio = readFileSync('src/app/studio/page.tsx', 'utf8');
+  assert.match(studio, /switchMode\('paleta'\)/, 'botón del selector de módulos');
+  assert.match(studio, /<PaletteTool/, 'el panel se monta en el Studio');
+  assert.match(studio, /isTools \? \(/, 'reemplaza los formularios de los otros módulos');
+  const header = readFileSync('src/components/Header.tsx', 'utf8');
+  assert.doesNotMatch(header, /href: '\/tools'/, 'sin enlace de menú aparte');
+  assert.match(readFileSync('src/app/tools/page.tsx', 'utf8'), /redirect\('\/studio'\)/, '/tools lleva al Studio');
 });
