@@ -165,9 +165,9 @@ export function CameraFields({ params, onChange, disabled, scene }: ExtrasProps 
 /** Dirección creativa libre y lo que NO debe aparecer: compartido por todos los módulos de generación */
 export function CreativeFields({ params, onChange, disabled, artDirection = true }: ExtrasProps & { artDirection?: boolean }) {
   return (
-    <div className="space-y-6">
+    <div className={artDirection ? 'grid grid-cols-1 md:grid-cols-2 gap-5 items-stretch' : 'space-y-6'}>
       {artDirection && (
-        <div className="flex flex-col gap-2 p-4 border border-primary/40 bg-primary/5">
+        <div className="flex flex-col gap-2 p-4 border border-primary/40 bg-primary/5 min-w-0">
           <div className="flex items-center justify-between gap-2 flex-wrap">
             <label htmlFor="field-art-direction" className="text-xs font-bold text-foreground uppercase tracking-widest">
               Dirección creativa (Instrucción Principal)
@@ -190,8 +190,8 @@ export function CreativeFields({ params, onChange, disabled, artDirection = true
           />
         </div>
       )}
-      <div className="flex flex-col gap-2">
-        <label htmlFor="field-negative-prompt" className="text-xs font-semibold text-muted-foreground uppercase tracking-widest pl-1">Excluir (lo que NO debe aparecer)</label>
+      <div className="flex flex-col gap-2 min-w-0 md:p-4 md:border md:border-border">
+        <label htmlFor="field-negative-prompt" className="text-xs font-bold text-foreground uppercase tracking-widest">Prompt negativo (lo que NO debe aparecer)</label>
         <DebouncedInput
           id="field-negative-prompt"
           type="textarea"
@@ -199,7 +199,7 @@ export function CreativeFields({ params, onChange, disabled, artDirection = true
           onChange={(val) => onChange('negativePrompt', val)}
           placeholder="Ej: personas, autos, carteles, muebles de plástico..."
           disabled={disabled}
-          className="h-20"
+          className="min-h-[104px] md:flex-1"
         />
       </div>
     </div>
