@@ -10,10 +10,11 @@ import InteriorForm from '@/modules/interior/components/InteriorForm';
 import EditForm from '@/modules/edit/components/EditForm';
 import VistasForm from '@/modules/vistas/components/VistasForm';
 import PlantaForm from '@/modules/planta/components/PlantaForm';
+import PaletteTool from '@/modules/tools/paleta/components/PaletteTool';
 import ResultDisplay from '@/components/ResultDisplay';
 import PromptPreview, { type LoadedFile } from '@/components/PromptPreview';
 import { DreamHouseParams, DEFAULT_PARAMS, CustomDetailSlot } from '@/types';
-import { Wand2, AlertCircle, RotateCcw, Dices, Loader2, CheckCircle2, Home, Armchair, Maximize2, Camera, PenLine, Wand, ImageIcon, LayoutGrid } from 'lucide-react';
+import { Wand2, AlertCircle, RotateCcw, Dices, Loader2, CheckCircle2, Home, Armchair, Maximize2, Camera, PenLine, Wand, ImageIcon, LayoutGrid, Palette } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { Section } from '@/components/ui/Section';
 import * as SC from '@/modules/shared/constants';
@@ -76,6 +77,8 @@ function StudioContent() {
   const [editCompositeFile, setEditCompositeFile] = useState<File | null>(null);
   const [editMask, setEditMask] = useState<EditMaskPayload | null>(null);
   const [objectFiles, setObjectFiles] = useState<File[]>([]);
+  // Tools · Paleta de colores: el espacio es `lotFile` y la paleta va aparte
+  const [paletteFile, setPaletteFile] = useState<File | null>(null);
   const [customDetailSlots, setCustomDetailSlots] = useState<CustomDetailSlot[]>([]);
   const [params, setParams] = useState<DreamHouseParams>(DEFAULT_PARAMS);
   const [imageUrl, setImageUrl] = useState<string | null>(null);
@@ -99,11 +102,11 @@ function StudioContent() {
     [customDetailSlots]
   );
   const inputFiles = useMemo(() => pickOpenAIInputs<File>(params.mode, {
-    lot: effectiveLotForMode, exteriorRef: exteriorReferenceFile, floorPlan: floorPlanFile, references: files, objects: objectFiles,
-    editImage: editMask?.base ?? editCompositeFile ?? lotFile,
+    lot: effectiveLotForMode, exteriorRef: exteriorReferenceFile, floorPlan: floorPlanFile, references: params.mode === 'paleta' ? (paletteFile ? [paletteFile] : []) : files, objects: objectFiles,
+    editImage: params.mode === 'paleta' ? lotFile : (editMask?.base ?? editCompositeFile ?? lotFile),
     customSlots: activeCustomSlotFiles,
   }).concat(params.mode === 'edit' && editMask ? [editMask.mask] : []),
-  [params.mode, effectiveLotForMode, lotFile, exteriorReferenceFile, floorPlanFile, files, objectFiles, editMask, editCompositeFile, activeCustomSlotFiles]);
+  [params.mode, effectiveLotForMode, lotFile, paletteFile, exteriorReferenceFile, floorPlanFile, files, objectFiles, editMask, editCompositeFile, activeCustomSlotFiles]);
   const inputPixels = useFilePixels(inputFiles);
   const quote: QuoteState = useMemo(() => {
     const q = quoteRender(params as unknown as Record<string, unknown>, { inputImagePixels: inputPixels, isAdmin, estimate: true });
@@ -146,6 +149,7 @@ function StudioContent() {
   const LOT_ROLE: Record<DreamHouseParams['mode'], string> = {
     planta: 'la foto del terreno', exterior: 'la foto del terreno', interior: 'la foto del espacio actual', vistas: 'la casa a fotografiar', edit: 'la imagen base a editar', paleta: 'el espacio a recolorear',
   };
+  const isTools = params.mode === 'paleta';
   const FIRST_SECTION: Record<DreamHouseParams['mode'], string> = {
     planta: 'program', exterior: 'concept', interior: 'context', vistas: 'context', edit: 'sketch', paleta: 'mode',
   };
@@ -665,7 +669,7 @@ function StudioContent() {
             </div>
 
             {/* Asistente IA NLP Panel */}
-            {params.mode !== 'edit' && params.mode !== 'vistas' && (
+            {params.mode !== 'edit' && params.mode !== 'vistas' && !isTools && (
               <AIAssistantPanel
                 mode={params.mode}
                 onParseSuccess={(parsedData) => {
@@ -685,6 +689,7 @@ function StudioContent() {
               />
             )}
            {/* Global Actions - Reset & Randomize */}
+           {!isTools && (
            <div className="flex justify-end gap-3 sticky top-20 z-20 pointer-events-none mb-8">
             <div className="pointer-events-auto flex gap-0 border border-border bg-background shadow-lg">
                 <button
@@ -715,6 +720,8 @@ function StudioContent() {
             </div>
           </div>
 
+           )}
+
           {/* Toast Notification */}
           {toastMessage && (
             <div className="fixed top-24 right-4 left-4 sm:left-auto sm:right-6 sm:max-w-xl z-50 animate-fade-in-up">
@@ -738,6 +745,7 @@ function StudioContent() {
               params.mode === 'exterior' ? "Arquitectura Exterior" :
               params.mode === 'interior' ? "Diseño Interior" :
               params.mode === 'edit' ? "Editar Imagen con IA" :
+              params.mode === 'paleta' ? "Tools · Paleta de colores" :
               "Portafolio de Vistas"
             }
           >
@@ -792,9 +800,37 @@ function StudioContent() {
                 <ImageIcon className="w-8 h-8" />
                 <span className="text-xs font-bold uppercase tracking-widest">Portafolio de Vistas</span>
               </button>
+              <button
+                onClick={() => switchMode('paleta')}
+                data-testid="mode-tools"
+                className={clsx(
+                  "flex flex-col items-center gap-3 p-6 border transition-all sm:col-span-2 lg:col-span-5",
+                  params.mode === "paleta" ? "bg-primary text-primary-foreground" : "bg-card text-muted-foreground"
+                )}
+              >
+                <Palette className="w-8 h-8" />
+                <span className="text-xs font-bold uppercase tracking-widest">Tools · Paleta de colores</span>
+              </button>
             </div>
             <RestoreParamsButton onRestore={handleRestoreParams} disabled={isLoading} />
           </Section>
+
+          {isTools ? (
+            <PaletteTool
+              params={params}
+              onChange={setParam}
+              spaceFile={lotFile}
+              onSpaceChange={setLotFile}
+              paletteFile={paletteFile}
+              onPaletteChange={setPaletteFile}
+              quote={quote}
+              isAdmin={isAdmin}
+              credits={credits}
+              saveToHistory={saveToHistory}
+              onNotice={showToast}
+            />
+          ) : (
+          <>
 
           {/* 02: Referencias Visuales (Shared) */}
           {params.mode !== 'edit' && params.mode !== 'vistas' && params.mode !== 'exterior' && params.mode !== 'planta' && (
@@ -1050,6 +1086,9 @@ function StudioContent() {
               </div>
             </div>
           </div>
+
+          </>
+          )}
 
           {/* History Section */}
           <div id="history" className="pt-20 border-t border-border/50">
