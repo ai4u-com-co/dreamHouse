@@ -87,6 +87,7 @@ export default function HistoryGallery({
       case 'exterior': return 'Exterior';
       case 'interior': return 'Interior';
       case 'edit': return 'Edición';
+      case 'paleta': return 'Paleta';
       default: return mode;
     }
   };

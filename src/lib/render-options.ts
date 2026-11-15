@@ -16,7 +16,7 @@ type Loose = Partial<DreamHouseParams> & Record<string, unknown>;
  * Solo se traducen los valores antiguos de la resolución ("", "512", "4K") y, en edición, se fija lo que no aplica.
  */
 export function imageOptionsInput(p: Loose): Record<string, unknown> {
-  const edit = p.mode === 'edit';
+  const edit = p.mode === 'edit' || p.mode === 'paleta';
   const label: unknown = p.renderQuality;
   const res: unknown = p.renderOutputResolution;
   const resolution = res === undefined || res === '' || res === '512' ? '1K' : res === '4K' ? '2K' : res;
@@ -55,7 +55,8 @@ export function quoteRender(
   ctx: { inputImagePixels: number[]; isAdmin?: boolean; promptChars?: number; estimate?: boolean },
 ): { ok: true; value: Quote } | Extract<Resolved, { ok: false }> {
   const input = imageOptionsInput(params);
-  const edit = params.mode === 'edit';
+  // «paleta» (Tools) se cotiza como una edición: el tamaño de salida lo decide la imagen del espacio
+  const edit = params.mode === 'edit' || params.mode === 'paleta';
   // En edición el tamaño del formulario no aplica: se valida con uno neutro y luego se sustituye por el de la base
   const r: Resolved = resolveImageOptions(
     edit ? { ...input, imageSize: '1K', aspectRatio: '1:1', size: undefined } : input,
@@ -94,6 +95,8 @@ export function pickOpenAIInputs<T>(
 ): T[] {
   // Los slots de detalle valen en TODOS los módulos: van después de la(s) imagen(es) base (en edición la base es la primera: la máscara aplica a ella)
   const withCustom = (base: T[]): T[] => [...base, ...(c.customSlots ?? []).slice(0, Math.max(0, OPENAI_MAX_INPUT_IMAGES - base.length))];
+  // Paleta: el espacio (base) y la paleta de colores; sin slots de detalle
+  if (mode === 'paleta') return [c.editImage, ...c.references.slice(0, 1)].filter((x): x is T => !!x);
   if (mode === 'edit') return withCustom(c.editImage ? [c.editImage] : []);
   if (mode === 'vistas') return withCustom(c.lot ? [c.lot] : []);
   if (mode === 'planta') return withCustom([c.floorPlan, c.lot].filter((x): x is T => !!x));
