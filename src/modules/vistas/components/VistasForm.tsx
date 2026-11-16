@@ -51,32 +51,49 @@ export default function VistasForm({ params, onChange, disabled, activeSection, 
       {/* ── 01 SELECCIÓN DE VISTAS ────────────────────────────────── */}
       <Section title="Portafolio de Vistas" number="05" icon={<LayoutGrid className="w-5 h-5" />} isOpen={isSectionOpen('vistasSelection')} onToggle={() => onSectionChange('vistasSelection')}>
         <SectionDescription>Ya vienen marcadas las vistas básicas de un portafolio (principal, frontal, aérea e isométrica). Quita las que no necesites o suma otras, por ejemplo la nocturna o la crepuscular. Cada vista se cobra por separado.</SectionDescription>
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 max-h-[420px] overflow-y-auto custom-scrollbar pr-1">
+        <p className="text-xs text-muted-foreground font-mono opacity-70 mb-3">
+          Cada tarjeta muestra un ejemplo de la vista con una casa de muestra, para que sepas qué vas a recibir. Las tuyas se generan a partir de la foto de tu casa.
+        </p>
+        <div className="grid grid-cols-1 min-[420px]:grid-cols-2 lg:grid-cols-3 gap-3 max-h-[640px] overflow-y-auto custom-scrollbar pr-1">
           {VC.ARCHITECTURAL_VISTAS.map(vista => {
             const isSelected = selected.includes(vista);
+            const example = VC.VISTA_EXAMPLES[vista];
             return (
               <button
                 key={vista}
                 type="button"
                 disabled={disabled}
+                aria-pressed={isSelected}
                 onClick={() => toggleVista(vista)}
                 className={clsx(
-                  'flex items-start gap-3 px-3 py-2.5 border text-left transition-all duration-150',
+                  'flex flex-col border text-left transition-all duration-150 overflow-hidden',
                   'disabled:opacity-40 disabled:cursor-not-allowed',
                   isSelected
                     ? 'bg-foreground text-background border-foreground'
                     : 'bg-transparent text-muted-foreground border-border hover:border-foreground hover:text-foreground'
                 )}
               >
-                <span className={clsx('mt-0.5 w-3.5 h-3.5 shrink-0 flex items-center justify-center border',
-                  isSelected ? 'border-background' : 'border-current'
-                )}>
-                  {isSelected && <Check className="w-2.5 h-2.5" strokeWidth={3} />}
-                </span>
-                <span className="flex flex-col min-w-0">
+                {example && (
+                  <span className="relative block w-full aspect-[3/2] bg-muted">
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img
+                      src={example}
+                      alt={`Ejemplo de ${vista}`}
+                      loading="lazy"
+                      decoding="async"
+                      className="absolute inset-0 w-full h-full object-cover"
+                    />
+                    <span className={clsx('absolute top-2 left-2 w-5 h-5 flex items-center justify-center border-2',
+                      isSelected ? 'bg-foreground border-background text-background' : 'bg-background/80 border-foreground/60 text-transparent'
+                    )}>
+                      <Check className="w-3 h-3" strokeWidth={3} />
+                    </span>
+                  </span>
+                )}
+                <span className="flex flex-col min-w-0 px-3 py-2.5">
                   <span className="text-xs font-bold uppercase tracking-wide leading-tight">{vista}</span>
-                  <span className={clsx('text-xs font-mono leading-snug mt-0.5 truncate',
-                    isSelected ? 'opacity-70' : 'opacity-50'
+                  <span className={clsx('text-xs font-mono leading-snug mt-1',
+                    isSelected ? 'opacity-70' : 'opacity-60'
                   )}>
                     {VC.VISTA_SHORT_DESC[vista]}
                   </span>
