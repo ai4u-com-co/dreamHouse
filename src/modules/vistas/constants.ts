@@ -127,3 +127,32 @@ export const DEFAULT_VISTAS: string[] = [
   "Vista Aérea (Drone)",
   "Vista Isométrica",
 ];
+
+/**
+ * Ejemplo visual de cada vista: una miniatura generada con una misma casa de muestra para que la persona vea,
+ * antes de generar, qué entrega cada vista. Son ilustrativas: la vista real sale de la foto de SU casa.
+ * Archivos en public/vistas-ejemplos; regenerables con scripts/vistas-ejemplos/.
+ */
+export const VISTA_EXAMPLES: Record<string, string> = {
+  "Perspectiva Principal (Hero Shot)": "/vistas-ejemplos/principal.webp",
+  "Fachada Frontal (Elevación)": "/vistas-ejemplos/frontal.webp",
+  "Fachada Lateral Derecha": "/vistas-ejemplos/lateral-derecha.webp",
+  "Fachada Lateral Izquierda": "/vistas-ejemplos/lateral-izquierda.webp",
+  "Fachada Posterior": "/vistas-ejemplos/posterior.webp",
+  "Vista Diagonal Posterior": "/vistas-ejemplos/diagonal-posterior.webp",
+  "Perspectiva a Nivel de Calle": "/vistas-ejemplos/nivel-calle.webp",
+  "Perspectiva Peatonal (Ojo humano)": "/vistas-ejemplos/peatonal.webp",
+  "Vista Contrapicada": "/vistas-ejemplos/contrapicada.webp",
+  "Vista Gran Angular": "/vistas-ejemplos/gran-angular.webp",
+  "Vista Aérea (Drone)": "/vistas-ejemplos/aerea.webp",
+  "Vista Isométrica": "/vistas-ejemplos/isometrica.webp",
+  "Vista de Cubierta": "/vistas-ejemplos/cubierta.webp",
+  "Vista de Acceso": "/vistas-ejemplos/acceso.webp",
+  "Vista desde Jardín": "/vistas-ejemplos/jardin.webp",
+  "Vista Crepuscular (Blue Hour)": "/vistas-ejemplos/crepuscular.webp",
+  "Vista Nocturna": "/vistas-ejemplos/nocturna.webp",
+  "Detalle de Fachada": "/vistas-ejemplos/detalle-fachada.webp",
+  "Detalle de Materialidad": "/vistas-ejemplos/materialidad.webp",
+  "Corte Perspectivado 3D": "/vistas-ejemplos/corte-3d.webp",
+  "Isométrica Explotada": "/vistas-ejemplos/isometrica-explotada.webp",
+};

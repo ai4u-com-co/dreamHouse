@@ -27,6 +27,17 @@ const KIND_RULES: Record<VistaKind, string> = {
   diagram: "This is a deliberate architectural representation (cut or exploded view), not a photograph. Keep the design language, volumes, proportions and materiality of the reference; simplifying is allowed, redesigning is not.",
 };
 
+/** La luz propia de las vistas de iluminación (la hora manda sobre la luz del render original y sobre el formulario) */
+const LIGHTING_BY_VISTA: Record<string, string> = {
+  "Vista Crepuscular (Blue Hour)": "blue-hour twilight: deep blue sky just after sunset, warm interior and exterior lights switched on, soft cool ambient fill on the facade",
+  "Vista Nocturna": "night: a dark night sky, lit only by artificial light — warm interior glow through the glazing and discreet exterior lighting that models the volumes; no sunlight",
+};
+
+/** Isométrica y cortes/explotadas: representaciones sin perspectiva de cámara, no fotografías */
+export function isTechnicalView(viewType: string): boolean {
+  return lookup(VISTA_KINDS, viewType) === 'diagram' || viewType === 'Vista Isométrica';
+}
+
 /** Campos de diseño que se heredan del render original cuando el usuario no los eligió de nuevo */
 const INHERITED_KEYS = [
   'projectType', 'levels', 'architecturalStyles', 'architect', 'materials', 'finishLevel',
@@ -116,12 +127,19 @@ export function buildVistasPrompt(rawParams: DreamHouseParams, viewType: string,
     : "";
 
   const materialList = params.materials.join(', ') || 'all original facade materials';
-  const lightingCtx = params.lighting
-    ? `${params.lighting} light — with clear shadow direction, soft gradient fall-off, and surface-specific specularity`
-    : "lighting that matches the reference image — preserve its shadow direction, intensity, and color temperature";
+  // Las vistas de iluminación definen SU luz: ni la luz de día heredada del render original ni la que se
+  // eligió en el formulario pueden pisarla (una «nocturna» con «golden hour» no es una nocturna).
+  const lightingCtx = kind === 'lighting'
+    ? (lookup(LIGHTING_BY_VISTA, viewType) ?? "the lighting defined by the requested time of day")
+    : params.lighting
+      ? `${params.lighting} light — with clear shadow direction, soft gradient fall-off, and surface-specific specularity`
+      : "lighting that matches the reference image — preserve its shadow direction, intensity, and color temperature";
   const facts = designFactLines(params);
   const continuity = continuityLines(params, kind);
-  const camera = style.photographic ? cameraSentence(params) : "";
+  // Isométrica y cortes/explotadas son representaciones, no fotos: sin lente, apertura ni fotografía de revista
+  const technical = isTechnicalView(viewType);
+  const photographic = style.photographic && !technical;
+  const camera = photographic ? cameraSentence(params) : "";
   const moodLine = params.mood || "Professional, high-end architectural presentation — evocative but not over-processed.";
 
   if (isOpenAI) {
@@ -141,15 +159,15 @@ IDENTITY LOCK (identical to the reference, do not restyle or redesign):
 ${facts.length ? `\nDESIGN FACTS${hasSource ? " (from the original render's parameters)" : ""} — fixed, must match the reference:\n${facts.map((l) => `- ${l}`).join('\n')}\n` : ""}${continuity.length ? `\nCONTINUITY with the rest of the portfolio:\n${continuity.map((l) => `- ${l}`).join('\n')}\n` : ""}
 COMPOSITION:
 - Subject: the building is the sole protagonist, standing completely alone.
-- Background: neutral (open sky, landscape or vegetation).
+- Background: ${technical ? "a plain, light neutral ground with no sky and no surroundings beyond a minimal base." : "neutral (open sky, landscape or vegetation)."}
 - Exclude: neighboring buildings, adjacent houses, other structures, party walls and competing architecture.
 
-${style.photographic ? "PHOTOGRAPHY & LIGHTING" : "VISUAL TREATMENT & LIGHTING"}:
+${photographic ? "PHOTOGRAPHY & LIGHTING" : "VISUAL TREATMENT & LIGHTING"}:
 ${camera ? `- Camera Setting: ${camera}\n` : ""}- Lighting: ${lightingCtx}
 - Mood/Atmosphere: ${moodLine}
 - Materials: ${materialList}, with honest texture, grain and natural color variation.
-- Look: ${style.photographic ? "Photorealistic. Real textures, pores, material thickness, glass reflections, and soft shadows. No digital smoothness." : style.look}
-${magazinePhotoBlock(params, 'vistas', style.photographic) ? `\n${magazinePhotoBlock(params, 'vistas', style.photographic)}\n` : ""}${creativeDirectionBlock(params, true) ? `\n${creativeDirectionBlock(params, true)}\n` : ""}`.trim();
+- Look: ${photographic ? "Photorealistic. Real textures, pores, material thickness, glass reflections, and soft shadows. No digital smoothness." : technical && style.photographic ? "A clean, high-quality architectural 3D visualization with realistic materials, soft shadows, not a camera photograph." : style.look}
+${magazinePhotoBlock(params, 'vistas', photographic) ? `\n${magazinePhotoBlock(params, 'vistas', photographic)}\n` : ""}${creativeDirectionBlock(params, true) ? `\n${creativeDirectionBlock(params, true)}\n` : ""}`.trim();
     return prompt;
   }
 

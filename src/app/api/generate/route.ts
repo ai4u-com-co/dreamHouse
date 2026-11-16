@@ -236,6 +236,11 @@ export async function POST(req: NextRequest) {
 
     const isEditMode = params.mode === 'edit';
 
+    // Una vista es siempre "la MISMA casa, otra cámara": sin la foto de la casa el modelo inventaría una distinta (y se cobraría).
+    if (params.mode === 'vistas' && !lotImage) {
+      return NextResponse.json({ message: 'Sube la foto de la casa para generar sus vistas.' }, { status: 400 });
+    }
+
     if (lotImage) {
       const validation = validateImageSize(lotImage, 'Lot image', isEditMode);
       if (!validation.valid) {
